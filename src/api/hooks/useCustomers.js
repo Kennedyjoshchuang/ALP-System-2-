@@ -14,7 +14,7 @@ export function useCustomers() {
 
   // Fetch customers – cached and refetched based on React‑Query defaults
   const {
-    data: customers = [],
+    data,
     isLoading,
     isError,
     error,
@@ -23,6 +23,8 @@ export function useCustomers() {
     queryKey: CUSTOMERS_QUERY_KEY,
     queryFn: () => apiRequest("customers")
   });
+
+  const customers = Array.isArray(data) ? data : [];
 
   // Mutation to add a new customer
   const addCustomerMutation = useMutation({

@@ -29,10 +29,10 @@ const SystemControl = () => {
 
   const isID = language === 'id';
 
-  // Fallback to empty arrays to prevent TypeError if context values are null/undefined
-  const safeCustomers = customers || [];
-  const safeJobOrders = jobOrders || [];
-  const safeInvoices = invoices || [];
+  // Fallback to empty arrays to prevent TypeError if context values are not arrays
+  const safeCustomers = Array.isArray(customers) ? customers : [];
+  const safeJobOrders = Array.isArray(jobOrders) ? jobOrders : [];
+  const safeInvoices = Array.isArray(invoices) ? invoices : [];
 
   const [confirmModal, setConfirmModal] = useState({ show: false, type: '', id: null, label: '' });
   const [verifyStep, setVerifyStep] = useState(1);
