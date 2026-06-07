@@ -29,6 +29,11 @@ const SystemControl = () => {
 
   const isID = language === 'id';
 
+  // Fallback to empty arrays to prevent TypeError if context values are null/undefined
+  const safeCustomers = customers || [];
+  const safeJobOrders = jobOrders || [];
+  const safeInvoices = invoices || [];
+
   const [confirmModal, setConfirmModal] = useState({ show: false, type: '', id: null, label: '' });
   const [verifyStep, setVerifyStep] = useState(1);
   const [verifyText, setVerifyText] = useState('');
@@ -104,9 +109,9 @@ const SystemControl = () => {
   };
 
   const stats = [
-    { label: isID ? 'Total Pelanggan' : 'Total Customers', value: customers.length, icon: Users, color: '#10b981' },
-    { label: isID ? 'Job Order Aktif' : 'Active Job Orders', value: jobOrders.length, icon: Briefcase, color: '#d4af37' },
-    { label: isID ? 'Faktur Sistem' : 'System Invoices', value: invoices.length, icon: FileText, color: '#3b82f6' },
+    { label: isID ? 'Total Pelanggan' : 'Total Customers', value: safeCustomers.length, icon: Users, color: '#10b981' },
+    { label: isID ? 'Job Order Aktif' : 'Active Job Orders', value: safeJobOrders.length, icon: Briefcase, color: '#d4af37' },
+    { label: isID ? 'Faktur Sistem' : 'System Invoices', value: safeInvoices.length, icon: FileText, color: '#3b82f6' },
   ];
 
   return (
@@ -202,18 +207,18 @@ const SystemControl = () => {
               <Users size={18} /> {isID ? 'Database Pelanggan' : 'Customer Database'}
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {customers.map(c => (
+              {safeCustomers.map(c => (
                 <div key={c.id} style={{ padding: '15px', background: 'var(--glass)', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{c.customerName}</div>
+                    <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{c.name || c.customerName}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID: {c.id}</div>
                   </div>
-                  <button onClick={() => openConfirm('customer', c.id, c.customerName)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>
+                  <button onClick={() => openConfirm('customer', c.id, c.name || c.customerName)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>
                     <Trash2 size={16} />
                   </button>
                 </div>
               ))}
-              {customers.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center' }}>{isID ? 'Tidak ada pelanggan ditemukan.' : 'No customers found.'}</p>}
+              {safeCustomers.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center' }}>{isID ? 'Tidak ada pelanggan ditemukan.' : 'No customers found.'}</p>}
             </div>
           </div>
 
@@ -224,7 +229,7 @@ const SystemControl = () => {
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '10px' }}>{isID ? 'Job & Faktur Terbaru' : 'Recent Jobs & Invoices'}</p>
-              {jobOrders.slice(0, 5).map(jo => (
+              {safeJobOrders.slice(0, 5).map(jo => (
                 <div key={jo.id} style={{ padding: '15px', background: 'var(--glass)', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{jo.id}</div>
@@ -235,7 +240,7 @@ const SystemControl = () => {
                   </button>
                 </div>
               ))}
-              {jobOrders.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center' }}>{isID ? 'Tidak ada job order ditemukan.' : 'No job orders found.'}</p>}
+              {safeJobOrders.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center' }}>{isID ? 'Tidak ada job order ditemukan.' : 'No job orders found.'}</p>}
             </div>
           </div>
         </div>
