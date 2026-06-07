@@ -88,9 +88,9 @@ const PrintInvoiceReceipt = () => {
       <div className="receipt-card">
         <div className="receipt-header">
           <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-            <img src="/assets/logo.png" alt="Logo" style={{ height: '60px', width: 'auto', objectFit: 'contain' }} />
+            <img src="/assets/logo.png" alt="Logo" style={{ width: '45px', height: '45px', objectFit: 'contain' }} />
             <div>
-              <h1 style={{ margin: 0, fontSize: '18px', fontWeight: '900' }}>PT. Alpha Logistics Prakarsa</h1>
+              <h1 style={{ margin: 0, fontSize: '18px', fontWeight: '900' }}>PT. ALPHA LOGISTICS PRAKARSA</h1>
               <p style={{ margin: 0, fontSize: '10px', color: '#64748b' }}>Premium Logistics & Transportation Solutions</p>
             </div>
           </div>
@@ -145,7 +145,7 @@ const PrintInvoiceReceipt = () => {
         <div style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '10px', fontWeight: '700', color: '#94a3b8' }}>ARCHIVE COPY</div>
         <div className="receipt-header">
           <div>
-            <h1 style={{ margin: 0, fontSize: '16px', fontWeight: '900' }}>PT. Alpha Logistics Prakarsa</h1>
+            <h1 style={{ margin: 0, fontSize: '16px', fontWeight: '900' }}>PT. ALPHA LOGISTICS PRAKARSA</h1>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div className="receipt-title" style={{ fontSize: '18px' }}>KWITANSI / RECEIPT</div>
@@ -178,11 +178,4 @@ const PrintInvoiceReceipt = () => {
 };
 
 export default PrintInvoiceReceipt;
-
-
-
-
-
-
-
 

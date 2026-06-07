@@ -6,8 +6,13 @@ const { createClient } = require('@supabase/supabase-js');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yuddakkcoxllxfnaikus.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1ZGRha2tjb3hsbHhmbmFpa3VzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODA4ODY4MSwiZXhwIjoyMDkzNjY0NjgxfQ.HhvmpcTwzMSyf4WKJoXyweXaZLlBNC8TRD_x18aCKMw';
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('❌ Configuration Error: SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in your environment variables (.env file).');
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -34,143 +39,18 @@ const handleError = (res, error, context = '') => {
   res.status(500).json({ error: message });
 };
 
-// Mapping helper to handle Postgres lowercase vs Frontend camelCase
-// Only remap columns that are actually different between DB and frontend
-const mapToCamel = (obj) => {
-  if (!obj || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(mapToCamel);
-  
-  const mapped = {};
-  // Map DB column names → JS camelCase property names
-  const mapping = {
-    // job_orders: instruction → jobDescription (frontend uses jobDescription)
-    'instruction': 'jobDescription',
-    // Lowercase variants of camelCase columns (Postgres folds unquoted to lowercase)
-    'customerid': 'customerId',
-    'customername': 'customerName',
-    'generalnotes': 'generalNotes',
-    'marketingname': 'marketingName',
-    'marketingphone': 'marketingPhone',
-    'marketingemail': 'marketingEmail',
-    'validfrom': 'validFrom',
-    'validto': 'validTo',
-    'companyaddress': 'companyAddress',
-    'quotationid': 'quotationId',
-    'jobdescription': 'jobDescription',
-    'issuequantity': 'issueQuantity',
-    'containerno': 'containerNo',
-    'vehicleno': 'vehicleNo',
-    'drivername': 'driverName',
-    'activitystatus': 'activityStatus',
-    'quotenvalidity': 'quoteValidity',
-    'quotevalidity': 'quoteValidity',
-    'joid': 'joId',
-    'signedreceiptphoto': 'signedReceiptPhoto',
-    'signedinvoicephoto': 'signedInvoicePhoto',
-    'deliverystatus': 'deliveryStatus',
-    'invoiceid': 'invoiceId',
-    'paymentproofphoto': 'paymentProofPhoto',
-    'bankname': 'bankName',
-    'bankaccount': 'bankAccount',
-    'grandtotal': 'grandTotal',
-    'vendorid': 'vendorId',
-    'vendorname': 'vendorName',
-    'jobinstruction': 'jobInstruction',
-    'vendorinvoicephoto': 'vendorInvoicePhoto',
-    'paiddate': 'paidDate',
-    'basesalary': 'baseSalary',
-    'expensedate': 'expenseDate',
-    'totaltopay': 'totalToPay',
-    'employeename': 'employeeName',
-    'totalaftertax': 'totalAfterTax',
-    'accountnumber': 'accountNumber',
-    'accountname': 'accountName',
-    'otpkey': 'otpKey',
-    'otpupdatedat': 'otpUpdatedAt',
-    'isdefault': 'isDefault',
-    'created_at': 'created_at'
-  };
-
-  Object.keys(obj).forEach(key => {
-    const newKey = mapping[key] !== undefined ? mapping[key] : (mapping[key.toLowerCase()] !== undefined ? mapping[key.toLowerCase()] : key);
-    mapped[newKey] = obj[key];
-  });
-  return mapped;
-};
-
-const mapToDb = (obj) => {
-  if (!obj || typeof obj !== 'object') return obj;
-  const mapped = {};
-  // Map JS camelCase → DB column names
-  // For columns that PostgreSQL created with camelCase (they stay camelCase)
-  // For columns that are lowercase in DB, we map camelCase → lowercase
-  const mapping = {
-    // job_orders special: jobDescription → instruction column
-    'jobDescription': 'instruction',
-    // purchase_orders: jobInstruction stays as jobInstruction in DB? No - it's stored as jobinstruction
-    // Actually schema has jobInstruction in camelCase so Supabase keeps it
-    // Fields that ARE lowercase in PostgreSQL (unquoted CREATE TABLE)
-    'customerId': 'customerid',
-    'customerName': 'customername',
-    'generalNotes': 'generalnotes',
-    'marketingName': 'marketingname',
-    'marketingPhone': 'marketingphone',
-    'marketingEmail': 'marketingemail',
-    'validFrom': 'validfrom',
-    'validTo': 'validto',
-    'companyAddress': 'companyaddress',
-    'quotationId': 'quotationid',
-    'issueQuantity': 'issuequantity',
-    'containerNo': 'containerno',
-    'vehicleNo': 'vehicleno',
-    'driverName': 'drivername',
-    'activityStatus': 'activitystatus',
-    'quoteValidity': 'quotevalidity',
-    'joId': 'joid',
-    'signedReceiptPhoto': 'signedreceiptphoto',
-    'signedInvoicePhoto': 'signedinvoicephoto',
-    'deliveryStatus': 'deliverystatus',
-    'invoiceId': 'invoiceid',
-    'paymentProofPhoto': 'paymentproofphoto',
-    'bankName': 'bankname',
-    'bankAccount': 'bankaccount',
-    'grandTotal': 'grandtotal',
-    'vendorId': 'vendorid',
-    'vendorName': 'vendorname',
-    'jobInstruction': 'jobinstruction',
-    'vendorInvoicePhoto': 'vendorinvoicephoto',
-    'paidDate': 'paiddate',
-    'baseSalary': 'basesalary',
-    'expenseDate': 'expensedate',
-    'totalToPay': 'totaltopay',
-    'employeeName': 'employeename',
-    'totalAfterTax': 'totalaftertax',
-    'accountNumber': 'accountnumber',
-    'accountName': 'accountname',
-    'otpKey': 'otpkey',
-    'otpUpdatedAt': 'otpupdatedat',
-    'isDefault': 'isdefault'
-  };
-
-  Object.keys(obj).forEach(key => {
-    const newKey = mapping[key] !== undefined ? mapping[key] : key;
-    mapped[newKey] = obj[key];
-  });
-  return mapped;
-};
-
 // --- CUSTOMERS ---
 app.get('/api/customers', async (req, res) => {
   const { data, error } = await supabase.from('customers').select('*');
   if (error) return handleError(res, error, 'GET customers');
-  res.json(mapToCamel(data));
+  res.json(data);
 });
 
 app.post('/api/customers', async (req, res) => {
-  const data = mapToDb(req.body);
-  const { error } = await supabase.from('customers').insert(data);
+  const { id, name, phone, email, address } = req.body;
+  const { error } = await supabase.from('customers').insert({ id, name, phone, email, address });
   if (error) return handleError(res, error, 'POST customers');
-  res.status(201).json(mapToCamel(data));
+  res.status(201).json({ id });
 });
 
 app.delete('/api/customers/:id', async (req, res) => {
@@ -183,18 +63,22 @@ app.delete('/api/customers/:id', async (req, res) => {
 app.get('/api/prospects', async (req, res) => {
   const { data, error } = await supabase.from('prospects').select('*');
   if (error) return handleError(res, error, 'GET prospects');
-  res.json(mapToCamel(data));
+  res.json(data);
 });
 
 app.post('/api/prospects', async (req, res) => {
-  const data = mapToDb(req.body);
-  const { error } = await supabase.from('prospects').insert(data);
+  const { id, name, phone, email, address, pic, notes, description, marketingName, marketingPhone, marketingEmail, companyAddress, date, status } = req.body;
+  const { error } = await supabase.from('prospects').insert({
+    id, name, phone, email, address, pic, notes, description,
+    marketingName, marketingPhone, marketingEmail, companyAddress, date, status
+  });
   if (error) return handleError(res, error, 'POST prospects');
-  res.status(201).json(mapToCamel(data));
+  res.status(201).json({ id });
 });
 
 app.put('/api/prospects/:id', async (req, res) => {
-  const { error } = await supabase.from('prospects').update(mapToDb(req.body)).eq('id', req.params.id);
+  const updates = req.body;
+  const { error } = await supabase.from('prospects').update(updates).eq('id', req.params.id);
   if (error) return handleError(res, error, 'PUT prospects');
   res.sendStatus(200);
 });
@@ -209,17 +93,37 @@ app.delete('/api/prospects/:id', async (req, res) => {
 app.get('/api/quotations', async (req, res) => {
   const { data, error } = await supabase.from('quotations').select('*');
   if (error) return handleError(res, error, 'GET quotations');
-  res.json(mapToCamel(data));
+  res.json(data);
 });
 
 app.post('/api/quotations', async (req, res) => {
   try {
-    const data = mapToDb(req.body);
-    const { error } = await supabase.from('quotations').insert(data);
+    const { id, customerId, customerName, pic, generalNotes, date, status, items, total, marketingName, marketingPhone, marketingEmail, validFrom, validTo, companyAddress } = req.body;
+    const { error } = await supabase.from('quotations').insert({
+      id, customerId, customerName, pic, generalNotes, date, status,
+      items: items || [], total, marketingName, marketingPhone, marketingEmail,
+      validFrom, validTo, companyAddress
+    });
     if (error) return handleError(res, error, 'POST quotations');
-    res.status(201).json(mapToCamel(data));
+    res.status(201).json({ id });
   } catch (err) {
     console.error('Create Quotation Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/quotations/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { pic, generalNotes, items, total, marketingName, marketingPhone, marketingEmail, validFrom, validTo, companyAddress } = req.body;
+    const { error } = await supabase.from('quotations').update({
+      pic, generalNotes, items: items || [], total, marketingName, marketingPhone, marketingEmail,
+      validFrom, validTo, companyAddress
+    }).eq('id', id);
+    if (error) return handleError(res, error, 'PUT quotations');
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Update Quotation Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -265,24 +169,23 @@ app.delete('/api/quotations/:id', async (req, res) => {
 app.get('/api/job-orders', async (req, res) => {
   const { data, error } = await supabase.from('job_orders').select('*');
   if (error) return handleError(res, error, 'GET job_orders');
-  res.json(mapToCamel(data));
+  res.json(data);
 });
 
 app.post('/api/job-orders', async (req, res) => {
   try {
     const { quotationId, customerName, jobDescription, phone, email, rate, quantity, quoteValidity } = req.body;
-    const id = req.body.id || 'JO-' + Date.now();
+    const id = 'JO-' + Date.now();
     const date = new Date().toISOString().split('T')[0];
-    const data = mapToDb({
-      id, quotationId, customerName, jobDescription,
+    const { error } = await supabase.from('job_orders').insert({
+      id, quotationId, customerName, instruction: jobDescription,
       status: 'pending', quantity, issueQuantity: 0,
       phone, email, rate, quoteValidity, date,
       photos: [], costs: [],
       containerNo: [], vehicleNo: [], driverName: []
     });
-    const { error } = await supabase.from('job_orders').insert(data);
     if (error) return handleError(res, error, 'POST job_orders');
-    res.status(201).json(mapToCamel(data));
+    res.status(201).json({ id });
   } catch (err) {
     console.error('Create JO Error:', err);
     res.status(500).json({ error: err.message });
@@ -290,7 +193,8 @@ app.post('/api/job-orders', async (req, res) => {
 });
 
 app.put('/api/job-orders/:id', async (req, res) => {
-  const { error } = await supabase.from('job_orders').update(mapToDb(req.body)).eq('id', req.params.id);
+  const updates = req.body;
+  const { error } = await supabase.from('job_orders').update(updates).eq('id', req.params.id);
   if (error) return handleError(res, error, 'PUT job_orders');
   res.sendStatus(200);
 });
@@ -305,15 +209,15 @@ app.delete('/api/job-orders/:id', async (req, res) => {
 app.get('/api/invoices', async (req, res) => {
   const { data, error } = await supabase.from('invoices').select('*');
   if (error) return handleError(res, error, 'GET invoices');
-  res.json(mapToCamel(data));
+  res.json(data);
 });
 
 app.post('/api/invoices', async (req, res) => {
   const { id, joId, customerName, amount, subtotal, tax, extra_charges, date, status } = req.body;
   
   try {
-    // 1. Create Invoice using mapToDb for consistent casing
-    const invoiceData = mapToDb({
+    // 1. Create Invoice — try with all columns, fallback if schema is old
+    const invoiceData = {
       id, joId, customerName,
       amount: parseFloat(amount) || 0,
       subtotal: parseFloat(subtotal) || 0,
@@ -323,19 +227,42 @@ app.post('/api/invoices', async (req, res) => {
       signedReceiptPhoto: req.body.signedReceiptPhoto || null,
       signedInvoicePhoto: req.body.signedInvoicePhoto || null,
       deliveryStatus: req.body.deliveryStatus || 'not_sent'
-    });
+    };
 
-    console.log(`[POST /invoices] Inserting ${id} with keys: ${Object.keys(invoiceData).join(', ')}`);
-    const { error: invErr } = await supabase.from('invoices').insert(invoiceData);
-    if (invErr) {
-      console.error(`[POST /invoices] Failed for ${id}:`, invErr.code, invErr.message);
-      return handleError(res, invErr, 'POST invoices');
+    console.log(`[POST /invoices] Attempting insert for ${id} with keys: ${Object.keys(invoiceData).join(', ')}`);
+    let { error: invErr } = await supabase.from('invoices').insert(invoiceData);
+    
+    // Catch schema mismatch (missing columns)
+    if (invErr && (
+      invErr.message.toLowerCase().includes('column') || 
+      invErr.message.toLowerCase().includes('schema cache') || 
+      invErr.code === '42703' || 
+      invErr.code === 'PGRST204'
+    )) {
+      console.warn(`[POST /invoices] Schema mismatch for ${id} (Code: ${invErr.code}). Retrying without tracking columns...`);
+      const { signedReceiptPhoto, signedInvoicePhoto, deliveryStatus, ...legacyData } = invoiceData;
+      console.log(`[POST /invoices] Retrying with keys: ${Object.keys(legacyData).join(', ')}`);
+      const { error: retryErr } = await supabase.from('invoices').insert(legacyData);
+      invErr = retryErr;
+
+      // Secondary fallback if still failing (e.g. missing subtotal/tax)
+      if (invErr && (invErr.message.toLowerCase().includes('column') || invErr.code === 'PGRST204')) {
+        console.warn(`[POST /invoices] Secondary schema mismatch. Retrying with bare minimum...`);
+        const bareData = { id, joId, customerName, amount: invoiceData.amount, date: invoiceData.date, status: invoiceData.status };
+        const { error: bareErr } = await supabase.from('invoices').insert(bareData);
+        invErr = bareErr;
+      }
     }
 
-    console.log(`[POST /invoices] Invoice saved. Creating receivable...`);
+    if (invErr) {
+      console.error(`[POST /invoices] Final failure for ${id}:`, invErr.code, invErr.message);
+      return handleError(res, invErr, 'POST invoices (Final)');
+    }
+
+    console.log(`[POST /invoices] Success for ${id}. Creating receivable...`);
 
     // 2. Create Receivable
-    const recData = mapToDb({
+    const recData = {
       id, invoiceId: id, customerName,
       amount: parseFloat(amount) || 0,
       subtotal: parseFloat(subtotal) || 0,
@@ -343,11 +270,25 @@ app.post('/api/invoices', async (req, res) => {
       extra_charges: extra_charges || [],
       balance: parseFloat(amount) || 0,
       status: 'unpaid'
-    });
+    };
 
-    const { error: recErr } = await supabase.from('receivables').insert(recData);
+    let { error: recErr } = await supabase.from('receivables').insert(recData);
+    
+    if (recErr && (
+      recErr.message.toLowerCase().includes('column') || 
+      recErr.message.toLowerCase().includes('schema cache') || 
+      recErr.code === '42703' || 
+      recErr.code === 'PGRST204'
+    )) {
+      console.warn(`[POST /invoices] Receivable schema mismatch for ${id}. Retrying with bare minimum...`);
+      const bareRecData = { id, invoiceId: id, customerName, amount: recData.amount, balance: recData.balance, status: 'unpaid' };
+      const { error: retryRecErr } = await supabase.from('receivables').insert(bareRecData);
+      recErr = retryRecErr;
+    }
+
     if (recErr) {
-      console.error(`[POST /invoices] Receivable failed for ${id}:`, recErr.message);
+      console.error(`[POST /invoices] Final receivable failure for ${id}:`, recErr.message);
+      // We don't fail the whole request but log it
     }
 
     // 3. Update Job Order status to 'invoiced'
@@ -356,7 +297,7 @@ app.post('/api/invoices', async (req, res) => {
       console.error(`[POST /invoices] JO Update error for ${joId}:`, joErr.message);
     }
 
-    console.log(`[POST /invoices] Complete for ${id}`);
+    console.log(`[POST /invoices] Everything complete for ${id}`);
     res.status(201).json({ id });
   } catch (err) {
     console.error('Invoice issuance exception:', err);
@@ -365,15 +306,15 @@ app.post('/api/invoices', async (req, res) => {
 });
 
 app.put('/api/invoices/:id', async (req, res) => {
-  const { error } = await supabase.from('invoices').update(mapToDb(req.body)).eq('id', req.params.id);
+  const updates = req.body;
+  const { error } = await supabase.from('invoices').update(updates).eq('id', req.params.id);
   if (error) return handleError(res, error, 'PUT invoices');
 
   // Sync receivables
-  const { amount } = req.body;
-  await supabase.from('receivables').update(mapToDb({ ...req.body, balance: amount || 0 })).eq('id', req.params.id);
+  const { amount, ...recUpdates } = updates;
+  await supabase.from('receivables').update({ ...recUpdates, balance: amount || 0 }).eq('id', req.params.id);
   res.sendStatus(200);
 });
-
 
 app.put('/api/invoices/:id/settle', async (req, res) => {
   const { paymentProofPhoto, taxesDeducted, taxDeductionProof } = req.body;
@@ -432,12 +373,6 @@ app.put('/api/invoices/:id/settle', async (req, res) => {
   }
 });
 
-app.put('/api/invoices/:id', async (req, res) => {
-  const updates = req.body;
-  const { error } = await supabase.from('invoices').update(updates).eq('id', req.params.id);
-  if (error) return handleError(res, error, 'PUT invoices');
-  res.sendStatus(200);
-});
 
 app.delete('/api/invoices/:id', async (req, res) => {
   await supabase.from('receivables').delete().eq('invoiceId', req.params.id);
@@ -450,25 +385,32 @@ app.delete('/api/invoices/:id', async (req, res) => {
 app.get('/api/receivables', async (req, res) => {
   const { data, error } = await supabase.from('receivables').select('*');
   if (error) return handleError(res, error, 'GET receivables');
-  res.json(mapToCamel(data));
+  res.json(data);
 });
 
 // --- VENDORS ---
 app.get('/api/vendors', async (req, res) => {
   const { data, error } = await supabase.from('vendors').select('*');
   if (error) return handleError(res, error, 'GET vendors');
-  res.json(mapToCamel(data));
+  res.json(data);
 });
 
 app.post('/api/vendors', async (req, res) => {
-  const data = mapToDb(req.body);
-  const { error } = await supabase.from('vendors').insert(data);
+  const { id, name, phone, email, address, bankName, bankAccount, services, assets, date } = req.body;
+  const { error } = await supabase.from('vendors').insert({
+    id, name, phone, email, address, bankName, bankAccount,
+    services: services || [], assets: assets || [], date
+  });
   if (error) return handleError(res, error, 'POST vendors');
-  res.status(201).json(mapToCamel(data));
+  res.status(201).json({ id });
 });
 
 app.put('/api/vendors/:id', async (req, res) => {
-  const { error } = await supabase.from('vendors').update(mapToDb(req.body)).eq('id', req.params.id);
+  const { name, phone, email, address, bankName, bankAccount, services, assets } = req.body;
+  const { error } = await supabase.from('vendors').update({
+    name, phone, email, address, bankName, bankAccount,
+    services: services || [], assets: assets || []
+  }).eq('id', req.params.id);
   if (error) return handleError(res, error, 'PUT vendors');
   res.sendStatus(200);
 });
@@ -483,25 +425,23 @@ app.delete('/api/vendors/:id', async (req, res) => {
 app.get('/api/purchase-orders', async (req, res) => {
   const { data, error } = await supabase.from('purchase_orders').select('*').order('date', { ascending: false });
   if (error) return handleError(res, error, 'GET purchase_orders');
-  res.json(mapToCamel(data));
+  res.json(data);
 });
 
 app.post('/api/purchase-orders', async (req, res) => {
   try {
-    const id = req.body.id || 'PO-' + Date.now();
+    const { joId, customerName, jobInstruction, vendorId, vendorName, items, grandTotal, status, validFrom, validTo, quoteValidity, notes } = req.body;
+    const id = 'PO-' + Date.now();
     const date = new Date().toISOString().split('T')[0];
-    const poData = mapToDb({ 
-      ...req.body, 
-      id, 
-      date,
-      vendorInvoicePhoto: [],
-      paymentProofPhoto: []
+    const { error } = await supabase.from('purchase_orders').insert({
+      id, joId, customerName, jobInstruction, vendorId, vendorName,
+      items: items || [], grandTotal, status: status || 'draft',
+      validFrom, validTo, quoteValidity, date, notes,
+      vendorInvoicePhoto: [], paymentProofPhoto: []
     });
-    
-    const { error } = await supabase.from('purchase_orders').insert(poData);
     if (error) return handleError(res, error, 'POST purchase_orders');
-    
-    res.status(201).json(mapToCamel(poData));
+    const fullPO = { id, joId, customerName, jobInstruction, vendorId, vendorName, items, grandTotal, status: status || 'draft', validFrom, validTo, quoteValidity, date, notes };
+    res.status(201).json(fullPO);
   } catch (err) {
     console.error('Create PO Error:', err);
     res.status(500).json({ error: err.message });
@@ -516,7 +456,8 @@ app.put('/api/purchase-orders/:id/issue', async (req, res) => {
 
 app.put('/api/purchase-orders/:id', async (req, res) => {
   try {
-    const { error } = await supabase.from('purchase_orders').update(mapToDb(req.body)).eq('id', req.params.id);
+    const updates = req.body;
+    const { error } = await supabase.from('purchase_orders').update(updates).eq('id', req.params.id);
     if (error) return handleError(res, error, 'PUT purchase_orders');
     res.sendStatus(200);
   } catch (err) {
@@ -534,18 +475,22 @@ app.delete('/api/purchase-orders/:id', async (req, res) => {
 app.get('/api/salaries', async (req, res) => {
   const { data, error } = await supabase.from('salaries').select('*');
   if (error) return handleError(res, error, 'GET salaries');
-  res.json(mapToCamel(data));
+  res.json(data);
 });
 
 app.post('/api/salaries', async (req, res) => {
-  const data = mapToDb(req.body);
-  const { error } = await supabase.from('salaries').insert(data);
+  const { id, name, position, bankAccount, bankName, baseSalary, period, nik, npwp, taxes, proofPhoto, expenseDate, totalToPay, date } = req.body;
+  const { error } = await supabase.from('salaries').insert({
+    id, name, position, bankAccount, bankName, baseSalary, period,
+    nik, npwp, taxes: taxes || [], proofPhoto, expenseDate, totalToPay, date
+  });
   if (error) return handleError(res, error, 'POST salaries');
-  res.status(201).json(mapToCamel(data));
+  res.status(201).json({ id });
 });
 
 app.put('/api/salaries/:id', async (req, res) => {
-  const { error } = await supabase.from('salaries').update(mapToDb(req.body)).eq('id', req.params.id);
+  const updates = req.body;
+  const { error } = await supabase.from('salaries').update(updates).eq('id', req.params.id);
   if (error) return handleError(res, error, 'PUT salaries');
   res.sendStatus(200);
 });
@@ -560,18 +505,22 @@ app.delete('/api/salaries/:id', async (req, res) => {
 app.get('/api/other-expenses', async (req, res) => {
   const { data, error } = await supabase.from('other_expenses').select('*');
   if (error) return handleError(res, error, 'GET other_expenses');
-  res.json(mapToCamel(data));
+  res.json(data);
 });
 
 app.post('/api/other-expenses', async (req, res) => {
-  const data = mapToDb(req.body);
-  const { error } = await supabase.from('other_expenses').insert(data);
+  const { id, employeeName, position, bankAccount, bankName, amount, description, taxes, proofPhoto, expenseDate, totalAfterTax, date } = req.body;
+  const { error } = await supabase.from('other_expenses').insert({
+    id, employeeName, position, bankAccount, bankName, amount,
+    description, taxes: taxes || [], proofPhoto, expenseDate, totalAfterTax, date
+  });
   if (error) return handleError(res, error, 'POST other_expenses');
-  res.status(201).json(mapToCamel(data));
+  res.status(201).json({ id });
 });
 
 app.put('/api/other-expenses/:id', async (req, res) => {
-  const { error } = await supabase.from('other_expenses').update(mapToDb(req.body)).eq('id', req.params.id);
+  const updates = req.body;
+  const { error } = await supabase.from('other_expenses').update(updates).eq('id', req.params.id);
   if (error) return handleError(res, error, 'PUT other_expenses');
   res.sendStatus(200);
 });
@@ -594,7 +543,8 @@ app.get('/api/system/config', async (req, res) => {
 });
 
 app.post('/api/system/config', async (req, res) => {
-  const { error } = await supabase.from('system_config').upsert({ ...mapToDb(req.body), id: 'global_config' });
+  const { otpKey, otpUpdatedAt } = req.body;
+  const { error } = await supabase.from('system_config').upsert({ id: 'global_config', otpKey, otpUpdatedAt });
   if (error) return handleError(res, error, 'POST system_config');
   res.sendStatus(200);
 });
@@ -619,22 +569,32 @@ app.post('/api/system/clear', async (req, res) => {
 app.get('/api/employees', async (req, res) => {
   const { data, error } = await supabase.from('employees').select('*');
   if (error) return handleError(res, error, 'GET employees');
-  res.json(mapToCamel(data));
+  res.json(data);
 });
 
 app.post('/api/employees', async (req, res) => {
   try {
-    const { id, name, address, phone, nik, npwp, position, email, accountNumber, bankName } = req.body;
-    const employee = {
-      id, name, address: address || null, phone: phone || null,
-      nik: nik || null, npwp: npwp || null, position: position || null,
-      email: email || null,
-      accountnumber: accountNumber || null,
-      bankname: bankName || null
-    };
+    const { id, name, position, phone, email, nik, npwp, bankName, accountNumber, bankAccount, address, baseSalary, accountName } = req.body;
+    // Explicitly build the employee object to avoid PostgREST schema cache issues
+    const employee = { id, name, position, phone, email, nik: nik || null, npwp: npwp || null, bankName: bankName || null, address: address || null };
+    if (accountNumber !== undefined) employee.accountNumber = accountNumber;
+    if (bankAccount !== undefined) employee.bankAccount = bankAccount;
+    if (baseSalary !== undefined) employee.baseSalary = baseSalary;
+    if (accountName !== undefined) employee.accountName = accountName;
     const { error } = await supabase.from('employees').insert(employee);
-    if (error) return handleError(res, error, 'POST employees');
-    res.status(201).json({ id });
+    if (error) {
+      // Fallback: if schema cache error, retry with only safe columns
+      if (error.code === 'PGRST204' || (error.message && error.message.includes('schema cache'))) {
+        console.warn('[POST /employees] Schema cache error, retrying with minimal fields...');
+        const safeEmployee = { id, name, position, phone, email, nik: nik || null, npwp: npwp || null, address: address || null };
+        if (bankName) safeEmployee.bankName = bankName;
+        const { error: retryErr } = await supabase.from('employees').insert(safeEmployee);
+        if (retryErr) return handleError(res, retryErr, 'POST employees (retry)');
+        return res.status(201).json({ id });
+      }
+      return handleError(res, error, 'POST employees');
+    }
+    res.status(201).json({ id: employee.id });
   } catch (err) {
     console.error('POST /employees error:', err);
     res.status(500).json({ error: err.message });
@@ -643,14 +603,16 @@ app.post('/api/employees', async (req, res) => {
 
 app.put('/api/employees/:id', async (req, res) => {
   try {
-    const { name, address, phone, nik, npwp, position, email, accountNumber, bankName } = req.body;
-    const updates = {
-      name, address: address || null, phone: phone || null,
-      nik: nik || null, npwp: npwp || null, position: position || null,
-      email: email || null,
-      accountnumber: accountNumber || null,
-      bankname: bankName || null
-    };
+    const { name, position, phone, email, nik, npwp, bankName, accountNumber, bankAccount, address, baseSalary, accountName } = req.body;
+    const updates = { name, position, phone, email };
+    if (nik !== undefined) updates.nik = nik;
+    if (npwp !== undefined) updates.npwp = npwp;
+    if (bankName !== undefined) updates.bankName = bankName;
+    if (address !== undefined) updates.address = address;
+    if (accountNumber !== undefined) updates.accountNumber = accountNumber;
+    if (bankAccount !== undefined) updates.bankAccount = bankAccount;
+    if (baseSalary !== undefined) updates.baseSalary = baseSalary;
+    if (accountName !== undefined) updates.accountName = accountName;
     const { error } = await supabase.from('employees').update(updates).eq('id', req.params.id);
     if (error) return handleError(res, error, 'PUT employees');
     res.sendStatus(200);
@@ -670,7 +632,7 @@ app.delete('/api/employees/:id', async (req, res) => {
 app.get('/api/employee-accounts', async (req, res) => {
   const { data, error } = await supabase.from('employee_accounts').select('*');
   if (error) return handleError(res, error, 'GET employee-accounts');
-  res.json(mapToCamel(data));
+  res.json(data);
 });
 
 app.post('/api/employee-accounts', async (req, res) => {
@@ -697,12 +659,11 @@ app.delete('/api/employee-accounts/:id', async (req, res) => {
 app.get('/api/company-bank-accounts', async (req, res) => {
   const { data, error } = await supabase.from('company_bank_accounts').select('*');
   if (error) return handleError(res, error, 'GET company-bank-accounts');
-  res.json(mapToCamel(data));
+  res.json(data);
 });
 
 app.post('/api/company-bank-accounts', async (req, res) => {
-  const { id, bankName, accountNumber, accountName, isDefault } = req.body;
-  const account = { id, bankname: bankName, accountnumber: accountNumber, accountname: accountName, isdefault: isDefault };
+  const account = req.body;
   const { error } = await supabase.from('company_bank_accounts').upsert(account);
   if (error) return handleError(res, error, 'POST company-bank-accounts');
   res.status(200).json({ id: account.id });
@@ -712,6 +673,15 @@ app.delete('/api/company-bank-accounts/:id', async (req, res) => {
   const { error } = await supabase.from('company_bank_accounts').delete().eq('id', req.params.id);
   if (error) return handleError(res, error, 'DELETE company-bank-accounts');
   res.sendStatus(204);
+});
+
+// Serve frontend static files
+const path = require('path');
+app.use(express.static(path.join(__dirname, '../dist')));
+
+// Catch-all route for SPA
+app.use((req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
 app.listen(PORT, () => {

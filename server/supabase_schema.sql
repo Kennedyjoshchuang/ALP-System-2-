@@ -1,4 +1,4 @@
--- Supabase (PostgreSQL) Schema for OTL System
+-- Supabase (PostgreSQL) Schema for ALP System
 
 -- Enable uuid-ossp extension if needed
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -79,7 +79,9 @@ CREATE TABLE IF NOT EXISTS job_orders (
     date TEXT,
     phone TEXT,
     email TEXT,
-    rate NUMERIC
+    rate NUMERIC,
+    dispatchedAt TEXT,
+    completedAt TEXT
 );
 
 -- 6. Invoices

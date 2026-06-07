@@ -24,8 +24,10 @@ const SystemControl = () => {
     invoices, deleteInvoice,
     maintenanceMode, setMaintenanceMode,
     clearAllData,
-    t, theme
+    t, theme, language
   } = useApp();
+
+  const isID = language === 'id';
 
   const [confirmModal, setConfirmModal] = useState({ show: false, type: '', id: null, label: '' });
   const [verifyStep, setVerifyStep] = useState(1);
@@ -54,7 +56,7 @@ const SystemControl = () => {
     // Step 2: Authorize Text
     if (verifyStep === 2) {
       if (verifyText.toUpperCase() !== 'DELETE') {
-        alert('Verification text mismatch. Please type DELETE.');
+        alert(isID ? 'Teks verifikasi tidak sesuai. Silakan ketik DELETE.' : 'Verification text mismatch. Please type DELETE.');
         return;
       }
 
@@ -72,13 +74,13 @@ const SystemControl = () => {
       try {
         const config = await getSystemConfig();
         if (!config || otpInput !== config.otpKey) {
-          alert('Invalid Authorization Key. Please check the OTP board above.');
+          alert(isID ? 'Kunci Otorisasi Salah. Silakan periksa papan OTP di atas.' : 'Invalid Authorization Key. Please check the OTP board above.');
           return;
         }
         executeDeletion();
       } catch (err) {
         console.error("Verification failed:", err);
-        alert("System error during verification. Please try again.");
+        alert(isID ? "Kesalahan sistem selama verifikasi. Silakan coba lagi." : "System error during verification. Please try again.");
       }
     }
   };
@@ -87,7 +89,7 @@ const SystemControl = () => {
     const { type, id } = confirmModal;
     if (type === 'all') {
       clearAllData().then(() => {
-        alert('Action successfully authorized and executed. System will refresh.');
+        alert(isID ? 'Tindakan berhasil diotorisasi dan dijalankan. Sistem akan dimuat ulang.' : 'Action successfully authorized and executed. System will refresh.');
         window.location.reload();
       });
     } else {
@@ -95,16 +97,16 @@ const SystemControl = () => {
       else if (type === 'jo') deleteJO(id);
       else if (type === 'invoice') deleteInvoice(id);
 
-      alert('Action successfully authorized and executed.');
+      alert(isID ? 'Tindakan berhasil diotorisasi dan dijalankan.' : 'Action successfully authorized and executed.');
     }
 
     closeConfirm();
   };
 
   const stats = [
-    { label: 'Total Customers', value: customers.length, icon: Users, color: '#3b82f6' },
-    { label: 'Active Job Orders', value: jobOrders.length, icon: Briefcase, color: '#ed1c24' },
-    { label: 'System Invoices', value: invoices.length, icon: FileText, color: '#3b82f6' },
+    { label: isID ? 'Total Pelanggan' : 'Total Customers', value: customers.length, icon: Users, color: '#10b981' },
+    { label: isID ? 'Job Order Aktif' : 'Active Job Orders', value: jobOrders.length, icon: Briefcase, color: '#d4af37' },
+    { label: isID ? 'Faktur Sistem' : 'System Invoices', value: invoices.length, icon: FileText, color: '#3b82f6' },
   ];
 
   return (
@@ -124,8 +126,8 @@ const SystemControl = () => {
           <ShieldAlert size={28} />
         </div>
         <div>
-          <h2 style={{ fontSize: '1.8rem', margin: 0 }}>{t('systemControl') || 'System Management'}</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Authorized data removal and system maintenance.</p>
+          <h2 style={{ fontSize: '1.8rem', margin: 0 }}>{t('systemControl') || (isID ? 'Manajemen Sistem' : 'System Management')}</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{isID ? 'Penghapusan data terotorisasi dan pemeliharaan sistem.' : 'Authorized data removal and system maintenance.'}</p>
         </div>
       </div>
 
@@ -134,17 +136,17 @@ const SystemControl = () => {
           <div style={{ 
             padding: '15px', 
             borderRadius: '15px', 
-            background: maintenanceMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(37, 99, 235, 0.1)',
-            color: maintenanceMode ? '#f59e0b' : '#3b82f6'
+            background: maintenanceMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+            color: maintenanceMode ? '#f59e0b' : '#10b981'
           }}>
             <Settings size={24} className={maintenanceMode ? 'animate-spin' : ''} style={{ animationDuration: '3s' }} />
           </div>
           <div>
-            <h3 style={{ fontSize: '1.2rem', margin: 0, color: 'var(--text)' }}>Maintenance Mode</h3>
+            <h3 style={{ fontSize: '1.2rem', margin: 0, color: 'var(--text)' }}>{isID ? 'Mode Pemeliharaan' : 'Maintenance Mode'}</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: 0 }}>
               {maintenanceMode 
-                ? 'System is currently hidden from staff/public.' 
-                : 'System is live and accessible to all authorized users.'}
+                ? (isID ? 'Sistem saat ini disembunyikan dari staf/publik.' : 'System is currently hidden from staff/public.') 
+                : (isID ? 'Sistem aktif dan dapat diakses oleh semua pengguna terotorisasi.' : 'System is live and accessible to all authorized users.')}
             </p>
           </div>
         </div>
@@ -155,11 +157,11 @@ const SystemControl = () => {
           style={{ borderRadius: '30px', padding: '10px 25px' }}
         >
           <Power size={18} />
-          {maintenanceMode ? 'DEACTIVATE' : 'ACTIVATE'}
+          {maintenanceMode ? (isID ? 'NONAKTIFKAN' : 'DEACTIVATE') : (isID ? 'AKTIFKAN' : 'ACTIVATE')}
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '25px', marginBottom: '40px' }}>
+      <div className="grid-responsive-3" style={{ marginBottom: '40px' }}>
         {stats.map((stat, idx) => (
           <div key={idx} className="glass-card" style={{ padding: '30px', display: 'flex', alignItems: 'center', gap: '20px' }}>
             <div style={{ padding: '15px', borderRadius: '12px', background: `${stat.color}15`, color: stat.color }}>
@@ -180,8 +182,8 @@ const SystemControl = () => {
       <div className="glass-card" style={{ padding: '40px', border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.02)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
           <div>
-            <h3 style={{ color: '#ef4444', marginBottom: '5px' }}>Critical System Actions</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>These actions are permanent and cannot be undone.</p>
+            <h3 style={{ color: '#ef4444', marginBottom: '5px' }}>{isID ? 'Tindakan Sistem Kritis' : 'Critical System Actions'}</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{isID ? 'Tindakan ini bersifat permanen dan tidak dapat dibatalkan.' : 'These actions are permanent and cannot be undone.'}</p>
           </div>
           <button
             className="btn"
@@ -189,15 +191,15 @@ const SystemControl = () => {
             onClick={() => openConfirm('all', null, 'ALL SYSTEM DATA')}
           >
             <AlertTriangle size={18} />
-            Reset Entire System
+            {isID ? 'Atur Ulang Seluruh Sistem' : 'Reset Entire System'}
           </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
+        <div className="grid-responsive-2" style={{ gap: '30px' }}>
           {/* Customers Section */}
           <div>
             <h4 style={{ color: 'var(--secondary)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Users size={18} /> Customer Database
+              <Users size={18} /> {isID ? 'Database Pelanggan' : 'Customer Database'}
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {customers.map(c => (
@@ -211,17 +213,17 @@ const SystemControl = () => {
                   </button>
                 </div>
               ))}
-              {customers.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center' }}>No customers found.</p>}
+              {customers.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center' }}>{isID ? 'Tidak ada pelanggan ditemukan.' : 'No customers found.'}</p>}
             </div>
           </div>
 
           {/* Jobs & Invoices Section */}
           <div>
             <h4 style={{ color: 'var(--secondary)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Database size={18} /> Operations & Finance
+              <Database size={18} /> {isID ? 'Operasi & Keuangan' : 'Operations & Finance'}
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '10px' }}>Recent Jobs & Invoices</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '10px' }}>{isID ? 'Job & Faktur Terbaru' : 'Recent Jobs & Invoices'}</p>
               {jobOrders.slice(0, 5).map(jo => (
                 <div key={jo.id} style={{ padding: '15px', background: 'var(--glass)', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
@@ -233,7 +235,7 @@ const SystemControl = () => {
                   </button>
                 </div>
               ))}
-              {jobOrders.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center' }}>No job orders found.</p>}
+              {jobOrders.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center' }}>{isID ? 'Tidak ada job order ditemukan.' : 'No job orders found.'}</p>}
             </div>
           </div>
         </div>
@@ -286,12 +288,12 @@ const SystemControl = () => {
                 </div>
 
                 <h2 style={{ fontSize: '1.5rem', marginBottom: '10px', color: '#ef4444' }}>
-                  {verifyStep === 1 ? 'Permanent Deletion?' : 'Final Verification'}
+                  {verifyStep === 1 ? (isID ? 'Hapus Permanen?' : 'Permanent Deletion?') : (isID ? 'Verifikasi Akhir' : 'Final Verification')}
                 </h2>
                 <p style={{ color: 'var(--text-muted)', marginBottom: '30px' }}>
                   {verifyStep === 1
-                    ? `Are you sure you want to delete "${confirmModal.label}"? This action is irreversible.`
-                    : `To confirm, please type "DELETE" in the box below to authorize the removal.`}
+                    ? (isID ? `Apakah Anda yakin ingin menghapus "${confirmModal.label}"? Tindakan ini tidak dapat dibatalkan.` : `Are you sure you want to delete "${confirmModal.label}"? This action is irreversible.`)
+                    : (isID ? `Untuk mengonfirmasi, silakan ketik "DELETE" pada kotak di bawah untuk mengotorisasi penghapusan.` : `To confirm, please type "DELETE" in the box below to authorize the removal.`)}
                 </p>
 
                 {verifyStep === 2 && (
@@ -300,7 +302,7 @@ const SystemControl = () => {
                       type="text"
                       value={verifyText}
                       onChange={e => setVerifyText(e.target.value)}
-                      placeholder="Type DELETE here..."
+                      placeholder={isID ? "Ketik DELETE di sini..." : "Type DELETE here..."}
                       style={{
                         textAlign: 'center',
                         fontSize: '1.2rem',
@@ -317,7 +319,7 @@ const SystemControl = () => {
 
                 {verifyStep === 3 && (
                   <div className="input-group">
-                    <label style={{ color: 'var(--secondary)', marginBottom: '15px' }}>Enter 4-Digit Security Key</label>
+                    <label style={{ color: 'var(--secondary)', marginBottom: '15px' }}>{isID ? 'Masukkan Kunci Keamanan 4-Digit' : 'Enter 4-Digit Security Key'}</label>
                     <input
                       type="text"
                       maxLength={4}
@@ -340,7 +342,7 @@ const SystemControl = () => {
 
                 <div style={{ display: 'flex', gap: '15px' }}>
                   <button onClick={closeConfirm} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)' }}>
-                    Cancel
+                    {isID ? 'Batal' : 'Cancel'}
                   </button>
                   <button
                     onClick={handleAction}
@@ -354,7 +356,7 @@ const SystemControl = () => {
                       opacity: ((verifyStep === 2 && verifyText.toUpperCase() !== 'DELETE') || (verifyStep === 3 && otpInput.length !== 4)) ? 0.6 : 1
                     }}
                   >
-                    {verifyStep === 1 ? 'Confirm Deletion' : (verifyStep === 2 ? 'Authorize Text' : 'Verify Security Key')}
+                    {verifyStep === 1 ? (isID ? 'Konfirmasi Hapus' : 'Confirm Deletion') : (verifyStep === 2 ? (isID ? 'Otorisasi Teks' : 'Authorize Text') : (isID ? 'Verifikasi Kunci Keamanan' : 'Verify Security Key'))}
                     {verifyStep === 3 && <CheckCircle size={18} style={{ marginLeft: '10px' }} />}
                   </button>
                 </div>
@@ -368,8 +370,4 @@ const SystemControl = () => {
 };
 
 export default SystemControl;
-
-
-
-
 

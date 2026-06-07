@@ -1,11 +1,11 @@
 #!/bin/bash
-# OTL System - VPS Deployment Script
+# ALP System - VPS Deployment Script
 # Run this on your VPS: bash vps-setup.sh
 
 set -e
 
-APP_DIR="/var/www/otlsystem"
-REPO_URL=""
+APP_DIR="/var/www/alpsystem"
+REPO_URL="https://github.com/Kennedyjoshchuang/OTLSystem.git"
 
 # Colors
 GREEN='\033[0;32m'
@@ -13,7 +13,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  OTL System - VPS Deployment Script   ${NC}"
+echo -e "${GREEN}  ALP System - VPS Deployment Script   ${NC}"
 echo -e "${GREEN}========================================${NC}"
 
 # Step 1: Update & install Node.js 20
@@ -45,14 +45,23 @@ cd $APP_DIR && npm install
 
 # Step 5: Create .env file
 echo -e "\n${YELLOW}[5/8] Creating .env file...${NC}"
-cat > $APP_DIR/.env << 'EOF'
-SUPABASE_URL=https://yuddakkcoxllxfnaikus.supabase.co
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZii6Inl1ZGRha2tjb3hsbHhmbmFpa3VzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NjU3NTA0NiwiZXhwIjoyMDYyMTUxMDQ2fQ.HhvmpcTwzMSyf4WKJoXyweXaZLIBNC8TRD_x18aCKMw
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZii6Inl1ZGRha2tjb3hsbHhmbmFpa3VzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY1NzUwNDYsImV4cCI6MjA2MjE1MTA0Nn0.byWMbObnT7TVUEJrtGHWoZqDdmiJLhKu_0JUrsmQQK4
+if [ -f "$APP_DIR/.env" ]; then
+  echo ".env file already exists. Skipping creation."
+else
+  echo -e "${YELLOW}Please enter the Supabase configuration details:${NC}"
+  read -p "SUPABASE_URL: " supabase_url
+  read -p "SUPABASE_SERVICE_KEY: " supabase_service_key
+  read -p "SUPABASE_ANON_KEY: " supabase_anon_key
+
+  cat > $APP_DIR/.env << EOF
+SUPABASE_URL=$supabase_url
+SUPABASE_SERVICE_KEY=$supabase_service_key
+SUPABASE_ANON_KEY=$supabase_anon_key
 PORT=5000
 NODE_ENV=production
 EOF
-echo ".env file created."
+  echo ".env file created."
+fi
 
 # Step 6: Build frontend
 echo -e "\n${YELLOW}[6/8] Building frontend...${NC}"
@@ -60,19 +69,19 @@ cd $APP_DIR && npm run build
 
 # Step 7: Setup PM2 for backend
 echo -e "\n${YELLOW}[7/8] Starting backend with PM2...${NC}"
-pm2 delete otl-backend 2>/dev/null || true
-cd $APP_DIR && pm2 start server/index.cjs --name otl-backend
+pm2 delete alp-backend 2>/dev/null || true
+cd $APP_DIR && pm2 start server/index.cjs --name alp-backend
 pm2 save
 pm2 startup systemd -u root --hp /root 2>/dev/null | tail -1 | bash 2>/dev/null || true
 
 # Step 8: Configure Nginx
 echo -e "\n${YELLOW}[8/9] Configuring Nginx...${NC}"
-cat > /etc/nginx/sites-available/otlsystem << 'NGINX_EOF'
+cat > /etc/nginx/sites-available/alpsystem << 'NGINX_EOF'
 server {
     listen 80;
     server_name _;
 
-    root /var/www/otlsystem/dist;
+    root /var/www/alpsystem/dist;
     index index.html;
 
     location /api {
@@ -93,7 +102,7 @@ server {
 }
 NGINX_EOF
 
-ln -sf /etc/nginx/sites-available/otlsystem /etc/nginx/sites-enabled/otlsystem
+ln -sf /etc/nginx/sites-available/alpsystem /etc/nginx/sites-enabled/alpsystem
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl restart nginx
 
@@ -117,5 +126,5 @@ echo -e ""
 echo -e "📋 PM2 Status:"
 pm2 list
 echo -e ""
-echo -e "Use 'pm2 logs otl-backend' to view server logs"
+echo -e "Use 'pm2 logs alp-backend' to view server logs"
 echo -e "${GREEN}========================================${NC}"

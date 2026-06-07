@@ -31,5 +31,5 @@ dist-ssr
 # SQLite databases (replaced by Supabase)
 *.sqlite
 *.db
-server/omega_trust.db
+server/alp_system.db
 scratch/

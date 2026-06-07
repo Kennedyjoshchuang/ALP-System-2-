@@ -8,7 +8,8 @@ import { ButtonWithLoading } from '../components/ButtonWithLoading';
 const emptyVendor = { name: '', phone: '', email: '', address: '', bankName: '', bankAccount: '', services: [{ description: '', price: '' }], assets: [''] };
 
 const Procurement = () => {
-  const { vendors: vendorsRaw, addVendor, updateVendor, deleteVendor, user } = useApp();
+  const { vendors: vendorsRaw, addVendor, updateVendor, deleteVendor, user, language } = useApp();
+  const isID = language === 'id';
   const vendors = vendorsRaw || [];
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -52,7 +53,7 @@ const Procurement = () => {
       }));
 
     if (dataToExport.length === 0) {
-      alert("Tidak ada data vendor untuk di-export pada rentang tanggal ini.");
+      alert(isID ? "Tidak ada data vendor untuk di-export pada rentang tanggal ini." : "No vendor data to export within this date range.");
       return;
     }
 
@@ -98,11 +99,15 @@ const Procurement = () => {
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
             <motion.div initial={{ scale: 0.85 }} animate={{ scale: 1 }} exit={{ scale: 0.85 }} className="glass-card" style={{ padding: '40px', maxWidth: '440px', width: '100%', textAlign: 'center' }}>
               <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🗑️</div>
-              <h3 style={{ color: '#ef4444', marginBottom: '8px' }}>Hapus Vendor?</h3>
-              <p style={{ color: 'var(--text-muted)', marginBottom: '28px' }}>Data vendor <strong style={{ color: 'var(--text)' }}>{deleteConfirm.name}</strong> akan dihapus permanen.</p>
+              <h3 style={{ color: '#ef4444', marginBottom: '8px' }}>{isID ? 'Hapus Vendor?' : 'Delete Vendor?'}</h3>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '28px' }}>
+                {isID ? 'Data vendor ' : 'Vendor data for '}
+                <strong style={{ color: 'var(--text)' }}>{deleteConfirm.name}</strong>
+                {isID ? ' akan dihapus permanen.' : ' will be permanently deleted.'}
+              </p>
               <div style={{ display: 'flex', gap: '12px' }}>
-                <button className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)' }} onClick={() => setDeleteConfirm(null)}>Batal</button>
-                <ButtonWithLoading className="btn" style={{ flex: 1, background: '#ef4444', color: 'white', border: 'none' }} onClick={async () => { await deleteVendor(deleteConfirm.id); setDeleteConfirm(null); }}>Hapus</ButtonWithLoading>
+                <button className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)' }} onClick={() => setDeleteConfirm(null)}>{isID ? 'Batal' : 'Cancel'}</button>
+                <ButtonWithLoading className="btn" style={{ flex: 1, background: '#ef4444', color: 'white', border: 'none' }} onClick={async () => { await deleteVendor(deleteConfirm.id); setDeleteConfirm(null); }}>{isID ? 'Hapus' : 'Delete'}</ButtonWithLoading>
               </div>
             </motion.div>
           </motion.div>
@@ -112,11 +117,11 @@ const Procurement = () => {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h3 className="shimmer-text" style={{ fontSize: '1.8rem', margin: 0 }}>Procurement & Vendor Rates</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '6px' }}>Kelola daftar vendor, harga layanan, dan aset operasional.</p>
+          <h3 className="shimmer-text" style={{ fontSize: '1.8rem', margin: 0 }}>{isID ? 'Pengadaan & Tarif Vendor' : 'Procurement & Vendor Rates'}</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '6px' }}>{isID ? 'Kelola daftar vendor, harga layanan, dan aset operasional.' : 'Manage vendor lists, service rates, and operational assets.'}</p>
         </div>
         <button className="btn btn-gold" onClick={() => { setForm(emptyVendor); setEditingId(null); setShowForm(!showForm); }}>
-          <Plus size={18} /> {showForm && !editingId ? 'Batal' : 'Tambah Vendor'}
+          <Plus size={18} /> {showForm && !editingId ? (isID ? 'Batal' : 'Cancel') : (isID ? 'Tambah Vendor' : 'Add Vendor')}
         </button>
       </div>
 
@@ -124,11 +129,18 @@ const Procurement = () => {
       <AnimatePresence>
         {showForm && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="glass-card" style={{ padding: '35px', overflow: 'hidden' }}>
-            <h4 style={{ color: 'var(--secondary)', marginBottom: '25px' }}>{editingId ? 'Edit Vendor' : 'Tambah Vendor Baru'}</h4>
+            <h4 style={{ color: 'var(--secondary)', marginBottom: '25px' }}>{editingId ? (isID ? 'Edit Vendor' : 'Edit Vendor') : (isID ? 'Tambah Vendor Baru' : 'Add New Vendor')}</h4>
             <form onSubmit={handleSubmit}>
               {/* Basic Info */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '25px' }}>
-                {[['name','Nama Vendor *',true,'text'],['phone','No. Telepon',false,'text'],['email','Email',false,'email'],['address','Alamat',false,'text'],['bankName','Nama Bank',false,'text'],['bankAccount','Nomor Rekening',false,'text']].map(([field, label, req, type]) => (
+              <div className="grid-responsive-2" style={{ marginBottom: '25px' }}>
+                {[
+                  ['name', isID ? 'Nama Vendor *' : 'Vendor Name *', true, 'text'],
+                  ['phone', isID ? 'No. Telepon' : 'Phone Number', false, 'text'],
+                  ['email', 'Email', false, 'email'],
+                  ['address', isID ? 'Alamat' : 'Address', false, 'text'],
+                  ['bankName', isID ? 'Nama Bank' : 'Bank Name', false, 'text'],
+                  ['bankAccount', isID ? 'Nomor Rekening' : 'Bank Account Number', false, 'text']
+                ].map(([field, label, req, type]) => (
                   <div key={field} className="input-group">
                     <label>{label}</label>
                     <input required={req} type={type} value={form[field]} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} />
@@ -139,17 +151,17 @@ const Procurement = () => {
               {/* Services */}
               <div style={{ marginBottom: '25px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>Daftar Layanan & Harga</label>
-                  <button type="button" className="btn" style={{ padding: '5px 12px', fontSize: '0.8rem', background: 'rgba(212,175,55,0.1)', color: 'var(--secondary)', border: '1px dashed var(--secondary)' }} onClick={addService}>+ Tambah Layanan</button>
+                  <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>{isID ? 'Daftar Layanan & Harga' : 'Services & Rates List'}</label>
+                  <button type="button" className="btn" style={{ padding: '5px 12px', fontSize: '0.8rem', background: 'rgba(212,175,55,0.1)', color: 'var(--secondary)', border: '1px dashed var(--secondary)' }} onClick={addService}>{isID ? '+ Tambah Layanan' : '+ Add Service'}</button>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '10px 1fr 180px 40px', gap: '8px', marginBottom: '8px', fontSize: '0.75rem', color: 'var(--text-muted)', paddingLeft: '4px' }}>
-                  <div/><div>Deskripsi Pekerjaan</div><div>Harga (IDR)</div><div/>
+                <div className="grid-vendor-services desktop-only" style={{ marginBottom: '8px', fontSize: '0.75rem', color: 'var(--text-muted)', paddingLeft: '4px' }}>
+                  <div/><div>{isID ? 'Deskripsi Pekerjaan' : 'Job Description'}</div><div>{isID ? 'Harga (IDR)' : 'Rate (IDR)'}</div><div/>
                 </div>
                 {form.services.map((s, i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '10px 1fr 180px 40px', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
+                  <div key={i} className="grid-vendor-services" style={{ marginBottom: '10px' }}>
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--secondary)' }} />
-                    <input required type="text" value={s.description} onChange={e => updateService(i, 'description', e.target.value)} placeholder="Contoh: Trucking 20ft Tanjung Priok" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '9px 12px' }} />
-                    <input required type="number" value={s.price} onChange={e => updateService(i, 'price', e.target.value)} placeholder="Harga" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '9px 12px' }} />
+                    <input required type="text" value={s.description} onChange={e => updateService(i, 'description', e.target.value)} placeholder={isID ? "Contoh: Trucking 20ft Tanjung Priok" : "Example: Trucking 20ft Tanjung Priok"} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '9px 12px' }} />
+                    <input required type="number" value={s.price} onChange={e => updateService(i, 'price', e.target.value)} placeholder={isID ? "Harga" : "Price"} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '9px 12px' }} />
                     <button type="button" onClick={() => removeService(i)} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
                   </div>
                 ))}
@@ -158,20 +170,20 @@ const Procurement = () => {
               {/* Assets */}
               <div style={{ marginBottom: '30px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>Aset Operasional</label>
-                  <button type="button" className="btn" style={{ padding: '5px 12px', fontSize: '0.8rem', background: 'rgba(212,175,55,0.1)', color: 'var(--secondary)', border: '1px dashed var(--secondary)' }} onClick={addAsset}>+ Tambah Aset</button>
+                  <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>{isID ? 'Aset Operasional' : 'Operational Assets'}</label>
+                  <button type="button" className="btn" style={{ padding: '5px 12px', fontSize: '0.8rem', background: 'rgba(212,175,55,0.1)', color: 'var(--secondary)', border: '1px dashed var(--secondary)' }} onClick={addAsset}>{isID ? '+ Tambah Aset' : '+ Add Asset'}</button>
                 </div>
                 {form.assets.map((a, i) => (
                   <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 40px', gap: '8px', marginBottom: '10px' }}>
-                    <input type="text" value={a} onChange={e => updateAsset(i, e.target.value)} placeholder="Contoh: Truk Fuso B 1234 ABC" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '9px 12px' }} />
+                    <input type="text" value={a} onChange={e => updateAsset(i, e.target.value)} placeholder={isID ? "Contoh: Truk Fuso B 1234 ABC" : "Example: Fuso Truck B 1234 ABC"} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '9px 12px' }} />
                     <button type="button" onClick={() => removeAsset(i)} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
                   </div>
                 ))}
               </div>
 
               <div style={{ display: 'flex', gap: '12px' }}>
-                <button type="button" className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)' }} onClick={() => { setShowForm(false); setEditingId(null); }}>Batal</button>
-                <ButtonWithLoading type="submit" className="btn btn-gold" style={{ flex: 2 }} onClick={handleSubmit}><Check size={16} /> {editingId ? 'Simpan Perubahan' : 'Daftarkan Vendor'}</ButtonWithLoading>
+                <button type="button" className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)' }} onClick={() => { setShowForm(false); setEditingId(null); }}>{isID ? 'Batal' : 'Cancel'}</button>
+                <ButtonWithLoading type="submit" className="btn btn-gold" style={{ flex: 2 }} onClick={handleSubmit}><Check size={16} /> {editingId ? (isID ? 'Simpan Perubahan' : 'Save Changes') : (isID ? 'Daftarkan Vendor' : 'Register Vendor')}</ButtonWithLoading>
               </div>
             </form>
           </motion.div>
@@ -179,11 +191,11 @@ const Procurement = () => {
       </AnimatePresence>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+      <div className="grid-responsive-3">
         {[
-          { label: 'Total Vendor', value: vendors.length, color: '#ed1c24', icon: '🏢' },
-          { label: 'Total Layanan', value: vendors.reduce((s, v) => s + (v.services?.length || 0), 0), color: '#3b82f6', icon: '📋' },
-          { label: 'Total Aset', value: vendors.reduce((s, v) => s + (v.assets?.filter(a=>a).length || 0), 0), color: '#3b82f6', icon: '🚛' },
+          { label: isID ? 'Total Vendor' : 'Total Vendors', value: vendors.length, color: '#d4af37', icon: '🏢' },
+          { label: isID ? 'Total Layanan' : 'Total Services', value: vendors.reduce((s, v) => s + (v.services?.length || 0), 0), color: '#10b981', icon: '📋' },
+          { label: isID ? 'Total Aset' : 'Total Assets', value: vendors.reduce((s, v) => s + (v.assets?.filter(a=>a).length || 0), 0), color: '#3b82f6', icon: '🚛' },
         ].map(stat => (
           <div key={stat.label} className="glass-card" style={{ padding: '25px', display: 'flex', alignItems: 'center', gap: '20px' }}>
             <div style={{ fontSize: '2rem' }}>{stat.icon}</div>
@@ -199,7 +211,7 @@ const Procurement = () => {
       <div className="glass-card" style={{ padding: '25px' }}>
         <h4 style={{ marginBottom: isListMinimized ? '0' : '20px', display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Truck size={20} style={{ color: 'var(--secondary)' }} /> Daftar Vendor Terdaftar
+            <Truck size={20} style={{ color: 'var(--secondary)' }} /> {isID ? 'Daftar Vendor Terdaftar' : 'Registered Vendor List'}
           </div>
           <button 
             onClick={() => setIsListMinimized(!isListMinimized)} 
@@ -208,7 +220,7 @@ const Procurement = () => {
             onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
           >
             {isListMinimized ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-            {isListMinimized ? 'Expand' : 'Minimize'}
+            {isListMinimized ? 'Expand' : (isID ? 'Kecilkan' : 'Minimize')}
           </button>
         </h4>
 
@@ -224,7 +236,7 @@ const Procurement = () => {
         {/* Filter Bar */}
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-            <input type="text" placeholder="Cari nama, ID, atau telp..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '8px 12px 8px 35px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
+            <input type="text" placeholder={isID ? "Cari nama, ID, atau telp..." : "Search name, ID, or phone..."} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '8px 12px 8px 35px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
             <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -245,8 +257,8 @@ const Procurement = () => {
         {vendors.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
             <Package size={48} style={{ opacity: 0.2, display: 'block', margin: '0 auto 15px' }} />
-            <p style={{ fontWeight: '600', marginBottom: '6px' }}>Belum ada vendor</p>
-            <p style={{ fontSize: '0.85rem' }}>Klik "Tambah Vendor" untuk mendaftarkan vendor pertama.</p>
+            <p style={{ fontWeight: '600', marginBottom: '6px' }}>{isID ? 'Belum ada vendor' : 'No vendors registered'}</p>
+            <p style={{ fontSize: '0.85rem' }}>{isID ? 'Klik "Tambah Vendor" untuk mendaftarkan vendor pertama.' : 'Click "Add Vendor" to register your first vendor.'}</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: '15px' }}>
@@ -267,13 +279,13 @@ const Procurement = () => {
                     </button>
                     <div>
                       <div style={{ fontWeight: '700', fontSize: '1rem' }}>{v.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{v.id} · {v.phone || 'No Phone'} · {v.services?.length || 0} layanan · {v.assets?.filter(a=>a).length || 0} aset</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{v.id} · {v.phone || (isID ? 'Tidak ada telp' : 'No Phone')} · {v.services?.length || 0} {isID ? 'layanan' : 'services'} · {v.assets?.filter(a=>a).length || 0} {isID ? 'aset' : 'assets'}</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button className="btn-icon" onClick={() => startEdit(v)} title="Edit"><Edit2 size={15} /></button>
                     {user?.role === 'owner' && (
-                      <button className="btn-icon" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }} onClick={() => setDeleteConfirm(v)} title="Hapus"><Trash2 size={15} /></button>
+                      <button className="btn-icon" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }} onClick={() => setDeleteConfirm(v)} title={isID ? 'Hapus' : 'Delete'}><Trash2 size={15} /></button>
                     )}
                   </div>
                 </div>
@@ -282,16 +294,16 @@ const Procurement = () => {
                 <AnimatePresence>
                   {expandedId === v.id && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} style={{ overflow: 'hidden' }}>
-                      <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px', paddingTop: '20px', borderTop: '1px solid var(--glass-border)' }}>
+                      <div className="grid-responsive-2" style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--glass-border)' }}>
                         {/* Services Table */}
                         <div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--secondary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>📋 Layanan & Harga</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--secondary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>{isID ? '📋 Layanan & Harga' : '📋 Services & Rates'}</div>
                           {v.services?.length > 0 ? (
                             <div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                               <thead>
                                 <tr style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                                  <th style={{ padding: '8px 0', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '500' }}>Deskripsi</th>
-                                  <th style={{ padding: '8px 0', textAlign: 'right', color: 'var(--text-muted)', fontWeight: '500' }}>Harga</th>
+                                  <th style={{ padding: '8px 0', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '500' }}>{isID ? 'Deskripsi' : 'Description'}</th>
+                                  <th style={{ padding: '8px 0', textAlign: 'right', color: 'var(--text-muted)', fontWeight: '500' }}>{isID ? 'Harga' : 'Price'}</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -303,11 +315,11 @@ const Procurement = () => {
                                 ))}
                               </tbody>
                             </table></div>
-                          ) : <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Tidak ada layanan.</p>}
+                          ) : <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{isID ? 'Tidak ada layanan.' : 'No services registered.'}</p>}
                         </div>
                         {/* Assets */}
                         <div>
-                          <div style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>🚛 Aset Operasional</div>
+                          <div style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>{isID ? '🚛 Aset Operasional' : '🚛 Operational Assets'}</div>
                           {v.assets?.filter(a => a).length > 0 ? (
                             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                               {v.assets.filter(a => a).map((a, i) => (
@@ -316,19 +328,19 @@ const Procurement = () => {
                                 </li>
                               ))}
                             </ul>
-                          ) : <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Tidak ada aset.</p>}
+                          ) : <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{isID ? 'Tidak ada aset.' : 'No assets registered.'}</p>}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '20px', marginTop: '15px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
                         {v.bankName && (
                           <div style={{ fontSize: '0.8rem' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>Bank: </span>
+                            <span style={{ color: 'var(--text-muted)' }}>{isID ? 'Bank: ' : 'Bank: '}</span>
                             <span style={{ fontWeight: '700', color: 'var(--secondary)' }}>{v.bankName}</span>
                           </div>
                         )}
                         {v.bankAccount && (
                           <div style={{ fontSize: '0.8rem' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>No. Rek: </span>
+                            <span style={{ color: 'var(--text-muted)' }}>{isID ? 'No. Rek: ' : 'Bank Account: '}</span>
                             <span style={{ fontWeight: '700', color: 'var(--secondary)' }}>{v.bankAccount}</span>
                           </div>
                         )}
@@ -355,8 +367,4 @@ const Procurement = () => {
 };
 
 export default Procurement;
-
-
-
-
 

@@ -14,7 +14,7 @@ const PrintInvoiceDelivery = () => {
     </div>
   );
 
-  const { invoice, jo, bankAccount } = data;
+  const { invoice, jo, consolidatedJOs, bankAccount } = data;
 
   const fmtDate = (d) => {
     if (!d) return '—';
@@ -58,9 +58,9 @@ const PrintInvoiceDelivery = () => {
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '4px solid #1e293b', paddingBottom: '22px', marginBottom: '40px' }}>
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <img src="/assets/logo.png" alt="Logo" style={{ height: '60px', width: 'auto', objectFit: 'contain' }} />
+            <img src="/assets/logo.png" alt="Logo" style={{ width: '60px', height: '60px', objectFit: 'contain' }} />
             <div>
-              <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', color: '#1e293b' }}>PT. Alpha Logistics Prakarsa</h1>
+              <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', color: '#1e293b' }}>PT. ALPHA LOGISTICS PRAKARSA</h1>
               <p style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>Green Sedayu Bizpark DM 11 No. 51, Kalideres, Jakarta Barat</p>
             </div>
           </div>
@@ -71,7 +71,7 @@ const PrintInvoiceDelivery = () => {
         </div>
 
         <p style={{ fontSize: '1rem', lineHeight: '1.6', marginBottom: '30px' }}>
-          Telah diterima dengan baik dokumen-dokumen penagihan (Invoice) dari <strong>PT. Alpha Logistics Prakarsa</strong> dengan detail sebagai berikut:
+          Telah diterima dengan baik dokumen-dokumen penagihan (Invoice) dari <strong>PT. ALPHA LOGISTICS PRAKARSA</strong> dengan detail sebagai berikut:
         </p>
 
         {/* Info Table */}
@@ -83,7 +83,7 @@ const PrintInvoiceDelivery = () => {
                 ['Nama Customer', invoice?.customerName],
                 ['Tanggal Invoice', fmtDate(invoice?.date)],
                 ['Nominal Tagihan', `Rp ${parseFloat(invoice?.amount || 0).toLocaleString('id-ID')}`],
-                ['Referensi JO', invoice?.joId],
+                ['Referensi JO', Array.isArray(consolidatedJOs) && consolidatedJOs.length > 0 ? consolidatedJOs.map(j => j.id).join(', ') : invoice?.joId],
                 ['Status Pengantaran', (invoice?.deliveryStatus === 'delivered' ? 'SUDAH TERANTAR' : 'DALAM PROSES / BELUM TERANTAR')],
               ].map(([l, v]) => (
                 <tr key={l}>
@@ -105,7 +105,7 @@ const PrintInvoiceDelivery = () => {
           <div style={{ textAlign: 'center', flex: 1 }}>
             <p style={{ fontSize: '0.9rem', fontWeight: '700', marginBottom: '80px' }}>PENGIRIM / KURIR,</p>
             <div style={{ borderBottom: '2px solid #1e293b', width: '100%', marginBottom: '5px' }}></div>
-            <p style={{ margin: 0, fontWeight: '800', fontSize: '0.9rem' }}>PT. Alpha Logistics Prakarsa</p>
+            <p style={{ margin: 0, fontWeight: '800', fontSize: '0.9rem' }}>PT. ALPHA LOGISTICS PRAKARSA</p>
           </div>
           <div style={{ textAlign: 'center', flex: 1 }}>
             <p style={{ fontSize: '0.9rem', fontWeight: '700', marginBottom: '80px' }}>PENERIMA / CUSTOMER,</p>
@@ -123,11 +123,4 @@ const PrintInvoiceDelivery = () => {
 };
 
 export default PrintInvoiceDelivery;
-
-
-
-
-
-
-
 

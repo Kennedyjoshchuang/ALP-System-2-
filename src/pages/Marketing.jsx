@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Plus, Download, CheckCircle, XCircle, FileText, UserPlus, Search, Trash2, FileSpreadsheet } from 'lucide-react';
+import { Plus, Download, CheckCircle, XCircle, FileText, UserPlus, Search, Trash2, FileSpreadsheet, Edit } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
@@ -20,6 +20,10 @@ const Marketing = () => {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeProspectForQuote, setActiveProspectForQuote] = useState(null);
+  const [activeProspectForEdit, setActiveProspectForEdit] = useState(null);
+  const [editProspectData, setEditProspectData] = useState({
+    name: '', address: '', phone: '', email: '', pic: '', notes: '', description: '', marketingName: '', marketingPhone: '', marketingEmail: '', companyAddress: ''
+  });
   const [quoteGeneralNotes, setQuoteGeneralNotes] = useState('');
   const [quotePic, setQuotePic] = useState('');
   const [quoteItems, setQuoteItems] = useState([
@@ -30,6 +34,14 @@ const Marketing = () => {
   const [prospectData, setProspectData] = useState({
     name: '', address: '', phone: '', email: '', pic: '', notes: '', description: '', marketingName: '', marketingPhone: '', marketingEmail: '', companyAddress: ''
   });
+
+  const [activeQuotationForEdit, setActiveQuotationForEdit] = useState(null);
+  const [editQuotePic, setEditQuotePic] = useState('');
+  const [editQuoteValidFrom, setEditQuoteValidFrom] = useState('');
+  const [editQuoteValidTo, setEditQuoteValidTo] = useState('');
+  const [editQuoteItems, setEditQuoteItems] = useState([{ description: '', rate: '', quantity: '1', unit: '' }]);
+  const [editQuoteGeneralNotes, setEditQuoteGeneralNotes] = useState('');
+  const [editQuoteCompanyAddress, setEditQuoteCompanyAddress] = useState('');
 
   // Pre-fill PIC and Description when modal opens
   React.useEffect(() => {
@@ -48,9 +60,9 @@ const Marketing = () => {
   if (!context) return null;
   const {
     customers = [], addCustomer,
-    prospects = [], addProspect, updateProspectStatus, deleteProspect,
+    prospects = [], addProspect, updateProspect, updateProspectStatus, deleteProspect,
     prospectDrafts = [], generateProspectDraft,
-    quotations = [], createQuotation, approveQuotation, unapproveQuotation, deleteQuotation,
+    quotations = [], createQuotation, updateQuotation, approveQuotation, unapproveQuotation, deleteQuotation,
     employees = [],
     user,
     t,
@@ -92,12 +104,42 @@ const Marketing = () => {
     setQuoteItems(newItems);
   };
 
+  const handleOpenEditModal = (prospect) => {
+    setActiveProspectForEdit(prospect);
+    setEditProspectData({
+      name: prospect.name || '',
+      address: prospect.address || '',
+      phone: prospect.phone || '',
+      email: prospect.email || '',
+      pic: prospect.pic || '',
+      notes: prospect.notes || '',
+      description: prospect.description || '',
+      marketingName: prospect.marketingName || '',
+      marketingPhone: prospect.marketingPhone || '',
+      marketingEmail: prospect.marketingEmail || '',
+      companyAddress: prospect.companyAddress || ''
+    });
+  };
+
+  const handleProspectEditSubmit = async (e) => {
+    if (e) e.preventDefault();
+    try {
+      await updateProspect(activeProspectForEdit.id, editProspectData);
+      setActiveProspectForEdit(null);
+    } catch (error) {
+      console.error("Gagal update prospek:", error);
+      alert("Gagal memperbarui data calon pelanggan.");
+    }
+  };
+
   const handleProspectSubmit = (e) => {
     e.preventDefault();
     addProspect(prospectData);
     setProspectData({ name: '', address: '', phone: '', email: '', pic: '', notes: '', description: '', marketingName: '', marketingPhone: '', marketingEmail: '', companyAddress: '' });
     setShowProspectForm(false);
   };
+
+
 
   const handleCreateProspectQuotation = async (e) => {
     if (e) e.preventDefault();
@@ -168,6 +210,75 @@ const Marketing = () => {
       console.error("Quotation creation failed:", error);
       throw error; // Re-throw so ButtonWithLoading can handle it
     }
+  };
+
+  const handleOpenEditQuotationModal = (quote) => {
+    setActiveQuotationForEdit(quote);
+    setEditQuotePic(quote.pic || '');
+    setEditQuoteValidFrom(quote.validFrom || '');
+    setEditQuoteValidTo(quote.validTo || '');
+    setEditQuoteItems(Array.isArray(quote.items) ? quote.items.map(item => ({
+      description: item.description || '',
+      rate: item.rate || '',
+      quantity: item.quantity || '1',
+      unit: item.unit || ''
+    })) : [{ description: '', rate: '', quantity: '1', unit: '' }]);
+    setEditQuoteGeneralNotes(quote.generalNotes || '');
+    setEditQuoteCompanyAddress(quote.companyAddress || '');
+  };
+
+  const handleSaveQuotationEdit = async (e) => {
+    if (e) e.preventDefault();
+    if (!activeQuotationForEdit) return;
+
+    if (editQuoteItems.length === 0 || editQuoteItems.some(item => !item.description || !item.rate || !item.quantity)) {
+      alert("Please fill in all item details (Description, Rate, and Quantity).");
+      return;
+    }
+
+    const totalAmount = editQuoteItems.reduce((sum, item) => {
+      const r = parseFloat(item.rate) || 0;
+      const q = parseFloat(item.quantity) || 0;
+      return sum + (r * q);
+    }, 0);
+
+    const combinedDescription = editQuoteItems.map(item =>
+      `${item.description} (Qty: ${item.quantity} ${item.unit || ''} @ Rp ${parseFloat(item.rate).toLocaleString()})`
+    ).join('\n');
+
+    try {
+      await updateQuotation(activeQuotationForEdit.id, {
+        pic: editQuotePic,
+        jobDescription: combinedDescription,
+        items: editQuoteItems,
+        generalNotes: editQuoteGeneralNotes,
+        total: totalAmount,
+        rate: totalAmount,
+        validFrom: editQuoteValidFrom,
+        validTo: editQuoteValidTo,
+        companyAddress: editQuoteCompanyAddress
+      });
+      setActiveQuotationForEdit(null);
+    } catch (error) {
+      console.error("Quotation edit failed:", error);
+      alert("Gagal menyimpan perubahan penawaran.");
+    }
+  };
+
+  const addEditQuoteItem = () => {
+    setEditQuoteItems([...editQuoteItems, { description: '', rate: '', quantity: '1', unit: '' }]);
+  };
+
+  const removeEditQuoteItem = (index) => {
+    if (editQuoteItems.length > 1) {
+      setEditQuoteItems(editQuoteItems.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateEditQuoteItem = (index, field, value) => {
+    const newItems = [...editQuoteItems];
+    newItems[index][field] = value;
+    setEditQuoteItems(newItems);
   };
 
   const handlePrint = () => {
@@ -278,7 +389,9 @@ const Marketing = () => {
   };
 
   return (
-    <div className="marketing-container" style={{ display: 'grid', gap: '25px' }}>
+    <div className="marketing-container" style={{ display: 'flex', flexDirection: 'column', gap: '25px', minWidth: 0, width: '100%' }}>
+
+
 
 
       {/* Delete Confirmation Modal */}
@@ -295,8 +408,7 @@ const Marketing = () => {
           >
             <motion.div
               initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.85, opacity: 0 }}
-              className="glass-card"
-              style={{ padding: '40px', maxWidth: '480px', width: '100%', textAlign: 'center' }}
+              className="glass-card" style={{ padding: '40px', maxWidth: '480px', width: '100%', textAlign: 'center' , overflowX: 'auto' }}
             >
               <div style={{ fontSize: '3rem', marginBottom: '20px' }}>🗑️</div>
               <h3 style={{ marginBottom: '10px', color: '#ef4444' }}>
@@ -344,8 +456,7 @@ const Marketing = () => {
           }}>
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-              className="glass-card"
-              style={{ width: '100%', maxWidth: '900px', padding: '40px', maxHeight: '90vh', overflowY: 'auto' }}
+              className="glass-card" style={{ width: '100%', maxWidth: '900px', padding: '40px', maxHeight: '90vh', overflowY: 'auto' , overflowX: 'auto' }}
             >
               <h3 style={{ marginBottom: '25px', color: 'var(--secondary)' }}>{t('createQuotation')} - {activeProspectForQuote.name}</h3>
               <form onSubmit={handleCreateProspectQuotation}>
@@ -384,7 +495,7 @@ const Marketing = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 100px 50px', gap: '15px', marginBottom: '10px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 100px 50px', minWidth: "700px", gap: '15px', marginBottom: '10px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                   <div>{t('activity')}</div>
                   <div>{t('ratePerTrip')}</div>
                   <div>{t('quantity')}</div>
@@ -393,7 +504,7 @@ const Marketing = () => {
                 </div>
 
                 {quoteItems.map((item, index) => (
-                  <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 100px 50px', gap: '15px', marginBottom: '15px' }}>
+                  <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 100px 50px', minWidth: "700px", gap: '15px', marginBottom: '15px' }}>
                     <input required type="text" value={item.description} onChange={e => updateQuoteItem(index, 'description', e.target.value)} placeholder="Service description..." style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
                     <input required type="number" value={item.rate} onChange={e => updateQuoteItem(index, 'rate', e.target.value)} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
                     <input required type="number" value={item.quantity} onChange={e => updateQuoteItem(index, 'quantity', e.target.value)} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
@@ -422,6 +533,203 @@ const Marketing = () => {
                   <button type="button" onClick={() => setActiveProspectForQuote(null)} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)' }}>Close Form</button>
                   <ButtonWithLoading type="submit" className="btn btn-gold" style={{ flex: 1, background: 'var(--secondary)', color: 'white' }} onClick={handleCreateProspectQuotation}>
                     {t('createQuotation')}
+                  </ButtonWithLoading>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Quotation Form Modal */}
+      <AnimatePresence>
+        {activeQuotationForEdit && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.8)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px'
+          }}>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="glass-card" style={{ width: '100%', maxWidth: '900px', padding: '40px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'auto' }}
+            >
+              <h3 style={{ marginBottom: '25px', color: 'var(--secondary)' }}>Edit Penawaran (Quotation) - {activeQuotationForEdit.id}</h3>
+              <h5 style={{ marginTop: '-15px', marginBottom: '25px', color: 'var(--text-muted)' }}>Pelanggan: {activeQuotationForEdit.customerName}</h5>
+              <form onSubmit={handleSaveQuotationEdit}>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', marginBottom: '25px' }}>
+                  <div className="input-group">
+                    <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>Attn: PIC Name</label>
+                    <input
+                      required
+                      type="text"
+                      value={editQuotePic}
+                      onChange={e => setEditQuotePic(e.target.value)}
+                      placeholder="Nama PIC..."
+                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }}
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>Berlaku Dari</label>
+                    <input
+                      required
+                      type="date"
+                      value={editQuoteValidFrom}
+                      onChange={e => setEditQuoteValidFrom(e.target.value)}
+                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }}
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>Berlaku Sampai</label>
+                    <input
+                      required
+                      type="date"
+                      value={editQuoteValidTo}
+                      onChange={e => setEditQuoteValidTo(e.target.value)}
+                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 100px 50px', minWidth: "700px", gap: '15px', marginBottom: '10px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  <div>{t('activity') || 'Deskripsi Pekerjaan'}</div>
+                  <div>{t('ratePerTrip') || 'Tarif'}</div>
+                  <div>{t('quantity') || 'Jumlah'}</div>
+                  <div>Satuan</div>
+                  <div></div>
+                </div>
+
+                {editQuoteItems.map((item, index) => (
+                  <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 100px 50px', minWidth: "700px", gap: '15px', marginBottom: '15px' }}>
+                    <input required type="text" value={item.description} onChange={e => updateEditQuoteItem(index, 'description', e.target.value)} placeholder="Service description..." style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
+                    <input required type="number" value={item.rate} onChange={e => updateEditQuoteItem(index, 'rate', e.target.value)} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
+                    <input required type="number" value={item.quantity} onChange={e => updateEditQuoteItem(index, 'quantity', e.target.value)} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
+                    <input type="text" value={item.unit} onChange={e => updateEditQuoteItem(index, 'unit', e.target.value)} placeholder="Trip/Kg/..." style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
+                    <button type="button" onClick={() => removeEditQuoteItem(index)} style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                  </div>
+                ))}
+
+                <button type="button" onClick={addEditQuoteItem} className="btn" style={{ marginBottom: '20px', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px dashed var(--secondary)', width: '100%' }}>
+                  + Add Item
+                </button>
+
+                <div className="input-group" style={{ marginBottom: '20px' }}>
+                  <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>Alamat ALP (Tampil Di Header Penawaran)</label>
+                  <input
+                    required
+                    type="text"
+                    value={editQuoteCompanyAddress}
+                    onChange={e => setEditQuoteCompanyAddress(e.target.value)}
+                    placeholder="Masukkan alamat cabang ALP untuk penawaran ini..."
+                    style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%', border: '2px solid var(--secondary)' }}
+                  />
+                </div>
+
+                <div className="input-group" style={{ marginBottom: '20px' }}>
+                  <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>Catatan Penawaran (Tampil di bagian bawah)</label>
+                  <textarea
+                    rows="3"
+                    value={editQuoteGeneralNotes}
+                    onChange={e => setEditQuoteGeneralNotes(e.target.value)}
+                    placeholder="Syarat & ketentuan..."
+                    style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '15px', width: '100%', fontFamily: 'inherit' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '15px', marginTop: '20px' }}>
+                  <button type="button" onClick={() => setActiveQuotationForEdit(null)} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)' }}>Close Form</button>
+                  <ButtonWithLoading type="submit" className="btn btn-gold" style={{ flex: 1, background: 'var(--secondary)', color: 'white' }} onClick={handleSaveQuotationEdit}>
+                    Simpan Perubahan
+                  </ButtonWithLoading>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Prospect Form Modal */}
+      <AnimatePresence>
+        {activeProspectForEdit && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.8)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px'
+          }}>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="glass-card" style={{ width: '100%', maxWidth: '900px', padding: '40px', maxHeight: '90vh', overflowY: 'auto' , overflowX: 'auto' }}
+            >
+              <h3 style={{ marginBottom: '25px', color: 'var(--secondary)' }}>Edit Calon Pelanggan - {activeProspectForEdit.name}</h3>
+              <form onSubmit={handleProspectEditSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+                <div className="input-group">
+                  <label>{t('customerName')}</label>
+                  <input required type="text" value={editProspectData.name} onChange={e => setEditProspectData({ ...editProspectData, name: e.target.value })} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }} />
+                </div>
+                <div className="input-group">
+                  <label>PIC (Person In Charge)</label>
+                  <input required type="text" value={editProspectData.pic} onChange={e => setEditProspectData({ ...editProspectData, pic: e.target.value })} placeholder="Nama penanggung jawab" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }} />
+                </div>
+                <div className="input-group">
+                  <label>{t('phoneNumber')}</label>
+                  <input required type="text" value={editProspectData.phone} onChange={e => setEditProspectData({ ...editProspectData, phone: e.target.value })} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }} />
+                </div>
+                <div className="input-group">
+                  <label>{t('emailAddress')}</label>
+                  <input required type="email" value={editProspectData.email} onChange={e => setEditProspectData({ ...editProspectData, email: e.target.value })} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }} />
+                </div>
+                <div className="input-group">
+                  <label>{t('address')}</label>
+                  <input required type="text" value={editProspectData.address} onChange={e => setEditProspectData({ ...editProspectData, address: e.target.value })} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }} />
+                </div>
+                <div className="input-group">
+                  <label>Notes</label>
+                  <input type="text" value={editProspectData.notes} onChange={e => setEditProspectData({ ...editProspectData, notes: e.target.value })} placeholder="Catatan tambahan" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }} />
+                </div>
+                <div className="input-group">
+                  <label>Nama Marketing</label>
+                  <select 
+                    required 
+                    value={editProspectData.marketingName} 
+                    onChange={e => {
+                      const emp = employees.find(emp => emp.name === e.target.value);
+                      setEditProspectData({ 
+                        ...editProspectData, 
+                        marketingName: e.target.value,
+                        marketingPhone: emp?.phone || '',
+                        marketingEmail: emp?.email || ''
+                      });
+                    }}
+                    style={{ background: 'var(--input-bg)', border: '2px solid var(--secondary)', borderRadius: '12px', color: 'var(--text)', padding: '12px', fontWeight: '600', width: '100%' }}
+                  >
+                    <option value="" style={{ background: 'var(--bg)', color: 'var(--text)' }}>-- Pilih Marketing --</option>
+                    {employees.filter(e => e.position?.toLowerCase().includes('marketing')).map(e => (
+                      <option key={e.id} value={e.name} style={{ background: 'var(--bg)', color: 'var(--text)' }}>{e.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="input-group">
+                  <label>Nomor Telpon Marketing</label>
+                  <input required type="text" value={editProspectData.marketingPhone} onChange={e => setEditProspectData({ ...editProspectData, marketingPhone: e.target.value })} placeholder="+62 812..." style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }} />
+                </div>
+                <div className="input-group">
+                  <label>Email Marketing</label>
+                  <input required type="email" value={editProspectData.marketingEmail} onChange={e => setEditProspectData({ ...editProspectData, marketingEmail: e.target.value })} placeholder="marketing@alpfreight.co.id" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }} />
+                </div>
+                <div className="input-group" style={{ gridColumn: 'span 3' }}>
+                  <label>Alamat ALP (Tampil Di Header Penawaran)</label>
+                  <input required type="text" value={editProspectData.companyAddress} onChange={e => setEditProspectData({ ...editProspectData, companyAddress: e.target.value })} placeholder="Masukkan alamat cabang ALP untuk penawaran ini..." style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }} />
+                </div>
+                <div className="input-group" style={{ gridColumn: 'span 3' }}>
+                  <label>{t('prospectJob')}</label>
+                  <textarea required rows="2" value={editProspectData.description} onChange={e => setEditProspectData({ ...editProspectData, description: e.target.value })} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '15px', width: '100%', fontFamily: 'inherit' }} />
+                </div>
+                <div style={{ display: 'flex', gap: '15px', gridColumn: 'span 3', marginTop: '20px' }}>
+                  <button type="button" onClick={() => setActiveProspectForEdit(null)} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)' }}>Batal</button>
+                  <ButtonWithLoading type="submit" className="btn btn-gold" style={{ flex: 1, background: 'var(--secondary)', color: 'white' }} onClick={handleProspectEditSubmit}>
+                    Simpan Perubahan
                   </ButtonWithLoading>
                 </div>
               </form>
@@ -479,8 +787,8 @@ const Marketing = () => {
 
                 {/* Header Section */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f172a', paddingBottom: '25px', marginBottom: '45px' }}>
-                  <div style={{ display: 'flex', gap: '25px', alignItems: 'center' }}>
-                    <img src="/assets/logo.png" alt="Logo" style={{ height: '60px', width: 'auto', objectFit: 'contain' }} />
+                  <div style={{ display: "flex", gap: "25px", alignItems: "center", flexWrap: "wrap" }}>
+                    <img src="/assets/logo.png" alt="Logo" style={{ width: '75px', height: '75px', objectFit: 'contain' }} />
                     <div>
                       <h4 style={{ margin: 0, fontWeight: '900', fontSize: '1.1rem', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>LOGISTICS & FREIGHT FORWARDING</h4>
                       <div className="text-slate" style={{ fontSize: '0.75rem', lineHeight: '1.4', marginTop: '5px', maxWidth: '300px', fontWeight: '500' }}>
@@ -499,7 +807,7 @@ const Marketing = () => {
                 {/* Info Grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '60px', marginBottom: '70px' }}>
                   {/* Customer Details */}
-                  <div style={{ borderLeft: '4px solid #1e40af', paddingLeft: '30px' }}>
+                  <div style={{ borderLeft: '4px solid #065f46', paddingLeft: '30px' }}>
                     <h5 className="text-slate" style={{ textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: '800', marginBottom: '18px', letterSpacing: '1.5px' }}>CUSTOMER DETAILS</h5>
                     <h3 className="text-gold" style={{ margin: '0 0 10px 0', fontSize: '2.4rem', fontWeight: '900', letterSpacing: '-0.5px', lineHeight: '1.1' }}>{selectedDraft.customerName}</h3>
                     <p className="text-green" style={{ margin: '0 0 8px 0', fontSize: '1.3rem', fontWeight: '800' }}>Attn: {selectedDraft.pic || 'Purchasing Department'}</p>
@@ -510,7 +818,7 @@ const Marketing = () => {
                   <div style={{ textAlign: 'right' }}>
                     <h5 className="text-slate" style={{ textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: '800', marginBottom: '18px', letterSpacing: '1.5px' }}>MARKETING PERSON</h5>
                     <h4 style={{ margin: '0 0 6px 0', fontSize: '1.8rem', fontWeight: '900', color: '#0f172a' }}>{selectedDraft.marketingName || 'PT. Alpha Logistics Prakarsa Team'}</h4>
-                    <p className="text-slate" style={{ margin: 0, fontWeight: '700', fontSize: '1rem' }}>{selectedDraft.marketingEmail || 'marketing@otl.co.id'}</p>
+                    <p className="text-slate" style={{ margin: 0, fontWeight: '700', fontSize: '1rem' }}>{selectedDraft.marketingEmail || 'marketing@alp.co.id'}</p>
                     <p className="text-slate" style={{ margin: '4px 0 25px 0', fontWeight: '700', fontSize: '1rem' }}>+62 21 5000 8000</p>
                     <div style={{ borderTop: '1px solid #e2e8f0', display: 'inline-block', paddingTop: '12px' }}>
                       <span className="text-slate" style={{ textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: '800', letterSpacing: '1px', marginRight: '12px' }}>VALIDITY PERIOD:</span>
@@ -592,7 +900,7 @@ const Marketing = () => {
                     <p style={{ fontWeight: '900', fontSize: '1rem', color: '#0f172a', textTransform: 'uppercase', marginBottom: '80px', letterSpacing: '1.5px' }}>AUTHORIZED SIGNATURE</p>
                     <div style={{ borderBottom: '2.5px solid #0f172a', width: '250px', margin: '0 auto 15px auto' }}></div>
                     <p style={{ margin: 0, fontWeight: '900', fontSize: '1.2rem', color: '#0f172a' }}>Management</p>
-                    <p className="text-slate" style={{ margin: 0, fontWeight: '800', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>PT. Alpha Logistics Prakarsa</p>
+                    <p className="text-slate" style={{ margin: 0, fontWeight: '800', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>PT. OMEGA TRUST LOGISTIK</p>
                   </div>
                 </div>
             </motion.div>
@@ -651,8 +959,8 @@ const Marketing = () => {
       </div>
 
       {/* Unified Search & Date Filter Bar */}
-      <div className="glass-card" style={{ padding: '15px 25px', marginBottom: '25px', display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap', background: 'rgba(255,255,255,0.03)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div className="glass-card" style={{ padding: '15px 25px', marginBottom: '25px', display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap', background: 'rgba(255,255,255,0.03)' , overflowX: 'auto' }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>Filter Tanggal:</span>
           <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
           <span style={{ color: 'var(--text-muted)' }}>s/d</span>
@@ -672,7 +980,7 @@ const Marketing = () => {
         {showProspectForm && activeTab === 'prospects' && (
           <motion.div
             initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-            className="glass-card" style={{ padding: '30px', overflow: 'hidden' }}
+            className="glass-card" style={{ padding: '30px', overflow: 'hidden' , overflowX: 'auto' }}
           >
             <form onSubmit={handleProspectSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
               <div className="input-group">
@@ -713,11 +1021,11 @@ const Marketing = () => {
                       marketingEmail: emp?.email || ''
                     });
                   }}
-                  style={{ background: '#ffffff', border: '2px solid var(--secondary)', borderRadius: '12px', color: '#000000', padding: '12px', fontWeight: '600' }}
+                  style={{ background: 'var(--input-bg)', border: '2px solid var(--secondary)', borderRadius: '12px', color: 'var(--text)', padding: '12px', fontWeight: '600' }}
                 >
-                  <option value="" style={{ background: '#ffffff', color: '#000000' }}>-- Pilih Marketing --</option>
+                  <option value="" style={{ background: 'var(--bg)', color: 'var(--text)' }}>-- Pilih Marketing --</option>
                   {employees.filter(e => e.position?.toLowerCase().includes('marketing')).map(e => (
-                    <option key={e.id} value={e.name} style={{ background: '#ffffff', color: '#000000' }}>{e.name}</option>
+                    <option key={e.id} value={e.name} style={{ background: 'var(--bg)', color: 'var(--text)' }}>{e.name}</option>
                   ))}
                 </select>
               </div>
@@ -727,11 +1035,11 @@ const Marketing = () => {
               </div>
               <div className="input-group">
                 <label>Email Marketing</label>
-                <input required type="email" value={prospectData.marketingEmail} onChange={e => setProspectData({ ...prospectData, marketingEmail: e.target.value })} placeholder="marketing@otlfreight.co.id" />
+                <input required type="email" value={prospectData.marketingEmail} onChange={e => setProspectData({ ...prospectData, marketingEmail: e.target.value })} placeholder="marketing@alpfreight.co.id" />
               </div>
               <div className="input-group" style={{ gridColumn: 'span 3' }}>
-                <label>Alamat OTL (Tampil Di Header Penawaran)</label>
-                <input required type="text" value={prospectData.companyAddress} onChange={e => setProspectData({ ...prospectData, companyAddress: e.target.value })} placeholder="Masukkan alamat cabang OTL untuk penawaran ini..." />
+                <label>Alamat ALP (Tampil Di Header Penawaran)</label>
+                <input required type="text" value={prospectData.companyAddress} onChange={e => setProspectData({ ...prospectData, companyAddress: e.target.value })} placeholder="Masukkan alamat cabang ALP untuk penawaran ini..." />
               </div>
               <div className="input-group" style={{ gridColumn: 'span 3' }}>
                 <label>{t('prospectJob')}</label>
@@ -751,9 +1059,9 @@ const Marketing = () => {
       >
         {activeTab === 'jobOrders' ? (
           <div className="glass-card" style={{ padding: '25px', overflowX: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px", flexWrap: "wrap", gap: "15px" }}>
               <h4 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-                <CheckCircle size={20} style={{ color: '#3b82f6' }} />
+                <CheckCircle size={20} style={{ color: '#10b981' }} />
                 {t('activeJobOrders')}
               </h4>
               <div style={{ position: 'relative', width: '300px' }}>
@@ -767,7 +1075,8 @@ const Marketing = () => {
                 <Search size={18} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               </div>
             </div>
-            <div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1050px' }}>
+            <div className="table-container"><div className="table-responsive-wrapper" style={{ overflowX: 'auto', width: '100%' }}>
+<table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--gold-metallic)' }}>
                   <th style={{ padding: '15px' }}>Quotation #</th>
@@ -797,7 +1106,7 @@ const Marketing = () => {
                     const firstItem = Array.isArray(quote.items) && quote.items.length > 0 ? quote.items[0] : null;
                     const activityLabel = firstItem ? firstItem.description : '-';
                     return (
-                      <tr key={quote.id} style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(37, 99, 235, 0.04)' }} className="table-row-hover">
+                      <tr key={quote.id} style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(16, 185, 129, 0.04)' }} className="table-row-hover">
                         <td style={{ padding: '15px', fontWeight: '700', color: 'var(--secondary)', fontSize: '0.85rem' }}>{quote.id}</td>
                         <td style={{ padding: '15px', fontSize: '0.85rem' }}>{quote.date}</td>
                         <td style={{ padding: '15px', fontSize: '0.95rem', fontWeight: '600' }}>{quote.customerName}</td>
@@ -835,7 +1144,8 @@ const Marketing = () => {
                     );
                   })}
               </tbody>
-            </table></div>
+            </table>
+</div></div>
             {quotations.filter(q => q.status === 'approved').filter(q =>
               q.customerName.toLowerCase().includes(jobOrderSearchTerm.toLowerCase()) ||
               q.id.toLowerCase().includes(jobOrderSearchTerm.toLowerCase())
@@ -849,7 +1159,7 @@ const Marketing = () => {
           </div>
         ) : activeTab === 'quotationList' ? (
           <div className="glass-card" style={{ padding: '25px', overflowX: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px", flexWrap: "wrap", gap: "15px" }}>
               <h4 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
                 <FileText size={20} style={{ color: 'var(--gold-metallic)' }} />
                 {t('quotationList') || 'All Quotations'}
@@ -865,7 +1175,8 @@ const Marketing = () => {
                 <Search size={18} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               </div>
             </div>
-            <div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
+            <div className="table-container"><div className="table-responsive-wrapper" style={{ overflowX: 'auto', width: '100%' }}>
+<table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--gold-metallic)' }}>
                   <th style={{ padding: '15px' }}>Quotation #</th>
@@ -905,7 +1216,7 @@ const Marketing = () => {
                           {quote.status === 'pending' && (
                             <ButtonWithLoading
                               className="btn-icon"
-                              style={{ color: '#3b82f6', background: 'rgba(37, 99, 235, 0.1)' }}
+                              style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.1)' }}
                               onClick={async () => {
                                 await approveQuotation(quote.id);
                                 setActiveTab('jobOrders');
@@ -933,6 +1244,14 @@ const Marketing = () => {
                           >
                             <FileText size={16} />
                           </button>
+                          <button
+                            className="btn-icon"
+                            style={{ color: 'var(--secondary)', background: 'rgba(212, 175, 55, 0.1)' }}
+                            onClick={() => handleOpenEditQuotationModal(quote)}
+                            title="Edit Quotation"
+                          >
+                            <Edit size={16} />
+                          </button>
                           {user?.role === 'owner' && (
                             <button
                               className="btn-icon"
@@ -948,11 +1267,12 @@ const Marketing = () => {
                     </tr>
                   ))}
               </tbody>
-            </table></div>
+            </table>
+</div></div>
           </div>
         ) : (
           <div className="glass-card" style={{ padding: '25px', overflowX: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px", flexWrap: "wrap", gap: "15px" }}>
               <h4 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
                 <UserPlus size={20} style={{ color: 'var(--secondary)' }} />
                 {t('prospectCustomers')}
@@ -962,7 +1282,8 @@ const Marketing = () => {
                 <Search size={18} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               </div>
             </div>
-            <div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1200px' }}>
+            <div className="table-container"><div className="table-responsive-wrapper" style={{ overflowX: 'auto', width: '100%' }}>
+<table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--glass-border)' }}>
                   <th style={{ padding: '15px' }}>{t('companyName')}</th>
@@ -991,10 +1312,10 @@ const Marketing = () => {
                     </td>
                     <td style={{ padding: '15px' }}>
                       <select value={prospect.status} onChange={(e) => updateProspectStatus(prospect.id, e.target.value)} style={{ padding: '6px 10px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--secondary)', fontSize: '0.8rem' }}>
-                        <option value="followUp">{t('followUp')}</option>
-                        <option value="negotiation">{t('negotiation')}</option>
-                        <option value="deal">{t('deal')}</option>
-                        <option value="lost">{t('lost')}</option>
+                        <option value="followUp" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{t('followUp')}</option>
+                        <option value="negotiation" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{t('negotiation')}</option>
+                        <option value="deal" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{t('deal')}</option>
+                        <option value="lost" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{t('lost')}</option>
                       </select>
                     </td>
                     <td style={{ padding: '15px' }}>
@@ -1002,6 +1323,14 @@ const Marketing = () => {
                         <button className="btn btn-gold" style={{ padding: '8px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={() => setActiveProspectForQuote(prospect)}>
                           <FileText size={14} />
                           {t('createQuotation')}
+                        </button>
+                        <button
+                          className="btn-icon"
+                          style={{ color: 'var(--secondary)', background: 'rgba(212, 175, 55, 0.1)', height: '28px', width: '28px' }}
+                          onClick={() => handleOpenEditModal(prospect)}
+                          title="Edit Calon Pelanggan"
+                        >
+                          <Edit size={14} />
                         </button>
                         {prospect.status === 'deal' && (
                           <button
@@ -1027,7 +1356,8 @@ const Marketing = () => {
                   </tr>
                 ))}
               </tbody>
-            </table></div>
+            </table>
+</div></div>
           </div>
         )}
       </motion.div>
@@ -1037,11 +1367,4 @@ const Marketing = () => {
 };
 
 export default Marketing;
-
-
-
-
-
-
-
 

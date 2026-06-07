@@ -102,28 +102,28 @@ const SuratJalanDetail = () => {
         >
           <div id="surat-jalan-document" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '3px solid #1e40af', paddingBottom: '20px', marginBottom: '25px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '3px solid #065f46', paddingBottom: '20px', marginBottom: '25px' }}>
               <div>
-                <h2 style={{ color: '#1e40af', margin: 0, fontWeight: '800', fontSize: '1.8rem', background: 'none', WebkitTextFillColor: 'initial' }}>PT. ALPHA LOGISTICS PRAKARSA</h2>
+                <h2 style={{ color: '#065f46', margin: 0, fontWeight: '800', fontSize: '1.8rem', background: 'none', WebkitTextFillColor: 'initial' }}>PT. ALPHA LOGISTICS PRAKARSA</h2>
                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '5px 0 0 0' }}>Logistik & Freight Forwarding System</p>
                 <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '2px 0 0 0' }}>Jl. Raya Freight No. 88, Jakarta Utara</p>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <h1 style={{ color: '#ed1c24', fontSize: '2.2rem', margin: 0, fontWeight: '900', letterSpacing: '1px', background: 'none', WebkitTextFillColor: 'initial' }}>SURAT JALAN</h1>
+                <h1 style={{ color: '#d4af37', fontSize: '2.2rem', margin: 0, fontWeight: '900', letterSpacing: '1px', background: 'none', WebkitTextFillColor: 'initial' }}>SURAT JALAN</h1>
                 <p style={{ fontWeight: '700', margin: '5px 0 0 0', fontSize: '1.1rem', color: '#1e293b' }}>{jo.id}</p>
                 <p style={{ margin: '5px 0 0 0', color: '#64748b' }}>Tanggal: {jo.date}</p>
               </div>
             </div>
 
             {/* Body Info */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '40px', marginBottom: '35px' }}>
+            <div className="grid-responsive-2" style={{ marginBottom: '30px' }}>
               <div>
-                <h4 style={{ color: '#1e40af', marginBottom: '12px', textTransform: 'uppercase', fontSize: '0.85rem', fontWeight: '700', borderBottom: '1px solid #e2e8f0', paddingBottom: '5px' }}>Tujuan Pengiriman</h4>
+                <h4 style={{ color: '#065f46', marginBottom: '12px', textTransform: 'uppercase', fontSize: '0.85rem', fontWeight: '700', borderBottom: '1px solid #e2e8f0', paddingBottom: '5px' }}>Tujuan Pengiriman</h4>
                 <p style={{ fontWeight: '800', fontSize: '1.3rem', margin: '0 0 8px 0', color: '#1e293b' }}>{jo.customerName}</p>
                 <p style={{ margin: 0, color: '#475569', lineHeight: '1.5', fontSize: '0.95rem' }}>{jo.address || 'Alamat sesuai Database'}</p>
               </div>
               <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <h4 style={{ color: '#1e40af', marginBottom: '15px', textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: '700' }}>Informasi Kendaraan</h4>
+                <h4 style={{ color: '#065f46', marginBottom: '15px', textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: '700' }}>Informasi Kendaraan</h4>
                 <div style={{ display: 'grid', gap: '10px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#64748b', fontSize: '0.85rem' }}>No. Container:</span>
@@ -143,12 +143,12 @@ const SuratJalanDetail = () => {
 
             {/* Detail Pengiriman */}
             <div style={{ marginBottom: '40px' }}>
-              <h4 style={{ color: '#1e40af', marginBottom: '15px', textTransform: 'uppercase', fontSize: '0.85rem', fontWeight: '700', borderBottom: '1px solid #e2e8f0', paddingBottom: '5px' }}>Detail Pengiriman</h4>
+              <h4 style={{ color: '#065f46', marginBottom: '15px', textTransform: 'uppercase', fontSize: '0.85rem', fontWeight: '700', borderBottom: '1px solid #e2e8f0', paddingBottom: '5px' }}>Detail Pengiriman</h4>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
-                    <th style={{ padding: '12px 15px', border: '1px solid #e2e8f0', color: '#1e40af' }}>Deskripsi Pekerjaan / Barang</th>
-                    <th style={{ padding: '12px 15px', border: '1px solid #e2e8f0', color: '#1e40af', width: '100px', textAlign: 'center' }}>Quantity</th>
+                    <th style={{ padding: '12px 15px', border: '1px solid #e2e8f0', color: '#065f46' }}>Deskripsi Pekerjaan / Barang</th>
+                    <th style={{ padding: '12px 15px', border: '1px solid #e2e8f0', color: '#065f46', width: '100px', textAlign: 'center' }}>Quantity</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -187,7 +187,7 @@ const SuratJalanDetail = () => {
             {/* Footer Note */}
             <div style={{ marginTop: '40px', borderTop: '1px dashed #cbd5e1', paddingTop: '15px' }}>
               <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: 0, fontStyle: 'italic', textAlign: 'center' }}>
-                * Surat Jalan ini adalah dokumen resmi pengiriman barang PT. ALPHA LOGISTICS PRAKARSA. Mohon diperiksa kembali kelengkapan barang saat diterima.
+                * Surat Jalan ini adalah dokumen resmi pengiriman barang PT. Alpha Logistics Prakarsa. Mohon diperiksa kembali kelengkapan barang saat diterima.
               </p>
             </div>
           </div>
@@ -198,8 +198,4 @@ const SuratJalanDetail = () => {
 };
 
 export default SuratJalanDetail;
-
-
-
-
 

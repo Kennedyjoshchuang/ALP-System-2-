@@ -1,6 +1,6 @@
 const Database = require('better-sqlite3');
 const path = require('path');
-const db = new Database(path.join(__dirname, 'omega_trust.db'));
+const db = new Database(path.join(__dirname, 'alp_system.db'));
 
 try {
   console.log('🚀 Starting Database Migration...');

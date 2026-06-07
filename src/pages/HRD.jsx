@@ -25,8 +25,9 @@ const HRD = () => {
   const { 
     employees = [], addEmployee, updateEmployee, deleteEmployee,
     employeeAccounts = [], addEmployeeAccount, updateEmployeeAccount, deleteEmployeeAccount,
-    t, user 
+    t, user, language 
   } = useApp();
+  const isID = language === 'id';
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -70,10 +71,10 @@ const HRD = () => {
       const isEditing = !!selectedEmployee;
       if (isEditing) {
         await updateEmployee(selectedEmployee.id, formData);
-        toast.success('Data karyawan berhasil diperbarui!');
+        toast.success(isID ? 'Data karyawan berhasil diperbarui!' : 'Employee data successfully updated!');
       } else {
         await addEmployee(formData);
-        toast.success('Karyawan baru berhasil ditambahkan!');
+        toast.success(isID ? 'Karyawan baru berhasil ditambahkan!' : 'New employee successfully added!');
       }
       setIsAddModalOpen(false);
       setSelectedEmployee(null);
@@ -83,9 +84,9 @@ const HRD = () => {
       });
     } catch (err) {
       console.error('Gagal menyimpan karyawan:', err);
-      const msg = err.message || 'Terjadi kesalahan. Coba lagi.';
+      const msg = err.message || (isID ? 'Terjadi kesalahan. Coba lagi.' : 'An error occurred. Please try again.');
       setSubmitError(msg);
-      toast.error('Gagal menyimpan: ' + msg);
+      toast.error((isID ? 'Gagal menyimpan: ' : 'Failed to save: ') + msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -100,13 +101,13 @@ const HRD = () => {
     try {
       if (isEditAccount) {
         await updateEmployeeAccount(selectedEmployee.id, accountData);
-        toast.success('Akses sistem berhasil diperbarui!');
+        toast.success(isID ? 'Akses sistem berhasil diperbarui!' : 'System access successfully updated!');
       } else {
         await addEmployeeAccount({
           id: selectedEmployee.id,
           ...accountData
         });
-        toast.success('Akses sistem berhasil diberikan!');
+        toast.success(isID ? 'Akses sistem berhasil diberikan!' : 'System access successfully granted!');
       }
       setIsAccountModalOpen(false);
       setIsEditAccount(false);
@@ -114,9 +115,9 @@ const HRD = () => {
       setAccountData({ username: '', password: '', role: 'staff' });
     } catch (err) {
       console.error('Gagal membuat akun:', err);
-      const msg = err.message || 'Terjadi kesalahan. Coba lagi.';
+      const msg = err.message || (isID ? 'Terjadi kesalahan. Coba lagi.' : 'An error occurred. Please try again.');
       setCreateAccountError(msg);
-      toast.error('Gagal memberi akses: ' + msg);
+      toast.error((isID ? 'Gagal memberi akses: ' : 'Failed to grant access: ') + msg);
     } finally {
       setIsAccountSubmitting(false);
     }
@@ -130,7 +131,7 @@ const HRD = () => {
         <div style={{ position: 'relative', width: '350px' }}>
           <input
             type="text"
-            placeholder="Cari karyawan..."
+            placeholder={isID ? "Cari karyawan..." : "Search employee..."}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
@@ -153,7 +154,7 @@ const HRD = () => {
           style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 25px' }}
         >
           <UserPlus size={20} />
-          Tambahkan Karyawan
+          {isID ? 'Tambahkan Karyawan' : 'Add Employee'}
         </button>
       </div>
 
@@ -161,12 +162,12 @@ const HRD = () => {
         <div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ textAlign: 'left', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border)' }}>
-              <th style={{ padding: '20px' }}>Nama & Jabatan</th>
-              <th style={{ padding: '20px' }}>Kontak</th>
-              <th style={{ padding: '20px' }}>Identitas (NIK/NPWP)</th>
-              <th style={{ padding: '20px' }}>Rekening Bank</th>
-              <th style={{ padding: '20px' }}>Akses Sistem</th>
-              <th style={{ padding: '20px' }}>Aksi</th>
+              <th style={{ padding: '20px' }}>{isID ? 'Nama & Jabatan' : 'Name & Position'}</th>
+              <th style={{ padding: '20px' }}>{isID ? 'Kontak' : 'Contact'}</th>
+              <th style={{ padding: '20px' }}>{isID ? 'Identitas (NIK/NPWP)' : 'Identity (NIK/NPWP)'}</th>
+              <th style={{ padding: '20px' }}>{isID ? 'Rekening Bank' : 'Bank Account'}</th>
+              <th style={{ padding: '20px' }}>{isID ? 'Akses Sistem' : 'System Access'}</th>
+              <th style={{ padding: '20px' }}>{isID ? 'Aksi' : 'Actions'}</th>
             </tr>
           </thead>
           <tbody>
@@ -207,12 +208,12 @@ const HRD = () => {
                     <td style={{ padding: '20px' }}>
                       {account ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#3b82f6', fontSize: '0.85rem', background: 'rgba(37, 99, 235, 0.1)', padding: '6px 12px', borderRadius: '100px', width: 'fit-content' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontSize: '0.85rem', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '100px', width: 'fit-content' }}>
                             <ShieldCheck size={14} />
                             {account.username}
                           </div>
                           <button 
-                            title="Reset Akses"
+                            title={isID ? "Reset Akses" : "Reset Access"}
                             onClick={() => {
                               setSelectedEmployee(emp);
                               setAccountData({ username: account.username, password: '', role: account.role });
@@ -225,9 +226,9 @@ const HRD = () => {
                             <RotateCcw size={14} />
                           </button>
                           <button 
-                            title="Hapus Akses"
+                            title={isID ? "Hapus Akses" : "Remove Access"}
                             onClick={() => {
-                              if (confirm(`Hapus akses sistem untuk ${emp.name}?`)) {
+                              if (confirm(isID ? `Hapus akses sistem untuk ${emp.name}?` : `Remove system access for ${emp.name}?`)) {
                                 deleteEmployeeAccount(emp.id);
                               }
                             }}
@@ -248,7 +249,7 @@ const HRD = () => {
                           className="btn-text" 
                           style={{ fontSize: '0.8rem', color: 'var(--secondary)', textDecoration: 'underline' }}
                         >
-                          Beri Akses
+                          {isID ? 'Beri Akses' : 'Grant Access'}
                         </button>
                       )}
                     </td>
@@ -267,7 +268,11 @@ const HRD = () => {
                         <button 
                           className="btn-icon" 
                           style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }}
-                          onClick={() => deleteEmployee(emp.id)}
+                          onClick={() => {
+                            if (confirm(isID ? `Hapus karyawan ${emp.name}?` : `Delete employee ${emp.name}?`)) {
+                              deleteEmployee(emp.id);
+                            }
+                          }}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -282,7 +287,7 @@ const HRD = () => {
         {filteredEmployees.length === 0 && (
           <div style={{ textAlign: 'center', padding: '100px 20px', color: 'var(--text-muted)' }}>
             <Users size={64} style={{ opacity: 0.1, marginBottom: '20px' }} />
-            <p>Belum ada data karyawan.</p>
+            <p>{isID ? 'Belum ada data karyawan.' : 'No employee data available.'}</p>
           </div>
         )}
       </div>
@@ -296,7 +301,7 @@ const HRD = () => {
               <button className="close-btn" onClick={() => setIsAddModalOpen(false)}><X size={24} /></button>
             </div>
             <form onSubmit={handleSubmit} style={{ padding: '30px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div className="grid-responsive-2">
                 <div className="input-group">
                   <label>Nama Lengkap</label>
                   <input required type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Masukkan nama lengkap" />
@@ -381,14 +386,14 @@ const HRD = () => {
                 <select 
                   value={accountData.role} 
                   onChange={e => setAccountData({ ...accountData, role: e.target.value })} 
-                  style={{ background: '#ffffff', color: '#000000', border: '2px solid var(--secondary)', borderRadius: '12px', padding: '12px', width: '100%', fontWeight: '600' }}
+                  style={{ background: 'var(--input-bg)', color: 'var(--text)', border: '2px solid var(--secondary)', borderRadius: '12px', padding: '12px', width: '100%', fontWeight: '600' }}
                 >
-                  <option value="marketing" style={{ background: '#ffffff', color: '#000000' }}>Marketing</option>
-                  <option value="accounting" style={{ background: '#ffffff', color: '#000000' }}>Accounting</option>
-                  <option value="executor" style={{ background: '#ffffff', color: '#000000' }}>Executor</option>
-                  <option value="admin" style={{ background: '#ffffff', color: '#000000' }}>Admin Office</option>
-                  <option value="hrd" style={{ background: '#ffffff', color: '#000000' }}>HRD</option>
-                  <option value="staff" style={{ background: '#ffffff', color: '#000000' }}>Staff (View Only)</option>
+                  <option value="marketing" style={{ background: 'var(--bg)', color: 'var(--text)' }}>Marketing</option>
+                  <option value="accounting" style={{ background: 'var(--bg)', color: 'var(--text)' }}>Accounting</option>
+                  <option value="executor" style={{ background: 'var(--bg)', color: 'var(--text)' }}>Executor</option>
+                  <option value="admin" style={{ background: 'var(--bg)', color: 'var(--text)' }}>Admin Office</option>
+                  <option value="hrd" style={{ background: 'var(--bg)', color: 'var(--text)' }}>HRD</option>
+                  <option value="staff" style={{ background: 'var(--bg)', color: 'var(--text)' }}>Staff (View Only)</option>
                 </select>
               </div>
               {createAccountError && (
@@ -410,8 +415,4 @@ const HRD = () => {
 };
 
 export default HRD;
-
-
-
-
 

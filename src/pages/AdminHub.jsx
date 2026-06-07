@@ -33,10 +33,11 @@ const AdminHub = () => {
   const [poNotes, setPoNotes] = useState('');
 
   if (!context) return null;
-  const { quotations = [], jobOrders = [], createJO, dispatchJO, vendors = [], purchaseOrders = [], createPurchaseOrder, updatePurchaseOrder, issuePurchaseOrder, deletePurchaseOrder, user, t, loading } = context;
+  const { quotations = [], jobOrders = [], createJO, dispatchJO, vendors = [], purchaseOrders = [], createPurchaseOrder, updatePurchaseOrder, issuePurchaseOrder, deletePurchaseOrder, user, t, loading, language } = context;
+  const isID = language === 'id';
   
   if (loading) {
-    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'var(--secondary)' }}>Loading Admin Hub...</div>;
+    return <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'var(--secondary)' }}>{isID ? 'Memuat Dasbor Admin...' : 'Loading Admin Hub...'}</div>;
   }
 
   const filterByDate = (itemDate) => {
@@ -116,7 +117,7 @@ const AdminHub = () => {
     fileName = "Purchase_Order_Records";
 
     if (dataToExport.length === 0) {
-      alert("Tidak ada data PO untuk di-export pada rentang tanggal ini.");
+      alert(isID ? "Tidak ada data PO untuk di-export pada rentang tanggal ini." : "No PO data to export for this date range.");
       return;
     }
 
@@ -125,8 +126,8 @@ const AdminHub = () => {
 
   const buildPOPayload = () => {
     const jo = jobOrders.find(j => String(j.id) === String(poJoId));
-    if (!jo) { alert('Job Order tidak ditemukan.'); return null; }
-    if (!poVendor) { alert('Vendor tidak ditemukan.'); return null; }
+    if (!jo) { alert(isID ? 'Job Order tidak ditemukan.' : 'Job Order not found.'); return null; }
+    if (!poVendor) { alert(isID ? 'Vendor tidak ditemukan.' : 'Vendor not found.'); return null; }
 
     const items = poItems
       .filter(it => it.serviceIdx !== '')
@@ -141,7 +142,7 @@ const AdminHub = () => {
         };
       });
 
-    if (items.length === 0) { alert('Pilih minimal satu layanan vendor.'); return null; }
+    if (items.length === 0) { alert(isID ? 'Pilih minimal satu layanan vendor.' : 'Select at least one vendor service.'); return null; }
 
     return {
       joId: jo.id,
@@ -204,7 +205,7 @@ const AdminHub = () => {
       resetPOForm();
     } catch (err) {
       console.error('Error saving draft PO:', err);
-      alert('Gagal menyimpan draft: ' + err.message);
+      alert((isID ? 'Gagal menyimpan draft: ' : 'Failed to save draft: ') + err.message);
     }
   };
 
@@ -230,7 +231,7 @@ const AdminHub = () => {
       }
     } catch (err) {
       console.error('Error issuing PO directly:', err);
-      alert('Gagal menerbitkan Purchase Order: ' + err.message);
+      alert((isID ? 'Gagal menerbitkan Purchase Order: ' : 'Failed to issue Purchase Order: ') + err.message);
     }
   };
 
@@ -271,7 +272,7 @@ const AdminHub = () => {
     const jo = jobOrders.find(j => j.id === joId);
     const qty = quantities[joId] || jo.quantity || 1;
     await dispatchJO(joId, parseInt(qty));
-    alert('Job Order dispatched to Executor!');
+    alert(isID ? 'Job Order berhasil dikirim ke Pelaksana!' : 'Job Order dispatched to Executor!');
   };
 
   return (
@@ -282,13 +283,13 @@ const AdminHub = () => {
       <AnimatePresence>
         {printPO && (
           <div style={{position:'fixed',inset:0,background:'white',zIndex:10000,padding:'40px',color:'black',overflowY:'auto'}}>
-            <div className="no-print" style={{position:'absolute',top:'20px',right:'20px',display:'flex',gap:'10px'}}>
-              <button className="btn" style={{background:'#eee',color:'#333'}} onClick={()=>setPrintPO(null)}>Close</button>
-              <button className="btn btn-primary" onClick={()=>window.print()}>Print PO</button>
+            <div className="no-print" style={{position:'absolute',top:'20px',right:'20px',display: 'flex', flexWrap: 'wrap',gap:'10px'}}>
+              <button className="btn" style={{background:'#eee',color:'#333'}} onClick={()=>setPrintPO(null)}>{isID ? 'Tutup' : 'Close'}</button>
+              <button className="btn btn-primary" onClick={()=>window.print()}>{isID ? 'Cetak PO' : 'Print PO'}</button>
             </div>
             
             <div id="po-print" className="quotation-modal-content" style={{maxWidth:'210mm',margin:'0 auto',border:'1px solid #ddd',padding:'40px',fontFamily:'Arial'}}>
-              <div style={{display:'flex',justifyContent:'space-between',borderBottom:'3px solid #333',paddingBottom:'20px',marginBottom:'30px'}}>
+              <div style={{display: 'flex', flexWrap: 'wrap',justifyContent:'space-between',borderBottom:'3px solid #333',paddingBottom:'20px',marginBottom:'30px'}}>
                 <div>
                   <h1 style={{margin:0,fontSize:'2rem',color:'#333'}}>PURCHASE ORDER</h1>
                   <div style={{color:'#666',marginTop:'5px'}}>Ref: {printPO.id}</div>
@@ -296,31 +297,32 @@ const AdminHub = () => {
                 <div style={{textAlign:'right'}}>
                   <div style={{fontWeight:'bold'}}>PT. Alpha Logistics Prakarsa</div>
                   <div>Jakarta, Indonesia</div>
-                  <div style={{marginTop:'5px',fontSize:'0.8rem'}}>Date: {formatDate(printPO.date)}</div>
+                  <div style={{marginTop:'5px',fontSize:'0.8rem'}}>{isID ? 'Tanggal:' : 'Date:'} {formatDate(printPO.date)}</div>
                 </div>
               </div>
 
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'40px',marginBottom:'30px'}}>
+              <div className="grid-responsive-2" style={{ marginBottom: '30px' }}>
                 <div>
-                  <div style={{textTransform:'uppercase',fontSize:'0.75rem',color:'#888',marginBottom:'5px'}}>Vendor:</div>
+                  <div style={{textTransform:'uppercase',fontSize:'0.75rem',color:'#888',marginBottom:'5px'}}>{isID ? 'Vendor:' : 'Vendor:'}</div>
                   <div style={{fontWeight:'bold',fontSize:'1.1rem'}}>{printPO.vendorName}</div>
                 </div>
                 <div>
-                  <div style={{textTransform:'uppercase',fontSize:'0.75rem',color:'var(--secondary)',marginBottom:'5px'}}>JO Reference:</div>
+                  <div style={{textTransform:'uppercase',fontSize:'0.75rem',color:'var(--secondary)',marginBottom:'5px'}}>{isID ? 'Referensi JO:' : 'JO Reference:'}</div>
                   <div style={{fontWeight:'bold'}}>{printPO.joId}</div>
                   <div style={{marginTop:'10px'}}>
-                    <span style={{textTransform:'uppercase',fontSize:'0.75rem',color:'var(--secondary)',marginBottom:'5px'}}>Customer:</span>
+                    <span style={{textTransform:'uppercase',fontSize:'0.75rem',color:'var(--secondary)',marginBottom:'5px'}}>{isID ? 'Pelanggan:' : 'Customer:'}</span>
                     <div style={{fontSize:'0.9rem'}}>{printPO.customerName}</div>
                   </div>
                 </div>
               </div>
 
-              <div className="table-container"><table style={{width:'100%',borderCollapse:'collapse',marginBottom:'30px'}}>
+              <div className="table-container"><div className="table-responsive-wrapper" style={{ overflowX: 'auto', width: '100%' }}>
+<table style={{width:'100%',borderCollapse:'collapse',marginBottom:'30px'}}>
                 <thead>
                   <tr style={{background:'#f5f5f5',borderBottom:'2px solid #333'}}>
-                    <th style={{padding:'10px',textAlign:'left'}}>Service Description</th>
-                    <th style={{padding:'10px',textAlign:'center'}}>Qty</th>
-                    <th style={{padding:'10px',textAlign:'right'}}>Unit Price</th>
+                    <th style={{padding:'10px',textAlign:'left'}}>{isID ? 'Deskripsi Layanan' : 'Service Description'}</th>
+                    <th style={{padding:'10px',textAlign:'center'}}>{isID ? 'Jumlah' : 'Qty'}</th>
+                    <th style={{padding:'10px',textAlign:'right'}}>{isID ? 'Harga Satuan' : 'Unit Price'}</th>
                     <th style={{padding:'10px',textAlign:'right'}}>Total</th>
                   </tr>
                 </thead>
@@ -340,23 +342,24 @@ const AdminHub = () => {
                     <td style={{padding:'15px',textAlign:'right',fontWeight:'bold',fontSize:'1.2rem',color:'#d97706'}}>Rp {(printPO.grandTotal||0).toLocaleString('id-ID')}</td>
                   </tr>
                 </tfoot>
-              </table></div>
+              </table>
+</div></div>
 
               {printPO.notes && (
                 <div style={{ marginBottom: '40px', padding: '15px', background: '#f8fafc', borderLeft: '4px solid #d97706', borderRadius: '4px' }}>
-                  <div style={{ textTransform: 'uppercase', fontSize: '0.75rem', color: '#64748b', fontWeight: '800', marginBottom: '5px', letterSpacing: '1px' }}>Notes / Special Instructions:</div>
+                  <div style={{ textTransform: 'uppercase', fontSize: '0.75rem', color: '#64748b', fontWeight: '800', marginBottom: '5px', letterSpacing: '1px' }}>{isID ? 'Catatan / Instruksi Khusus:' : 'Notes / Special Instructions:'}</div>
                   <div style={{ fontSize: '0.95rem', color: '#0f172a', fontWeight: '600', whiteSpace: 'pre-wrap' }}>{printPO.notes}</div>
                 </div>
               )}
 
-              <div style={{marginTop:'60px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'100px',textAlign:'center'}}>
+              <div className="grid-responsive-2" style={{ marginTop: '60px', textAlign: 'center' }}>
                 <div>
                   <div style={{borderBottom:'1px solid #333',height:'80px'}}/>
-                  <div style={{marginTop:'10px',fontSize:'0.8rem'}}>Vendor Signature</div>
+                  <div style={{marginTop:'10px',fontSize:'0.8rem'}}>{isID ? 'Tanda Tangan Vendor' : 'Vendor Signature'}</div>
                 </div>
                 <div>
                   <div style={{borderBottom:'1px solid #333',height:'80px'}}/>
-                  <div style={{marginTop:'10px',fontSize:'0.8rem'}}>Authorized Signature</div>
+                  <div style={{marginTop:'10px',fontSize:'0.8rem'}}>{isID ? 'Tanda Tangan Authorized' : 'Authorized Signature'}</div>
                 </div>
               </div>
             </div>
@@ -367,14 +370,14 @@ const AdminHub = () => {
       <AnimatePresence>
         {deletePOConfirm && (
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-            style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
-            <motion.div initial={{scale:0.85}} animate={{scale:1}} exit={{scale:0.85}} className="glass-card" style={{padding:'35px',maxWidth:'420px',width:'100%',textAlign:'center'}}>
+            style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display: 'flex', flexWrap: 'wrap',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+            <motion.div initial={{scale:0.85}} animate={{scale:1}} exit={{scale:0.85}} className="glass-card" style={{padding:'35px',maxWidth:'420px',width:'100%',textAlign:'center' , overflowX: 'auto' }}>
               <div style={{fontSize:'2.5rem',marginBottom:'12px'}}>🗑️</div>
-              <h3 style={{color:'#ef4444',marginBottom:'8px'}}>Hapus Purchase Order?</h3>
-              <p style={{color:'var(--text-muted)',marginBottom:'25px'}}>PO <strong style={{color:'var(--text)'}}>{deletePOConfirm.id}</strong> akan dihapus permanen.</p>
-              <div style={{display:'flex',gap:'12px'}}>
-                <button className="btn" style={{flex:1,background:'rgba(255,255,255,0.05)',border:'1px solid var(--border)',color:'var(--text)'}} onClick={()=>setDeletePOConfirm(null)}>Batal</button>
-                <ButtonWithLoading className="btn" style={{flex:1,background:'#ef4444',color:'white',border:'none'}} onClick={async()=>{await deletePurchaseOrder(deletePOConfirm.id);setDeletePOConfirm(null);}}>Hapus</ButtonWithLoading>
+              <h3 style={{color:'#ef4444',marginBottom:'8px'}}>{isID ? 'Hapus Purchase Order?' : 'Delete Purchase Order?'}</h3>
+              <p style={{color:'var(--text-muted)',marginBottom:'25px'}}>{isID ? 'PO ' : 'PO '}<strong style={{color:'var(--text)'}}>{deletePOConfirm.id}</strong>{isID ? ' akan dihapus permanen.' : ' will be permanently deleted.'}</p>
+              <div style={{display: 'flex', flexWrap: 'wrap',gap:'12px'}}>
+                <button className="btn" style={{flex:1,background:'rgba(255,255,255,0.05)',border:'1px solid var(--border)',color:'var(--text)'}} onClick={()=>setDeletePOConfirm(null)}>{isID ? 'Batal' : 'Cancel'}</button>
+                <ButtonWithLoading className="btn" style={{flex:1,background:'#ef4444',color:'white',border:'none'}} onClick={async()=>{await deletePurchaseOrder(deletePOConfirm.id);setDeletePOConfirm(null);}}>{isID ? 'Hapus' : 'Delete'}</ButtonWithLoading>
               </div>
             </motion.div>
           </motion.div>
@@ -384,14 +387,14 @@ const AdminHub = () => {
       <AnimatePresence>
         {deleteJOConfirm && (
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-            style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
-            <motion.div initial={{scale:0.85}} animate={{scale:1}} exit={{scale:0.85}} className="glass-card" style={{padding:'35px',maxWidth:'420px',width:'100%',textAlign:'center'}}>
+            style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display: 'flex', flexWrap: 'wrap',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+            <motion.div initial={{scale:0.85}} animate={{scale:1}} exit={{scale:0.85}} className="glass-card" style={{padding:'35px',maxWidth:'420px',width:'100%',textAlign:'center' , overflowX: 'auto' }}>
               <div style={{fontSize:'2.5rem',marginBottom:'12px'}}>🗑️</div>
-              <h3 style={{color:'#ef4444',marginBottom:'8px'}}>Batalkan / Hapus Job Order?</h3>
-              <p style={{color:'var(--text-muted)',marginBottom:'25px'}}>Job Order draft <strong style={{color:'var(--text)'}}>{deleteJOConfirm.id}</strong> ({deleteJOConfirm.customerName}) akan dihapus permanen.</p>
-              <div style={{display:'flex',gap:'12px'}}>
-                <button className="btn" style={{flex:1,background:'rgba(255,255,255,0.05)',border:'1px solid var(--border)',color:'var(--text)'}} onClick={()=>setDeleteJOConfirm(null)}>Batal</button>
-                <ButtonWithLoading className="btn" style={{flex:1,background:'#ef4444',color:'white',border:'none'}} onClick={async()=>{await context.deleteJO(deleteJOConfirm.id);setDeleteJOConfirm(null);}}>Hapus Draft</ButtonWithLoading>
+              <h3 style={{color:'#ef4444',marginBottom:'8px'}}>{isID ? 'Batalkan / Hapus Job Order?' : 'Cancel / Delete Job Order?'}</h3>
+              <p style={{color:'var(--text-muted)',marginBottom:'25px'}}>{isID ? 'Job Order draft ' : 'Draft Job Order '}<strong style={{color:'var(--text)'}}>{deleteJOConfirm.id}</strong> ({deleteJOConfirm.customerName}){isID ? ' akan dihapus permanen.' : ' will be permanently deleted.'}</p>
+              <div style={{display: 'flex', flexWrap: 'wrap',gap:'12px'}}>
+                <button className="btn" style={{flex:1,background:'rgba(255,255,255,0.05)',border:'1px solid var(--border)',color:'var(--text)'}} onClick={()=>setDeleteJOConfirm(null)}>{isID ? 'Batal' : 'Cancel'}</button>
+                <ButtonWithLoading className="btn" style={{flex:1,background:'#ef4444',color:'white',border:'none'}} onClick={async()=>{await context.deleteJO(deleteJOConfirm.id);setDeleteJOConfirm(null);}}>{isID ? 'Hapus Draft' : 'Delete Draft'}</ButtonWithLoading>
               </div>
             </motion.div>
           </motion.div>
@@ -401,20 +404,25 @@ const AdminHub = () => {
       {/* Create PO Modal */}
       <AnimatePresence>
         {showPOModal && (
-          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:1000,display: 'flex', flexWrap: 'wrap',alignItems:'center',justifyContent:'center',padding:'20px'}}>
             <motion.div initial={{scale:0.9,opacity:0}} animate={{scale:1,opacity:1}} exit={{scale:0.9,opacity:0}}
-              className="glass-card" style={{width:'100%',maxWidth:'720px',padding:'40px',maxHeight:'90vh',overflowY:'auto',position:'relative'}}>
+              className="glass-card" style={{width:'100%',maxWidth:'720px',padding:'40px',maxHeight:'90vh',overflowY:'auto',position:'relative' , overflowX: 'auto' }}>
               <button onClick={()=>setShowPOModal(false)} style={{position:'absolute',top:'15px',right:'15px',background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer'}}><X size={20}/></button>
-              <h3 style={{color:'var(--secondary)',marginBottom:'25px',display:'flex',alignItems:'center',gap:'10px'}}><ShoppingCart size={22}/> {editingPOId ? `Edit Purchase Order (${editingPOId})` : 'Buat Purchase Order'}</h3>
+              <h3 style={{color:'var(--secondary)',marginBottom:'25px',display: 'flex', flexWrap: 'wrap',alignItems:'center',gap:'10px'}}>
+                <ShoppingCart size={22}/> {isID ? (editingPOId ? `Ubah Purchase Order (${editingPOId})` : 'Buat Purchase Order') : (editingPOId ? `Edit Purchase Order (${editingPOId})` : 'Create Purchase Order')}
+              </h3>
               <form onSubmit={e => e.preventDefault()}>
                 {/* Step 1: Select JO */}
                 <div className="input-group" style={{marginBottom:'20px'}}>
-                  <label style={{color:'var(--secondary)',fontWeight:'600'}}>1. Pilih Job Order <span style={{color:'var(--text-muted)',fontWeight:'400'}}>(pilih JO yang akan dibuatkan PO-nya)</span></label>
-                  <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                  <label style={{color:'var(--secondary)',fontWeight:'600'}}>
+                    {isID ? '1. Pilih Job Order ' : '1. Select Job Order '}
+                    <span style={{color:'var(--text-muted)',fontWeight:'400'}}>{isID ? '(pilih JO yang akan dibuatkan PO-nya)' : '(select JO to create its PO)'}</span>
+                  </label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
                     <div style={{ position: 'relative', flex: 1 }}>
                       <input 
                         type="text" 
-                        placeholder="Cari nomor JO..." 
+                        placeholder={isID ? "Cari nomor JO..." : "Search JO number..."} 
                         value={poJoSearch} 
                         onChange={e => setPoJoSearch(e.target.value)} 
                         style={{ width: '100%', padding: '10px 15px 10px 40px', borderRadius: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} 
@@ -428,7 +436,7 @@ const AdminHub = () => {
                     onChange={e => setPoJoId(e.target.value)} 
                     style={{width:'100%',padding:'12px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'10px',color:'var(--secondary)',fontWeight:'700'}}
                   >
-                    <option value="" style={{color:'var(--text-muted)'}}>-- {poJoSearch ? 'Hasil Pencarian' : 'Pilih JO'} --</option>
+                    <option value="" style={{color:'var(--text-muted)', background: 'var(--bg)'}}>-- {poJoSearch ? (isID ? 'Hasil Pencarian' : 'Search Results') : (isID ? 'Pilih JO' : 'Select JO')} --</option>
                     {jobOrders
                       .filter(jo => jo.status !== 'cancelled')
                       .filter(jo => jo.id.toLowerCase().includes(poJoSearch.toLowerCase()) || jo.customerName.toLowerCase().includes(poJoSearch.toLowerCase()))
@@ -445,9 +453,9 @@ const AdminHub = () => {
                   const jo = jobOrders.find(j=>j.id===poJoId);
                   return jo ? (
                     <div style={{padding:'15px',background:'rgba(212,175,55,0.06)',border:'1px solid rgba(212,175,55,0.2)',borderRadius:'10px',marginBottom:'20px',fontSize:'0.875rem'}}>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
-                        <div><span style={{color:'var(--text-muted)'}}>Customer:</span><div style={{fontWeight:'700'}}>{jo.customerName}</div></div>
-                        <div><span style={{color:'var(--text-muted)'}}>Instruksi Kerja:</span><div style={{fontWeight:'700'}}>{jo.jobDescription||jo.instruction||'-'}</div></div>
+                      <div className="grid-responsive-2">
+                        <div><span style={{color:'var(--text-muted)'}}>{isID ? 'Pelanggan:' : 'Customer:'}</span><div style={{fontWeight:'700'}}>{jo.customerName}</div></div>
+                        <div><span style={{color:'var(--text-muted)'}}>{isID ? 'Instruksi Kerja:' : 'Work Instruction:'}</span><div style={{fontWeight:'700'}}>{jo.jobDescription||jo.instruction||'-'}</div></div>
                       </div>
                     </div>
                   ) : null;
@@ -455,11 +463,11 @@ const AdminHub = () => {
 
                 {/* Step 2: Select Vendor */}
                 <div className="input-group" style={{marginBottom:'20px'}}>
-                  <label style={{color:'var(--secondary)',fontWeight:'600'}}>2. Pilih Vendor</label>
+                  <label style={{color:'var(--secondary)',fontWeight:'600'}}>{isID ? '2. Pilih Vendor' : '2. Select Vendor'}</label>
                   <div style={{ position: 'relative', marginBottom: '10px' }}>
                     <input 
                       type="text" 
-                      placeholder="Cari nama vendor..." 
+                      placeholder={isID ? "Cari nama vendor..." : "Search vendor name..."} 
                       value={poVendorSearch} 
                       onChange={e => setPoVendorSearch(e.target.value)} 
                       style={{ width: '100%', padding: '10px 15px 10px 40px', borderRadius: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} 
@@ -472,7 +480,7 @@ const AdminHub = () => {
                     onChange={e=>{setPoVendorId(e.target.value);setPoItems([{serviceIdx:'',qty:1}]);}} 
                     style={{width:'100%',padding:'12px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'10px',color:'var(--secondary)',fontWeight:'700'}}
                   >
-                    <option value="" style={{color:'var(--text-muted)'}}>-- Pilih Vendor --</option>
+                    <option value="" style={{color:'var(--text-muted)', background: 'var(--bg)'}}>-- {isID ? 'Pilih Vendor' : 'Select Vendor'} --</option>
                     {vendorList
                       .filter(v => v.name.toLowerCase().includes(poVendorSearch.toLowerCase()))
                       .map(v=><option key={v.id} value={v.id} style={{color:'var(--text)',background:'var(--bg)'}}>{v.name}</option>)
@@ -480,50 +488,49 @@ const AdminHub = () => {
                   </select>
                 </div>
 
-
                 {/* Step 3: Select Services */}
                 {poVendor && (
                   <div style={{marginBottom:'20px'}}>
-                    <label style={{color:'var(--secondary)',fontWeight:'600',display:'block',marginBottom:'10px'}}>3. Pilih Layanan Vendor</label>
-                    <div style={{display:'grid',gridTemplateColumns:'10px 1fr 80px 140px 36px',gap:'8px',marginBottom:'8px',fontSize:'0.72rem',color:'var(--text-muted)',paddingLeft:'4px'}}>
-                      <div/><div>Layanan</div><div style={{textAlign:'center'}}>Qty</div><div style={{textAlign:'right'}}>Subtotal</div><div/>
+                    <label style={{color:'var(--secondary)',fontWeight:'600',display:'block',marginBottom:'10px'}}>{isID ? '3. Pilih Layanan Vendor' : '3. Select Vendor Services'}</label>
+                    <div className="grid-vendor-services desktop-only" style={{ marginBottom: '8px', fontSize: '0.72rem', color: 'var(--text-muted)', paddingLeft: '4px' }}>
+                      <div/><div>{isID ? 'Layanan' : 'Service'}</div><div style={{textAlign:'center'}}>{isID ? 'Jumlah' : 'Qty'}</div><div style={{textAlign:'right'}}>Subtotal</div><div/>
                     </div>
                     {poItems.map((item,i)=>{
                       const svc = poVendor.services[parseInt(item.serviceIdx)];
                       const sub = svc ? parseFloat(svc.price||0)*parseFloat(item.qty||1) : 0;
                       return (
-                        <div key={i} style={{display:'grid',gridTemplateColumns:'10px 1fr 80px 140px 36px',gap:'8px',marginBottom:'10px',alignItems:'center'}}>
+                        <div key={i} className="grid-vendor-services" style={{ marginBottom: '10px' }}>
                           <div style={{width:'6px',height:'6px',borderRadius:'50%',background:'var(--secondary)'}}/>
                           <select required value={item.serviceIdx} onChange={e=>updatePOItem(i,'serviceIdx',e.target.value)} style={{padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--secondary)',fontWeight:'600',fontSize:'0.85rem'}}>
-                            <option value="" style={{color:'var(--text-muted)'}}>-- Pilih Layanan --</option>
+                            <option value="" style={{color:'var(--text-muted)', background: 'var(--bg)'}}>-- {isID ? 'Pilih Layanan' : 'Select Service'} --</option>
                             {poVendor.services.map((s,si)=><option key={si} value={si} style={{color:'var(--text)', background:'var(--bg)'}}>{s.description} — Rp {parseFloat(s.price||0).toLocaleString('id-ID')}</option>)}
                           </select>
                           <input type="number" min="1" value={item.qty} onChange={e=>updatePOItem(i,'qty',e.target.value)} style={{padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--text)',fontSize:'0.85rem',textAlign:'center'}}/>
                           <div style={{padding:'9px',background:'rgba(255,255,255,0.03)',border:'1px solid var(--glass-border)',borderRadius:'8px',fontSize:'0.85rem',fontWeight:'700',color:'var(--secondary)',textAlign:'right'}}>{svc?`Rp ${sub.toLocaleString('id-ID')}`:'Rp 0'}</div>
-                          <button type="button" onClick={()=>removePOItem(i)} disabled={poItems.length===1} style={{background:'rgba(239,68,68,0.1)',color:'#ef4444',border:'none',borderRadius:'8px',height:'36px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}><X size={13}/></button>
+                          <button type="button" onClick={()=>removePOItem(i)} disabled={poItems.length===1} style={{background:'rgba(239,68,68,0.1)',color:'#ef4444',border:'none',borderRadius:'8px',height:'36px',cursor:'pointer',display: 'flex', flexWrap: 'wrap',alignItems:'center',justifyContent:'center'}}><X size={13}/></button>
                         </div>
                       );
                     })}
-                    <button type="button" onClick={addPOItem} style={{width:'100%',padding:'8px',background:'rgba(212,175,55,0.08)',color:'var(--secondary)',border:'1px dashed var(--secondary)',borderRadius:'8px',cursor:'pointer',fontSize:'0.85rem',marginBottom:'15px'}}>+ Tambah Baris Layanan</button>
+                    <button type="button" onClick={addPOItem} style={{width:'100%',padding:'8px',background:'rgba(212,175,55,0.08)',color:'var(--secondary)',border:'1px dashed var(--secondary)',borderRadius:'8px',cursor:'pointer',fontSize:'0.85rem',marginBottom:'15px'}}>+ {isID ? 'Tambah Baris Layanan' : 'Add Service Row'}</button>
                     <div style={{textAlign:'right',padding:'12px 15px',background:'rgba(255,255,255,0.03)',borderRadius:'10px',border:'1px solid var(--glass-border)'}}>
-                      <span style={{color:'var(--text-muted)',fontSize:'0.85rem'}}>Grand Total PO: </span>
+                      <span style={{color:'var(--text-muted)',fontSize:'0.85rem'}}>{isID ? 'Grand Total PO: ' : 'PO Grand Total: '}</span>
                       <span style={{color:'var(--secondary)',fontWeight:'800',fontSize:'1.1rem'}}>Rp {poItems.filter(it=>it.serviceIdx!=='').reduce((s,it)=>{const svc=poVendor.services[parseInt(it.serviceIdx)];return s+(svc?parseFloat(svc.price||0)*parseFloat(it.qty||1):0);},0).toLocaleString('id-ID')}</span>
                     </div>
                   </div>
                 )}
 
                 <div className="input-group" style={{marginBottom:'20px'}}>
-                  <label style={{color:'var(--secondary)',fontWeight:'600'}}>4. Catatan (Notes)</label>
+                  <label style={{color:'var(--secondary)',fontWeight:'600'}}>{isID ? '4. Catatan (Notes)' : '4. Notes (Optional)'}</label>
                   <textarea 
                     value={poNotes} 
                     onChange={e => setPoNotes(e.target.value)} 
-                    placeholder="Tambahkan instruksi khusus untuk vendor (opsional)..."
+                    placeholder={isID ? "Tambahkan instruksi khusus untuk vendor (opsional)..." : "Add special instructions for vendor (optional)..."}
                     style={{width:'100%',padding:'12px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'10px',color:'var(--text)',minHeight:'80px',fontSize:'0.9rem'}}
                   />
                 </div>
 
-                <div style={{display:'flex',gap:'12px',marginTop:'20px'}}>
-                  <button type="button" onClick={()=>setShowPOModal(false)} className="btn" style={{flex:1,background:'rgba(255,255,255,0.05)',border:'1px solid var(--border)',color:'var(--text)'}}>Batal</button>
+                <div style={{display: 'flex', flexWrap: 'wrap',gap:'12px',marginTop:'20px'}}>
+                  <button type="button" onClick={()=>setShowPOModal(false)} className="btn" style={{flex:1,background:'rgba(255,255,255,0.05)',border:'1px solid var(--border)',color:'var(--text)'}}>{isID ? 'Batal' : 'Cancel'}</button>
                   <ButtonWithLoading
                     type="button"
                     onClick={handleSaveDraft}
@@ -531,7 +538,7 @@ const AdminHub = () => {
                     style={{flex:1.5,background:'rgba(212,175,55,0.1)',color:'var(--secondary)',border:'1px solid var(--secondary)'}}
                     disabled={!poJoId||!poVendorId}
                   >
-                    💾 {editingPOId ? 'Update Draft' : 'Simpan Draft'}
+                    💾 {isID ? (editingPOId ? 'Perbarui Draft' : 'Simpan Draft') : (editingPOId ? 'Update Draft' : 'Save Draft')}
                   </ButtonWithLoading>
                   <ButtonWithLoading
                     type="button"
@@ -540,7 +547,7 @@ const AdminHub = () => {
                     style={{flex:2}}
                     disabled={!poJoId||!poVendorId}
                   >
-                    <CheckCircle size={16}/> {editingPOId ? 'Update & Terbitkan' : 'Langsung Terbitkan'}
+                    <CheckCircle size={16}/> {isID ? (editingPOId ? 'Perbarui & Terbitkan' : 'Langsung Terbitkan') : (editingPOId ? 'Update & Issue' : 'Issue Directly')}
                   </ButtonWithLoading>
                 </div>
               </form>
@@ -549,46 +556,46 @@ const AdminHub = () => {
         )}
       </AnimatePresence>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="flex-responsive-row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
-          <h3 className="shimmer-text" style={{ fontSize: '1.8rem', margin: 0 }}>Operational Instruction Hub</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Dispatch jobs to executors based on approved marketing contracts.</p>
+          <h3 className="shimmer-text" style={{ fontSize: '1.8rem', margin: 0 }}>{isID ? 'Hub Instruksi Operasional' : 'Operational Instruction Hub'}</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{isID ? 'Kirim pekerjaan ke pelaksana berdasarkan kontrak marketing yang disetujui.' : 'Dispatch jobs to executors based on approved marketing contracts.'}</p>
         </div>
-        <div style={{display:'flex',gap:'10px'}}>
+        <div style={{display: 'flex', flexWrap: 'wrap',gap:'10px'}}>
           <button 
             className="btn btn-gold" 
-            style={{ padding: '10px 22px', display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '12px', fontWeight: '700', boxShadow: '0 4px 15px rgba(212,175,55,0.2)' }} 
+            style={{ padding: '10px 22px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', borderRadius: '12px', fontWeight: '700', boxShadow: '0 4px 15px rgba(212,175,55,0.2)' }} 
             onClick={() => {
               setShowPOModal(true);
             }}
           >
-            <ShoppingCart size={18}/> Create Purchase Order
+            <ShoppingCart size={18}/> {isID ? 'Buat Purchase Order' : 'Create Purchase Order'}
           </button>
           <button className="btn btn-primary" onClick={() => setShowModal(true)}>
             <Plus size={18} />
-            Create Job Order
+            {isID ? 'Buat Job Order' : 'Create Job Order'}
           </button>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="glass-card" style={{ padding: '20px 25px', display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap', background: 'rgba(255,255,255,0.03)' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: '250px' }}>
-          <input type="text" placeholder="Search PO or JO..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '10px 15px 10px 40px', borderRadius: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+      <div className="glass-card" style={{ overflowX: "auto" }}  className="flex-responsive-row" style={{ padding: "20px 25px", alignItems: "flex-start", background: "rgba(255,255,255,0.03)", justifyContent: "space-between" }}>
+        <div style={{ position: 'relative', flex: 1, whiteSpace: "nowrap", flex: '1 1 100%' }}>
+          <input type="text" placeholder={isID ? "Cari PO atau JO..." : "Search PO or JO..."} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '10px 15px 10px 40px', borderRadius: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
           <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>Filter Tanggal:</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>{isID ? 'Filter Tanggal:' : 'Date Filter:'}</span>
           <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
-          <span style={{ color: 'var(--text-muted)' }}>s/d</span>
+          <span style={{ color: 'var(--text-muted)' }}>{isID ? 's/d' : 'to'}</span>
           <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
           {(startDate || endDate || searchTerm) && (
             <button onClick={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); }} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>Reset</button>
           )}
         </div>
-        <div style={{ marginLeft: 'auto' }}>
-          <button className="btn btn-gold" onClick={handleExport} style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
-            <FileSpreadsheet size={18} /> Export PO
+        <div>
+          <button className="btn btn-gold" onClick={handleExport} style={{ padding: '8px 16px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
+            <FileSpreadsheet size={18} /> {isID ? 'Ekspor PO' : 'Export PO'}
           </button>
         </div>
       </div>
@@ -598,30 +605,29 @@ const AdminHub = () => {
           <div style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             background: 'rgba(0,0,0,0.8)', zIndex: 1000,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center',
             padding: '20px'
           }}>
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-              className="glass-card"
-              style={{ width: '100%', maxWidth: '600px', padding: '40px', position: 'relative' }}
+              className="glass-card" style={{ width: '100%', maxWidth: '600px', padding: '40px', position: 'relative'  , overflowX: 'auto' }}
             >
               <button onClick={() => setShowModal(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
 
-              <h3 style={{ marginBottom: '25px', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <h3 style={{ marginBottom: '25px', color: 'var(--secondary)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px' }}>
                 <FileText size={24} />
-                New Operational Instruction
+                {isID ? 'Instruksi Operasional Baru' : 'New Operational Instruction'}
               </h3>
 
               <form onSubmit={handleModalSubmit}>
                 <div className="input-group" style={{ marginBottom: '25px' }}>
-                  <label>Select Approved Activity</label>
+                  <label>{isID ? 'Pilih Aktivitas yang Disetujui' : 'Select Approved Activity'}</label>
                   <div style={{ position: 'relative', marginBottom: '10px' }}>
                     <input 
                       type="text" 
-                      placeholder="Cari Penawaran (ID, Customer, atau Deskripsi)..." 
+                      placeholder={isID ? "Cari Penawaran (ID, Pelanggan, atau Deskripsi)..." : "Search Quotation (ID, Customer, or Description)..."} 
                       value={quoteSearchTerm} 
                       onChange={e => setQuoteSearchTerm(e.target.value)} 
                       style={{ 
@@ -661,7 +667,7 @@ const AdminHub = () => {
                       fontSize: '1rem'
                     }}
                   >
-                    <option value="" style={{ color: 'black' }}>-- Choose Approved Quotation --</option>
+                    <option value="" style={{ background: 'var(--bg)', color: 'var(--text-muted)' }}>-- {isID ? 'Pilih Penawaran yang Disetujui' : 'Choose Approved Quotation'} --</option>
                     {quotations
                       .filter(q => q.status === 'approved')
                       .filter(q => 
@@ -674,7 +680,7 @@ const AdminHub = () => {
                           ? quote.items[0].description
                           : (quote.jobDescription || 'No description');
                         return (
-                          <option key={quote.id} value={quote.id} style={{ color: 'black' }}>
+                          <option key={quote.id} value={quote.id} style={{ background: 'var(--bg)', color: 'var(--text)' }}>
                             {quote.id} - {quote.customerName} ({label.substring(0, 30)}...)
                           </option>
                         );
@@ -692,7 +698,7 @@ const AdminHub = () => {
                     >
                       {hasMultipleItems && (
                         <div className="input-group" style={{ marginBottom: '25px' }}>
-                          <label>Select Specific Activity Item</label>
+                          <label>{isID ? 'Pilih Item Aktivitas Spesifik' : 'Select Specific Activity Item'}</label>
                           <select
                             required
                             value={selectedActivityIndex}
@@ -712,7 +718,7 @@ const AdminHub = () => {
                             }}
                           >
                             {q.items.map((item, idx) => (
-                              <option key={idx} value={idx} style={{ color: 'black' }}>
+                              <option key={idx} value={idx} style={{ background: 'var(--bg)', color: 'var(--text)' }}>
                                 {item.description} (Qty: {item.quantity})
                               </option>
                             ))}
@@ -721,10 +727,10 @@ const AdminHub = () => {
                       )}
 
                       <div className="input-group" style={{ marginBottom: '25px' }}>
-                        <label style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>Quantity to Issue</span>
+                        <label style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                          <span>{isID ? 'Jumlah yang Dikeluarkan' : 'Quantity to Issue'}</span>
                           <span style={{ color: 'var(--secondary)', fontSize: '0.75rem' }}>
-                            Contract Max: {hasMultipleItems ? q.items[selectedActivityIndex].quantity : (q.quantity || 1)}
+                            {isID ? 'Maks Kontrak: ' : 'Contract Max: '}{hasMultipleItems ? q.items[selectedActivityIndex].quantity : (q.quantity || 1)}
                           </span>
                         </label>
                         <input
@@ -748,11 +754,11 @@ const AdminHub = () => {
 
                       <div style={{ padding: '20px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', marginBottom: '30px', border: '1px dashed var(--border)' }}>
                         <div style={{ marginBottom: '10px' }}>
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Customer:</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{isID ? 'Pelanggan:' : 'Customer:'}</span>
                           <div style={{ fontWeight: '600' }}>{q.customerName}</div>
                         </div>
                         <div style={{ marginBottom: '10px' }}>
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Selected Activity Detail:</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{isID ? 'Detail Aktivitas Terpilih:' : 'Selected Activity Detail:'}</span>
                           <div style={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>
                             {hasMultipleItems
                               ? q.items[selectedActivityIndex].description
@@ -760,7 +766,7 @@ const AdminHub = () => {
                           </div>
                         </div>
                         <div>
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Contract Rate:</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{isID ? 'Harga Kontrak:' : 'Contract Rate:'}</span>
                           <div style={{ fontWeight: '700', color: 'var(--secondary)' }}>
                             Rp {hasMultipleItems
                               ? parseFloat(q.items[selectedActivityIndex].rate || 0).toLocaleString()
@@ -772,12 +778,12 @@ const AdminHub = () => {
                   );
                 })()}
 
-                <div style={{ display: 'flex', gap: '15px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px' }}>
                   <button type="button" onClick={() => setShowModal(false)} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)' }}>
-                    Cancel
+                    {isID ? 'Batal' : 'Cancel'}
                   </button>
                   <ButtonWithLoading type="submit" className="btn btn-gold" style={{ flex: 1 }} disabled={!selectedQuoteId} onClick={handleModalSubmit}>
-                    Generate JO Form
+                    {isID ? 'Buat Form JO' : 'Generate JO Form'}
                   </ButtonWithLoading>
                 </div>
               </form>
@@ -787,15 +793,15 @@ const AdminHub = () => {
       </AnimatePresence>
 
       {/* Purchase Orders Section */}
-      <div className="glass-card" style={{ padding: '25px', marginTop: '30px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isPOListMinimized ? '0' : '25px' }}>
-          <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}><ShoppingCart size={20} style={{color:'var(--secondary)'}}/> Purchase Order Records</h4>
-          <div style={{display:'flex',alignItems:'center',gap:'20px'}}>
+      <div className="glass-card" style={{ padding: '25px', marginTop: '30px'  , overflowX: 'auto' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: isPOListMinimized ? '0' : '25px' }}>
+          <h4 style={{ margin: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px' }}><ShoppingCart size={20} style={{color:'var(--secondary)'}}/> {isID ? 'Catatan Purchase Order' : 'Purchase Order Records'}</h4>
+          <div style={{display: 'flex', flexWrap: 'wrap',alignItems:'center',gap:'20px'}}>
             {!isPOListMinimized && (
               <div style={{ position: 'relative', width: '250px' }}>
                 <input 
                   type="text" 
-                  placeholder="Cari PO, Vendor, Customer..." 
+                  placeholder={isID ? "Cari PO, Vendor, Pelanggan..." : "Search PO, Vendor, Customer..."} 
                   value={poSearchTerm} 
                   onChange={e => setPoSearchTerm(e.target.value)} 
                   style={{ width: '100%', padding: '6px 10px 6px 30px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.75rem' }} 
@@ -803,15 +809,15 @@ const AdminHub = () => {
                 <Search size={14} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               </div>
             )}
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{(purchaseOrders || []).length} PO Created</span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{(purchaseOrders || []).length} {isID ? 'PO Dibuat' : 'PO Created'}</span>
             <button 
               onClick={() => setIsPOListMinimized(!isPOListMinimized)} 
-              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', transition: 'color 0.2s' }}
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '5px', fontSize: '0.8rem', transition: 'color 0.2s' }}
               onMouseEnter={e => e.currentTarget.style.color = 'var(--secondary)'}
               onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
             >
               {isPOListMinimized ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-              {isPOListMinimized ? 'Expand' : 'Minimize'}
+              {isPOListMinimized ? (isID ? 'Buka' : 'Expand') : (isID ? 'Tutup' : 'Minimize')}
             </button>
           </div>
         </div>
@@ -824,17 +830,18 @@ const AdminHub = () => {
               exit={{ height: 0, opacity: 0 }}
               style={{ overflow: 'hidden' }}
             >
-          <div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
+          <div className="table-container"><div className="table-responsive-wrapper" style={{ overflowX: 'auto', width: '100%' }}>
+<table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: "nowrap" }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--gold-metallic)' }}>
-                <th style={{ padding: '12px' }}>PO Ref</th>
-                <th style={{ padding: '12px' }}>Date</th>
-                <th style={{ padding: '12px' }}>Linked JO</th>
+                <th style={{ padding: '12px' }}>{isID ? 'Ref PO' : 'PO Ref'}</th>
+                <th style={{ padding: '12px' }}>{isID ? 'Tanggal' : 'Date'}</th>
+                <th style={{ padding: '12px' }}>{isID ? 'JO Terkait' : 'Linked JO'}</th>
                 <th style={{ padding: '12px' }}>Vendor</th>
-                <th style={{ padding: '12px' }}>Customer</th>
+                <th style={{ padding: '12px' }}>{isID ? 'Pelanggan' : 'Customer'}</th>
                 <th style={{ padding: '12px', textAlign: 'right' }}>Grand Total</th>
                 <th style={{ padding: '12px', textAlign: 'center' }}>Status</th>
-                <th style={{ padding: '12px', textAlign: 'center' }}>Aksi</th>
+                <th style={{ padding: '12px', textAlign: 'center' }}>{isID ? 'Aksi' : 'Action'}</th>
               </tr>
             </thead>
             <tbody>
@@ -861,23 +868,23 @@ const AdminHub = () => {
                   <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: 'var(--secondary)' }}>Rp {(po.grandTotal || 0).toLocaleString('id-ID')}</td>
                   <td style={{ padding: '12px', textAlign: 'center' }}>
                     <span className={`badge badge-${po.status || 'draft'}`} style={{ fontSize: '0.7rem' }}>
-                      {po.status === 'issued' ? 'Issued' : 'Draft'}
+                      {po.status === 'issued' ? (isID ? 'Diterbitkan' : 'Issued') : 'Draft'}
                     </span>
                   </td>
                   <td style={{ padding: '12px', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                      <button className="btn-icon" onClick={() => handleEditPO(po)} title="Edit PO" style={{ color: '#3b82f6', background: 'rgba(59,130,246,0.1)' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+                      <button className="btn-icon" onClick={() => handleEditPO(po)} title={isID ? "Ubah PO" : "Edit PO"} style={{ color: '#3b82f6', background: 'rgba(59,130,246,0.1)' }}>
                         <Edit size={15} />
                       </button>
-                      <button className="btn-icon" onClick={() => setPrintPO(po)} title="Print PO" style={{ color: 'var(--secondary)', background: 'rgba(212,175,55,0.1)' }}>
+                      <button className="btn-icon" onClick={() => setPrintPO(po)} title={isID ? "Cetak PO" : "Print PO"} style={{ color: 'var(--secondary)', background: 'rgba(212,175,55,0.1)' }}>
                         <FileText size={15} />
                       </button>
                       {po.status !== 'issued' && (
-                        <ButtonWithLoading className="btn-icon" onClick={() => issuePurchaseOrder(po.id)} title="Issue PO" style={{ color: '#3b82f6', background: 'rgba(37, 99, 235,0.1)' }}>
+                        <ButtonWithLoading className="btn-icon" onClick={() => issuePurchaseOrder(po.id)} title={isID ? "Terbitkan PO" : "Issue PO"} style={{ color: '#10b981', background: 'rgba(16,185,129,0.1)' }}>
                           <CheckCircle size={15} />
                         </ButtonWithLoading>
                       )}
-                      <button className="btn-icon" onClick={() => setDeletePOConfirm(po)} title="Delete PO" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }}>
+                      <button className="btn-icon" onClick={() => setDeletePOConfirm(po)} title={isID ? "Hapus PO" : "Delete PO"} style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }}>
                         <Trash2 size={15} />
                       </button>
                     </div>
@@ -886,19 +893,20 @@ const AdminHub = () => {
               ))}
               {(purchaseOrders || []).length === 0 && (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No Purchase Orders recorded.</td>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>{isID ? 'Tidak ada Purchase Order tercatat.' : 'No Purchase Orders recorded.'}</td>
                 </tr>
               )}
             </tbody>
-          </table></div>
+          </table>
+</div></div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      <div className="glass-card" style={{ padding: '25px', marginTop: '30px' }}>
-        <h4 style={{ marginBottom: '25px' }}>Job Orders for Dispatch</h4>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '25px' }}>
+      <div className="glass-card" style={{ padding: '25px', marginTop: '30px'  , overflowX: 'auto' }}>
+        <h4 style={{ marginBottom: '25px' }}>{isID ? 'Job Order untuk Dikirim' : 'Job Orders for Dispatch'}</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 350px), 1fr))', gap: '25px' }}>
           {jobOrders
             .filter(jo => jo.status === 'pending')
             .filter(jo => filterByDate(jo.date))
@@ -910,8 +918,8 @@ const AdminHub = () => {
             })
             .map(jo => (
             <div key={jo.id} className="glass-card table-row-hover" style={{ padding: '25px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: '15px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px' }}>
                   <span style={{ color: 'var(--secondary)', fontWeight: 'bold' }}>{jo.id}</span>
                   <span className="badge badge-pending" style={{ fontSize: '0.7rem' }}>Draft</span>
                 </div>
@@ -919,7 +927,7 @@ const AdminHub = () => {
                   className="btn-icon" 
                   style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', width: '32px', height: '32px' }} 
                   onClick={() => setDeleteJOConfirm(jo)}
-                  title="Batalkan / Hapus JO Draft"
+                  title={isID ? "Batalkan / Hapus JO Draft" : "Cancel / Delete JO Draft"}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -928,26 +936,26 @@ const AdminHub = () => {
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px', minHeight: '40px' }}>{jo.jobDescription}</p>
 
               <div className="input-group" style={{ marginBottom: '20px' }}>
-                <label style={{ fontSize: '0.8rem' }}>Work Quantity (Units)</label>
+                <label style={{ fontSize: '0.8rem' }}>{isID ? 'Jumlah Pekerjaan (Unit)' : 'Work Quantity (Units)'}</label>
                 <input
                   type="number"
                   min="1"
                   value={quantities[jo.id] || jo.quantity || ''}
                   onChange={e => setQuantities({ ...quantities, [jo.id]: e.target.value })}
-                  placeholder="Enter quantity..."
+                  placeholder={isID ? "Masukkan jumlah..." : "Enter quantity..."}
                   style={{ borderRadius: '10px', padding: '10px' }}
                 />
               </div>
 
               <ButtonWithLoading className="btn btn-gold" style={{ width: '100%' }} onClick={() => handleDispatch(jo.id)}>
                 <Send size={18} />
-                Dispatch to Executor
+                {isID ? 'Kirim ke Pelaksana' : 'Dispatch to Executor'}
               </ButtonWithLoading>
             </div>
           ))}
           {jobOrders.filter(jo => jo.status === 'pending').length === 0 && (
             <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
-              No JO forms drafted yet.
+              {isID ? 'Belum ada form JO draft.' : 'No JO forms drafted yet.'}
             </div>
           )}
         </div>
@@ -957,9 +965,4 @@ const AdminHub = () => {
 };
 
 export default AdminHub;
-
-
-
-
-
 

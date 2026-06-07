@@ -1,7 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, 'omega_trust.db'));
+const db = new Database(path.join(__dirname, 'alp_system.db'));
 
 // Initialize Tables
 db.exec(`
@@ -183,6 +183,16 @@ try {
 try {
   db.prepare('ALTER TABLE quotations ADD COLUMN validTo TEXT').run();
   console.log('Added validTo to quotations');
+} catch (e) { /* column likely exists */ }
+
+try {
+  db.prepare('ALTER TABLE job_orders ADD COLUMN dispatchedAt TEXT').run();
+  console.log('Added dispatchedAt to job_orders');
+} catch (e) { /* column likely exists */ }
+
+try {
+  db.prepare('ALTER TABLE job_orders ADD COLUMN completedAt TEXT').run();
+  console.log('Added completedAt to job_orders');
 } catch (e) { /* column likely exists */ }
 
 module.exports = db;

@@ -50,7 +50,8 @@ const Login = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            height: '60px', width: 'auto',
+            width: '48px',
+            height: '48px',
             borderRadius: '50%',
             cursor: 'pointer',
             border: '1px solid var(--border)',
@@ -88,28 +89,26 @@ const Login = () => {
         position: 'absolute', 
         width: '100%', 
         height: '100%', 
-        background: 'radial-gradient(circle at center, rgba(30, 64, 175, 0.1) 0%, transparent 70%)',
+        background: 'radial-gradient(circle at center, rgba(6, 95, 70, 0.1) 0%, transparent 70%)',
         zIndex: 1
       }}></div>
 
-      <div className="mobile-stack" style={{ 
+      <div className="mobile-stack login-container" style={{ 
         display: 'flex', 
         gap: '20px', 
         maxWidth: '1000px', 
         width: '100%', 
         zIndex: 10, 
-        alignItems: 'stretch',
-        flexDirection: window.innerWidth <= 1024 ? 'column' : 'row'
+        alignItems: 'stretch'
       }}>
         
         {/* Login Card */}
         <motion.div 
           initial={{ opacity: 0, x: -30 }}
           animate={{ opacity: 1, x: 0 }}
-          className="glass-card" 
+          className="glass-card login-card" 
           style={{ 
             flex: 1,
-            padding: window.innerWidth <= 768 ? '40px 25px' : '50px 40px',
             textAlign: 'center',
             border: '1px solid var(--glass-border)',
             background: 'var(--glass)'
@@ -118,9 +117,9 @@ const Login = () => {
           <img 
             src="/assets/logo.png" 
             alt="ALP Logo" 
-            style={{ height: '70px', width: 'auto', marginBottom: '15px', filter: 'drop-shadow(0 0 15px rgba(34, 60, 149, 0.4))' }} 
+            style={{ width: '80px', marginBottom: '15px', filter: 'drop-shadow(0 0 15px rgba(16, 185, 129, 0.4))' }} 
           />
-          <h2 className="shimmer-text" style={{ fontSize: window.innerWidth <= 768 ? '1.5rem' : '2rem', marginBottom: '25px' }}>{t('logistikSystem')}</h2>
+          <h2 className="shimmer-text login-h2" style={{ marginBottom: '25px' }}>{t('logistikSystem')}</h2>
 
           <form onSubmit={handleSubmit}>
             <div className="input-group" style={{ textAlign: 'left' }}>
@@ -167,17 +166,16 @@ const Login = () => {
           initial={{ opacity: 0, x: 30 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
-          className="glass-card"
+          className="glass-card login-access-card"
           style={{ 
-            width: window.innerWidth <= 1024 ? '100%' : '350px',
             padding: '30px 25px',
-            background: 'rgba(30, 64, 175, 0.05)',
+            background: 'rgba(6, 95, 70, 0.05)',
             border: '1px solid var(--border)'
           }}
         >
           <h3 style={{ fontSize: '1.1rem', marginBottom: '20px', color: 'var(--secondary)' }}>Access Directory</h3>
           
-          <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth <= 600 ? '1fr' : 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+          <div className="login-accounts-grid">
             {accounts.map(acc => (
               <div key={acc.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <div style={{ fontWeight: '600', color: 'var(--text)', fontSize: '0.85rem', marginBottom: '2px' }}>{acc.name}</div>
@@ -187,7 +185,7 @@ const Login = () => {
           </div>
 
           <div style={{ marginTop: '25px', paddingTop: '20px', textAlign: 'center', borderTop: '1px solid var(--border)' }}>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.6rem' }}>Authorized Personnel Only &bull; PT. ALPHA LOGISTICS PRAKARSA</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.6rem' }}>Authorized Personnel Only &bull; PT. Alpha Logistics Prakarsa</p>
           </div>
         </motion.div>
 
@@ -198,10 +196,4 @@ const Login = () => {
 };
 
 export default Login;
-
-
-
-
-
-
 

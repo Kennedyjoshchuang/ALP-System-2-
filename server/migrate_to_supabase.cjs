@@ -1,13 +1,18 @@
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const Database = require('better-sqlite3');
 const path = require('path');
 
-// Supabase Credentials (verified working sb_* format keys)
-const SUPABASE_URL = 'https://yuddakkcoxllxfnaikus.supabase.co';
-const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZii6Inl1ZGRha2tjb3hsbHhmbmFpa3VzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NjU3NTA0NiwiZXhwIjoyMDYyMTUxMDQ2fQ.HhvmpcTwzMSyf4WKJoXyweXaZLIBNC8TRD_x18aCKMw';
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  console.error('❌ Configuration Error: SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in your environment variables (.env file).');
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-const sqliteDb = new Database(path.join(__dirname, 'omega_trust.db'));
+const sqliteDb = new Database(path.join(__dirname, 'alp_system.db'));
 
 const tablesToMigrate = [
   { name: 'customers' },

@@ -58,7 +58,7 @@ const OTPKeys = () => {
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
   const progress = (timeLeft / OTP_INTERVAL) * circumference;
-  const strokeColor = timeLeft > 15 ? '#3b82f6' : timeLeft > 5 ? '#ed1c24' : '#ef4444';
+  const strokeColor = timeLeft > 15 ? '#10b981' : timeLeft > 5 ? '#d4af37' : '#ef4444';
 
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto' }}>
@@ -71,7 +71,7 @@ const OTPKeys = () => {
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center',
-          color: '#ed1c24',
+          color: '#d4af37',
           border: '1px solid rgba(212, 175, 55, 0.2)'
         }}>
           <ShieldCheck size={24} />
@@ -89,7 +89,7 @@ const OTPKeys = () => {
         style={{
           textAlign: 'center',
           padding: '40px 30px',
-          background: 'linear-gradient(135deg, var(--card-bg) 0%, rgba(30, 64, 175, 0.05) 100%)',
+          background: 'linear-gradient(135deg, var(--card-bg) 0%, rgba(6, 95, 70, 0.05) 100%)',
           border: '1px solid var(--glass-border)',
         }}
       >
@@ -203,7 +203,7 @@ const OTPKeys = () => {
           gap: '15px',
           textAlign: 'left'
         }}>
-          <div style={{ color: '#ed1c24' }}><Clock size={20} /></div>
+          <div style={{ color: '#d4af37' }}><Clock size={20} /></div>
           <div>
             <strong>Security Protocol:</strong> This rolling key is required to authorize critical accounting edits and data deletions. Share only via secure channels.
           </div>
@@ -214,8 +214,4 @@ const OTPKeys = () => {
 };
 
 export default OTPKeys;
-
-
-
-
 

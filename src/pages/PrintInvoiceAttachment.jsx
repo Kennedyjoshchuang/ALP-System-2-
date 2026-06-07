@@ -14,8 +14,9 @@ const PrintInvoiceAttachment = () => {
     </div>
   );
 
-  const { invoice, jo } = data;
-  const operationalPhotos = Array.isArray(jo?.photos) ? jo.photos : [];
+  const { invoice, jo, consolidatedJOs } = data;
+  const targetJOs = Array.isArray(consolidatedJOs) && consolidatedJOs.length > 0 ? consolidatedJOs : (jo ? [jo] : []);
+  const operationalPhotos = targetJOs.reduce((acc, currJo) => acc.concat(Array.isArray(currJo.photos) ? currJo.photos : []), []);
   
   const docs = [
     { src: invoice?.signedInvoicePhoto, label: 'SIGNED INVOICE' },
@@ -132,9 +133,9 @@ const PrintInvoiceAttachment = () => {
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '3px solid #1e293b', paddingBottom: '18px', marginBottom: '28px' }}>
             <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-              <img src="/assets/logo.png" alt="Logo" style={{ height: '60px', width: 'auto', objectFit: 'contain' }} />
+              <img src="/assets/logo.png" alt="Logo" style={{ width: '45px', height: '45px', objectFit: 'contain' }} />
               <div>
-                <h1 style={{ margin: 0, fontSize: '1rem', fontWeight: '900', color: '#1e293b' }}>PT. Alpha Logistics Prakarsa</h1>
+                <h1 style={{ margin: 0, fontSize: '1rem', fontWeight: '900', color: '#1e293b' }}>PT. ALPHA LOGISTICS PRAKARSA</h1>
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -188,11 +189,3 @@ const PrintInvoiceAttachment = () => {
 };
 
 export default PrintInvoiceAttachment;
-
-
-
-
-
-
-
-

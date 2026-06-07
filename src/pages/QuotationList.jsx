@@ -96,13 +96,13 @@ const QuotationList = () => {
                 {/* Header Section */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f172a', paddingBottom: '20px', marginBottom: '40px' }}>
                   <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-                    <img src="/assets/logo.png" alt="Logo" style={{ height: '60px', width: 'auto', objectFit: 'contain' }} />
+                    <img src="/assets/logo.png" alt="Logo" style={{ width: '70px', height: '70px', objectFit: 'contain' }} />
                     <div>
-                      <h3 style={{ margin: 0, fontWeight: '950', fontSize: '1.4rem', color: '#0f172a', letterSpacing: '-0.5px' }}>PT. Alpha Logistics Prakarsa</h3>
+                      <h3 style={{ margin: 0, fontWeight: '950', fontSize: '1.4rem', color: '#0f172a', letterSpacing: '-0.5px' }}>PT. OMEGA TRUST LOGISTIK</h3>
                       <h4 style={{ margin: '1px 0 0 0', fontWeight: '800', fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Logistics & Freight Forwarding</h4>
                       <div style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.2', marginTop: '3px', maxWidth: '250px' }}>
                         Green Sedayu Bizpark DM 11 No. 51, Kalideres, Jakarta Barat<br />
-                        Tel: +62 21 2252 2333 | Email: info@alphalogistics.co.id
+                        Tel: +62 21 2252 2333 | Email: info@omegatrust.co.id
                       </div>
                     </div>
                   </div>
@@ -115,16 +115,16 @@ const QuotationList = () => {
                 </div>
                 {/* Customer & Marketing Grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '80px', marginBottom: '60px' }}>
-                  <div style={{ borderLeft: '4px solid #1e40af', paddingLeft: '25px' }}>
+                  <div style={{ borderLeft: '4px solid #065f46', paddingLeft: '25px' }}>
                     <h5 style={{ textTransform: 'uppercase', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '800', marginBottom: '15px', letterSpacing: '1px' }}>Customer Details</h5>
                     <h3 style={{ margin: '0 0 8px 0', fontSize: '2.2rem', fontWeight: '900', color: '#b45309', letterSpacing: '-0.5px' }}>{selectedDraft.customerName}</h3>
-                    <p style={{ margin: '0 0 5px 0', fontSize: '1.2rem', fontWeight: '800', color: '#1e40af' }}>Attn: {selectedDraft.pic || 'Purchasing Department'}</p>
+                    <p style={{ margin: '0 0 5px 0', fontSize: '1.2rem', fontWeight: '800', color: '#065f46' }}>Attn: {selectedDraft.pic || 'Purchasing Department'}</p>
                     <p style={{ margin: 0, fontSize: '1.1rem', color: '#475569', fontWeight: '600' }}>{selectedDraft.address || 'Batam'}</p>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <h5 style={{ textTransform: 'uppercase', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '800', marginBottom: '15px', letterSpacing: '1px' }}>Marketing Person</h5>
-                    <h4 style={{ margin: '0 0 5px 0', fontSize: '1.6rem', fontWeight: '900', color: '#0f172a' }}>{selectedDraft.marketingName || 'Alpha Logistics Prakarsa Team'}</h4>
-                    <p style={{ margin: 0, color: '#475569', fontWeight: '700', fontSize: '1rem' }}>{selectedDraft.marketingEmail || 'marketing@alphalogistics.co.id'}</p>
+                    <h4 style={{ margin: '0 0 5px 0', fontSize: '1.6rem', fontWeight: '900', color: '#0f172a' }}>{selectedDraft.marketingName || 'Omega Trust Team'}</h4>
+                    <p style={{ margin: 0, color: '#475569', fontWeight: '700', fontSize: '1rem' }}>{selectedDraft.marketingEmail || 'marketing@omegatrust.com'}</p>
                     <p style={{ margin: '3px 0 20px 0', color: '#475569', fontWeight: '700', fontSize: '1rem' }}>+62 21 5000 8000</p>
                     <div style={{ borderTop: '1px solid #e2e8f0', display: 'inline-block', paddingTop: '10px' }}>
                       <span style={{ textTransform: 'uppercase', color: '#94a3b8', fontSize: '0.75rem', fontWeight: '800', letterSpacing: '1px', marginRight: '10px' }}>Validity Period:</span>
@@ -207,7 +207,7 @@ const QuotationList = () => {
                     <p style={{ margin: '0 0 80px 0', fontSize: '0.9rem', fontWeight: '900', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Authorized Signature</p>
                     <div style={{ borderBottom: '2px solid #0f172a', marginBottom: '12px' }}></div>
                     <p style={{ margin: 0, fontWeight: '900', fontSize: '1.1rem', color: '#0f172a' }}>{selectedDraft.marketingName || 'Management'}</p>
-                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '800' }}>PT. ALPHA LOGISTICS PRAKARSA</p>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '800' }}>PT. OMEGA TRUST</p>
                   </div>
                 </div>
             </motion.div>
@@ -266,7 +266,7 @@ const QuotationList = () => {
                       <Download size={16} />
                     </button>
                     {quote.status === 'pending' && (
-                      <ButtonWithLoading className="btn-icon" style={{ color: '#3b82f6', background: 'rgba(37, 99, 235, 0.1)' }} onClick={() => approveQuotation(quote.id)}>
+                      <ButtonWithLoading className="btn-icon" style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.1)' }} onClick={() => approveQuotation(quote.id)}>
                         <CheckCircle size={16} />
                       </ButtonWithLoading>
                     )}
@@ -296,11 +296,4 @@ const QuotationList = () => {
 };
 
 export default QuotationList;
-
-
-
-
-
-
-
 

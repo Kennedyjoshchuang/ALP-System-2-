@@ -79,7 +79,7 @@ function App() {
             backdropFilter: 'blur(10px)',
             fontSize: '0.9rem',
           },
-          success: { iconTheme: { primary: '#3b82f6', secondary: '#fff' } },
+          success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
           error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
         }}
       />
@@ -98,8 +98,4 @@ const MaintenanceCheck = () => {
 };
 
 export default App;
-
-
-
-
 

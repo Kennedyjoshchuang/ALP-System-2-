@@ -1,5 +1,5 @@
 -- ============================================================
--- OTL System - Complete Supabase Schema Reset
+-- ALP System - Complete Supabase Schema Reset
 -- Run this in Supabase SQL Editor
 -- ============================================================
 

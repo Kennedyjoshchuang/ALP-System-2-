@@ -8,11 +8,14 @@ export const translations = {
     accounting: "Accounting",
     piutang: "Receivables",
     signOut: "Sign Out",
-    welcomeMessage: "Welcome to the Command Center, ALP Team",
+    welcomeMessage: "Welcome to the Command Center, PT. Alpha Logistics Prakarsa Team",
     authorized: "Authorized",
     systemRole: "System",
     logistikSystem: "PT. Alpha Logistics Prakarsa",
     systemControl: "System Control",
+    procurement: "Procurement",
+    hrd: "HRD",
+    
     
     // Auth
     loginTitle: "Command Center Access",
@@ -91,7 +94,6 @@ export const translations = {
     searchProspects: "Search by company name...",
     quotationListPage: "Quotation List",
     quotationList: "Quotation List",
-    activeJobOrders: "Active Job Orders",
     searchQuotations: "Search by customer name...",
     searchJobOrders: "Search Job Orders..."
   },
@@ -104,11 +106,14 @@ export const translations = {
     accounting: "Akuntansi",
     piutang: "Piutang",
     signOut: "Keluar",
-    welcomeMessage: "Selamat datang di Pusat Komando, Tim ALP",
+    welcomeMessage: "Selamat datang di Pusat Komando, Tim PT. Alpha Logistics Prakarsa",
     authorized: "Terotorisasi",
     systemRole: "Sistem",
     logistikSystem: "PT. Alpha Logistics Prakarsa",
     systemControl: "Kontrol Sistem",
+    procurement: "Pengadaan",
+    hrd: "HRD",
+    
     
     // Auth
     loginTitle: "Akses Pusat Komando",
@@ -187,10 +192,8 @@ export const translations = {
     searchProspects: "Cari berdasarkan nama...",
     quotationListPage: "Daftar Penawaran",
     quotationList: "Daftar Penawaran",
-    activeJobOrders: "Job Order Aktif",
     searchQuotations: "Cari berdasarkan nama customer...",
     searchJobOrders: "Cari Job Order..."
   }
 };
-
 

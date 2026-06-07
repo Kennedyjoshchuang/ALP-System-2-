@@ -8,8 +8,8 @@ const AppContext = createContext();
 // const API_URL is now imported from ../api/api
 
 export const AppProvider = ({ children }) => {
-  const [language, setLanguage] = useState(() => localStorage.getItem('omega_lang') || 'en');
-  const { customers, addCustomer: addCustomerHook, isLoading: customersLoading, error: customersError } = useCustomers();
+  const [language, setLanguage] = useState(() => localStorage.getItem('alp_lang') || 'en');
+  const { customers, addCustomer: addCustomerHook, isLoading: customersLoading, error: customersError, refetch: refetchCustomers } = useCustomers();
   const [prospects, setProspects] = useState([]);
   const [prospectDrafts, setProspectDrafts] = useState([]);
   const [quotations, setQuotations] = useState([]);
@@ -24,10 +24,10 @@ export const AppProvider = ({ children }) => {
   const [employeeAccounts, setEmployeeAccounts] = useState([]);
   const [companyBankAccounts, setCompanyBankAccounts] = useState([]);
   const [user, setUser] = useState(() => {
-    const saved = sessionStorage.getItem('omega_user');
+    const saved = sessionStorage.getItem('alp_user');
     return saved ? JSON.parse(saved) : null;
   });
-  const [theme, setTheme] = useState(() => localStorage.getItem('omega_theme') || 'dark');
+  const [theme, setTheme] = useState(() => localStorage.getItem('alp_theme') || 'dark');
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -39,13 +39,13 @@ export const AppProvider = ({ children }) => {
   const toggleLanguage = () => {
     const newLang = language === 'en' ? 'id' : 'en';
     setLanguage(newLang);
-    localStorage.setItem('omega_lang', newLang);
+    localStorage.setItem('alp_lang', newLang);
   };
 
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
-    localStorage.setItem('omega_theme', newTheme);
+    localStorage.setItem('alp_theme', newTheme);
   };
 
   const login = (username, password) => {
@@ -63,7 +63,7 @@ export const AppProvider = ({ children }) => {
     if (userMatch && password === userMatch.key) {
       const userData = { name: userMatch.name, role: userMatch.role };
       setUser(userData);
-      sessionStorage.setItem('omega_user', JSON.stringify(userData));
+      sessionStorage.setItem('alp_user', JSON.stringify(userData));
       return true;
     }
 
@@ -77,7 +77,7 @@ export const AppProvider = ({ children }) => {
         employeeId: empAccount.id 
       };
       setUser(userData);
-      sessionStorage.setItem('omega_user', JSON.stringify(userData));
+      sessionStorage.setItem('alp_user', JSON.stringify(userData));
       return true;
     }
 
@@ -86,7 +86,7 @@ export const AppProvider = ({ children }) => {
 
   const logout = () => {
     setUser(null);
-    sessionStorage.removeItem('omega_user');
+    sessionStorage.removeItem('alp_user');
   };
 
   // Fetch all data from API (excluding customers, which are handled by useCustomers)
@@ -150,7 +150,32 @@ export const AppProvider = ({ children }) => {
 
       setProspects(Array.isArray(prosData) ? prosData : []);
       setQuotations(safeParse(quoData, ['items']));
-      setJobOrders(safeParse(joData, ['photos', 'costs', 'containerNo', 'vehicleNo', 'driverName']));
+      const parsedJOs = safeParse(joData, ['photos', 'costs', 'containerNo', 'vehicleNo', 'driverName']).map(jo => {
+        let instructionText = jo.instruction || '';
+        let dispatchedAt = jo.dispatchedAt || null;
+        let completedAt = jo.completedAt || null;
+        
+        if (instructionText && instructionText.includes('|||')) {
+          const parts = instructionText.split('|||');
+          instructionText = parts[0].trim();
+          try {
+            const meta = JSON.parse(parts[1].trim());
+            if (meta.dispatchedAt) dispatchedAt = meta.dispatchedAt;
+            if (meta.completedAt) completedAt = meta.completedAt;
+          } catch (e) {
+            // failed to parse
+          }
+        }
+        
+        return {
+          ...jo,
+          instruction: instructionText,
+          jobDescription: instructionText,
+          dispatchedAt,
+          completedAt
+        };
+      });
+      setJobOrders(parsedJOs);
       setInvoices(safeParse(invData, ['extra_charges', 'tax_deduction_proof', 'taxes_deducted', 'paymentProofPhoto', 'signedInvoicePhoto', 'signedReceiptPhoto']));
       setReceivables(safeParse(recData, ['extra_charges', 'tax_deduction_proof', 'taxes_deducted', 'paymentProofPhoto', 'signedInvoicePhoto', 'signedReceiptPhoto']));
       setVendors(safeParse(venData, ['services', 'assets']));
@@ -201,6 +226,14 @@ export const AppProvider = ({ children }) => {
     setProspects(prev => prev.map(p => p.id === id ? { ...p, status } : p));
   };
 
+  const updateProspect = async (id, updates) => {
+    await apiRequest(`prospects/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    });
+    setProspects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+  };
+
   const convertProspectToCustomer = async (id) => {
     const prospect = prospects.find(p => p.id === id);
     if (prospect) {
@@ -229,6 +262,16 @@ export const AppProvider = ({ children }) => {
     const finalQuotation = { ...newQuotation, id };
     setQuotations(prev => [...prev, finalQuotation]);
     return finalQuotation;
+  };
+
+  const updateQuotation = async (quotationId, quotationData) => {
+    await apiRequest(`quotations/${quotationId}`, {
+      method: 'PUT',
+      body: JSON.stringify(quotationData)
+    });
+    setQuotations(prev => prev.map(q => 
+      q.id === quotationId ? { ...q, ...quotationData } : q
+    ));
   };
 
   const approveQuotation = async (quotationId) => {
@@ -267,23 +310,60 @@ export const AppProvider = ({ children }) => {
   };
 
   const dispatchJO = async (joId, quantity) => {
-    await updateJOStatus(joId, { status: 'dispatched', issueQuantity: quantity });
+    const dispatchedAt = new Date().toISOString();
+    await updateJOStatus(joId, { status: 'dispatched', issueQuantity: quantity, dispatchedAt });
   };
 
   const updateJOStatus = async (joId, updates) => {
+    // Intercept updates to serialize dispatchedAt/completedAt into instruction polymorphically
+    const currentJo = jobOrders.find(j => j.id === joId) || {};
+    
+    const dispatchedAt = 'dispatchedAt' in updates ? updates.dispatchedAt : currentJo.dispatchedAt;
+    const completedAt = 'completedAt' in updates ? updates.completedAt : currentJo.completedAt;
+    
+    const finalUpdates = { ...updates };
+    
+    // Clean up SQL columns to avoid PostgREST schema cache error
+    delete finalUpdates.dispatchedAt;
+    delete finalUpdates.completedAt;
+    
+    if (dispatchedAt || completedAt) {
+      // Get the raw instruction (without old metadata)
+      let rawInstruction = updates.instruction || currentJo.instruction || '';
+      // If the updates or current state has metadata, strip it first to get the pure instruction
+      if (rawInstruction.includes('|||')) {
+        rawInstruction = rawInstruction.split('|||')[0].trim();
+      }
+      
+      const meta = { dispatchedAt, completedAt };
+      finalUpdates.instruction = `${rawInstruction} ||| ${JSON.stringify(meta)}`;
+    }
+    
     // Optimistic update
-    setJobOrders(prev => prev.map(jo => 
-      jo.id === joId ? { ...jo, ...updates } : jo
-    ));
+    setJobOrders(prev => prev.map(jo => {
+      if (jo.id === joId) {
+        const merged = { ...jo, ...updates };
+        // Clean up serialized string inside state so the frontend gets pristine instruction
+        if (merged.instruction && merged.instruction.includes('|||')) {
+          merged.instruction = merged.instruction.split('|||')[0].trim();
+        }
+        merged.jobDescription = merged.instruction;
+        merged.dispatchedAt = dispatchedAt;
+        merged.completedAt = completedAt;
+        return merged;
+      }
+      return jo;
+    }));
 
     await apiRequest(`job-orders/${joId}`, {
       method: 'PUT',
-      body: JSON.stringify(updates)
+      body: JSON.stringify(finalUpdates)
     });
   };
 
   const completeJO = async (joId) => {
-    await updateJOStatus(joId, { status: 'done' });
+    const completedAt = new Date().toISOString();
+    await updateJOStatus(joId, { status: 'done', completedAt });
   };
 
   const cleanNumber = (val) => {
@@ -315,52 +395,60 @@ export const AppProvider = ({ children }) => {
       return null;
     }
     
-    const quotation = jo.quotationId 
-      ? quotations.find(q => String(q.id) === String(jo.quotationId))
-      : null;
+    // Find all JOs sharing the same quotationId and customerName, and are in 'done' status.
+    let targetJOs = [jo];
+    if (jo.quotationId) {
+      targetJOs = jobOrders.filter(j => 
+        String(j.quotationId) === String(jo.quotationId) && 
+        (j.status === 'done' || String(j.id) === String(joId)) &&
+        j.customerName === jo.customerName
+      );
+    }
     
-    // Defensive parsing for quotation items
-    let items = [];
-    if (quotation && quotation.items) {
-      try {
-        items = typeof quotation.items === 'string' ? JSON.parse(quotation.items) : quotation.items;
-      } catch (e) {
-        console.error("Failed to parse quotation items:", e);
-        items = [];
+    // Calculate total amount across all target JOs
+    let totalAmount = 0;
+    targetJOs.forEach(targetJo => {
+      const quotation = targetJo.quotationId 
+        ? quotations.find(q => String(q.id) === String(targetJo.quotationId))
+        : null;
+      
+      let items = [];
+      if (quotation && quotation.items) {
+        try {
+          items = typeof quotation.items === 'string' ? JSON.parse(quotation.items) : quotation.items;
+        } catch (e) {
+          items = [];
+        }
       }
-    }
-
-    if (!Array.isArray(items)) items = [];
+      if (!Array.isArray(items)) items = [];
+      
+      const targetDesc = (targetJo.instruction || targetJo.jobDescription || "").trim().toLowerCase();
+      const item = items.find(i => (i.description || "").trim().toLowerCase() === targetDesc);
+      
+      let rate = 0;
+      if (item && item.rate) {
+        rate = cleanNumber(item.rate);
+      } else {
+        rate = cleanNumber(targetJo.rate);
+      }
+      const qty = cleanNumber(targetJo.issueQuantity || targetJo.quantity || 1);
+      totalAmount += rate * qty;
+    });
     
-    // Find rate for selected activity (using description as matched in AdminHub)
-    const targetDesc = (jo.instruction || jo.jobDescription || "").trim().toLowerCase();
-    const item = items.find(i => (i.description || "").trim().toLowerCase() === targetDesc);
-    
-    // Ensure rate is a valid number using cleanNumber
-    let rate = 0;
-    if (item && item.rate) {
-      rate = cleanNumber(item.rate);
-    } else {
-      rate = cleanNumber(jo.rate);
-    }
-
-    const qty = cleanNumber(jo.issueQuantity || jo.quantity || 1);
-    const amount = rate * qty;
-    
-    console.log(`Calculated amount: ${amount} (Rate: ${rate}, Qty: ${qty})`);
-    
-    if (isNaN(amount)) {
-      console.error("Calculated amount is NaN. Rate:", rate, "Qty:", qty);
+    if (isNaN(totalAmount)) {
       throw new Error("Gagal menghitung nominal invoice (Data tidak valid).");
     }
 
+    const newInvoiceId = `INV-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+    const consolidatedJOs = targetJOs.map(j => j.id);
+
     const newInvoice = {
-      // Use more robust ID generation
-      id: `INV-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-      joId,
+      id: newInvoiceId,
+      joId, // Primary JO reference
+      consolidatedJOs, // Array of consolidated JO IDs
       customerName: jo.customerName || 'Pelanggan',
-      amount: amount,
-      subtotal: amount,
+      amount: totalAmount,
+      subtotal: totalAmount,
       tax: 0,
       date: new Date().toISOString(),
       status: 'unpaid',
@@ -376,13 +464,15 @@ export const AppProvider = ({ children }) => {
         body: JSON.stringify(newInvoice)
       });
       
-      const { id } = data;
-      const finalInvoice = { ...newInvoice, id: id || newInvoice.id };
+      const finalInvoice = { ...newInvoice, id: data.id || newInvoice.id };
       
-      // Update local state
       setInvoices(prev => [...prev, finalInvoice]);
       setReceivables(prev => [...prev, { ...finalInvoice, balance: finalInvoice.amount }]);
-      setJobOrders(prev => prev.map(j => String(j.id) === String(joId) ? { ...j, status: 'invoiced' } : j));
+      
+      // Update all consolidated JOs to 'invoiced'
+      setJobOrders(prev => prev.map(j => 
+        consolidatedJOs.includes(j.id) ? { ...j, status: 'invoiced' } : j
+      ));
       
       return finalInvoice;
     } catch (error) {
@@ -427,7 +517,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteCustomer = async (id) => {
     await apiRequest(`customers/${id}`, { method: 'DELETE' });
-    setCustomers(prev => prev.filter(c => c.id !== id));
+    refetchCustomers();
   };
 
   const addVendor = async (data) => {
@@ -501,11 +591,22 @@ export const AppProvider = ({ children }) => {
     await apiRequest(`prospects/${id}`, { method: 'DELETE' });
     setProspects(prev => prev.filter(p => p.id !== id));
   };
+
+
   const deleteJO = async (id) => {
     await apiRequest(`job-orders/${id}`, { method: 'DELETE' });
     setJobOrders(prev => prev.filter(jo => jo.id !== id));
   };
   const deleteInvoice = async (id) => {
+    // Revert JO status before deleting
+    const invoiceToDelete = invoices.find(inv => inv.id === id);
+    if (invoiceToDelete) {
+      const joIdsToRevert = invoiceToDelete.consolidatedJOs || [invoiceToDelete.joId];
+      setJobOrders(prev => prev.map(jo => 
+        joIdsToRevert.includes(jo.id) ? { ...jo, status: 'done' } : jo
+      ));
+    }
+
     await apiRequest(`invoices/${id}`, { method: 'DELETE' });
     setInvoices(prev => prev.filter(inv => inv.id !== id));
     setReceivables(prev => prev.filter(r => r.invoiceId !== id));
@@ -589,7 +690,7 @@ export const AppProvider = ({ children }) => {
   const clearAllData = async () => {
     if (user?.role !== 'owner') return;
     await apiRequest('system/clear', { method: 'POST' });
-    setCustomers([]);
+    refetchCustomers();
     setProspects([]);
     setProspectDrafts([]);
     setJobOrders([]);
@@ -685,9 +786,9 @@ export const AppProvider = ({ children }) => {
       customers, addCustomer, deleteCustomer,
       vendors, addVendor, updateVendor, deleteVendor,
       purchaseOrders, createPurchaseOrder, issuePurchaseOrder, updatePurchaseOrder, deletePurchaseOrder, patchPurchaseOrderLocal,
-      prospects, addProspect, updateProspectStatus, convertProspectToCustomer, deleteProspect,
+      prospects, addProspect, updateProspectStatus, convertProspectToCustomer, deleteProspect, updateProspect,
       prospectDrafts,
-      quotations, createQuotation, approveQuotation, unapproveQuotation, deleteQuotation,
+      quotations, createQuotation, updateQuotation, approveQuotation, unapproveQuotation, deleteQuotation,
       jobOrders, createJO, dispatchJO, updateJOStatus, completeJO, deleteJO,
       invoices, createInvoice, settleInvoice, deleteInvoice, updateInvoice,
       receivables, settleReceivable,
@@ -706,8 +807,4 @@ export const AppProvider = ({ children }) => {
 };
 
 export const useApp = () => useContext(AppContext);
-
-
-
-
 
