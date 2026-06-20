@@ -39,6 +39,15 @@ const handleError = (res, error, context = '') => {
   res.status(500).json({ error: message });
 };
 
+const cleanPayload = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const cleaned = {};
+  for (const [key, val] of Object.entries(obj)) {
+    cleaned[key] = val === '' ? null : val;
+  }
+  return cleaned;
+};
+
 // --- CUSTOMERS ---
 app.get('/api/customers', async (req, res) => {
   const { data, error } = await supabase.from('customers').select('*');
@@ -68,16 +77,17 @@ app.get('/api/prospects', async (req, res) => {
 
 app.post('/api/prospects', async (req, res) => {
   const { id, name, phone, email, address, pic, notes, description, marketingName, marketingPhone, marketingEmail, companyAddress, date, status } = req.body;
-  const { error } = await supabase.from('prospects').insert({
+  const prospect = cleanPayload({
     id, name, phone, email, address, pic, notes, description,
     marketingName, marketingPhone, marketingEmail, companyAddress, date, status
   });
+  const { error } = await supabase.from('prospects').insert(prospect);
   if (error) return handleError(res, error, 'POST prospects');
   res.status(201).json({ id });
 });
 
 app.put('/api/prospects/:id', async (req, res) => {
-  const updates = req.body;
+  const updates = cleanPayload(req.body);
   const { error } = await supabase.from('prospects').update(updates).eq('id', req.params.id);
   if (error) return handleError(res, error, 'PUT prospects');
   res.sendStatus(200);
