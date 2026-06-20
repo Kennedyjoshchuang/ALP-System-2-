@@ -23,7 +23,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const Layout = ({ children }) => {
   const location = useLocation();
-  const { logout, user, t, language, toggleLanguage, theme, toggleTheme, loading } = useApp();
+  const { logout, user, hasAccess, t, language, toggleLanguage, theme, toggleTheme, loading } = useApp();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [windowWidth, setWindowWidth] = React.useState(window.innerWidth);
 
@@ -38,14 +38,14 @@ const Layout = ({ children }) => {
   const SIDEBAR_WIDTH = isLaptop ? 220 : 260;
 
   const menuItems = [
-    { path: '/marketing', label: t('marketing'), icon: Users, roles: ['owner', 'marketing'] },
-    { path: '/admin', label: t('adminOffice'), icon: Briefcase, roles: ['owner', 'admin'] },
-    { path: '/procurement', label: t('procurement'), icon: ShoppingCart, roles: ['owner', 'admin'] },
-    { path: '/executor', label: t('executor'), icon: PlayCircle, roles: ['owner', 'executor'] },
-    { path: '/accounting', label: t('accounting'), icon: CreditCard, roles: ['owner', 'accounting'] },
-    { path: '/hrd', label: t('hrd'), icon: UserCheck, roles: ['owner', 'hrd'] },
-    { path: '/system-control', label: t('systemControl'), icon: ShieldAlert, roles: ['owner'] },
-  ].filter(item => item.roles.includes(user?.role));
+    { path: '/marketing', label: t('marketing'), icon: Users, moduleKey: 'marketing' },
+    { path: '/admin', label: t('adminOffice'), icon: Briefcase, moduleKey: 'admin' },
+    { path: '/procurement', label: t('procurement'), icon: ShoppingCart, moduleKey: 'procurement' },
+    { path: '/executor', label: t('executor'), icon: PlayCircle, moduleKey: 'executor' },
+    { path: '/accounting', label: t('accounting'), icon: CreditCard, moduleKey: 'accounting' },
+    { path: '/hrd', label: t('hrd'), icon: UserCheck, moduleKey: 'hrd' },
+    { path: '/system-control', label: t('systemControl'), icon: ShieldAlert, moduleKey: 'systemControl' },
+  ].filter(item => hasAccess(item.moduleKey));
 
   const getCurrentTitle = () => {
     const item = menuItems.find(i => i.path === location.pathname);

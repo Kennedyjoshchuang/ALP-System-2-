@@ -13,6 +13,10 @@ export async function apiRequest(endpoint, options = {}) {
     Accept: "application/json",
     "Content-Type": "application/json",
   };
+  const token = sessionStorage.getItem('alp_token');
+  if (token) {
+    defaultHeaders["Authorization"] = `Bearer ${token}`;
+  }
   const response = await fetch(url, {
     ...options,
     headers: { ...defaultHeaders, ...(options.headers || {}) },

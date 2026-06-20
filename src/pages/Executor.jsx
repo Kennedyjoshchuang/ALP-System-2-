@@ -53,8 +53,9 @@ const formatDuration = (dispatchedAt, completedAt, t, language) => {
 };
 
 const Executor = () => {
-  const { jobOrders, updateJOStatus, completeJO, deleteJO, t, language } = useApp();
+  const { jobOrders, updateJOStatus, completeJO, deleteJO, t, language, hasAccess } = useApp();
   const isID = language === 'id';
+  const canWrite = hasAccess ? hasAccess('executor', true) : false;
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'records'
   const fileInputRef = useRef(null);
@@ -485,13 +486,17 @@ const Executor = () => {
                   <td style={{ padding: '15px', textAlign: 'center' }}>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
                       {activeTab === 'active' ? (
-                        <ButtonWithLoading 
-                          className="btn btn-gold" 
-                          style={{ padding: '6px 12px', fontSize: '0.75rem' }}
-                          onClick={(e) => { e.stopPropagation(); return handleDone(jo); }}
-                        >
-                          {isID ? 'Selesai' : 'Done'}
-                        </ButtonWithLoading>
+                        canWrite ? (
+                          <ButtonWithLoading 
+                            className="btn btn-gold" 
+                            style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                            onClick={(e) => { e.stopPropagation(); return handleDone(jo); }}
+                          >
+                            {isID ? 'Selesai' : 'Done'}
+                          </ButtonWithLoading>
+                        ) : (
+                          <span className="badge badge-pending" style={{ fontSize: '0.7rem' }}>{isID ? 'Aktif' : 'Active'}</span>
+                        )
                       ) : (
                         <span className="badge badge-done" style={{ fontSize: '0.7rem' }}>{isID ? 'Diarsipkan' : 'Archived'}</span>
                       )}
@@ -511,7 +516,7 @@ const Executor = () => {
                       >
                         <Printer size={20} />
                       </button>
-                      {activeTab === 'records' && (
+                      {activeTab === 'records' && canWrite && (
                         <button 
                           className="btn-icon" 
                           style={{ width: '38px', height: '38px', color: 'var(--gold-metallic)', background: 'rgba(212, 175, 55, 0.1)', border: '1px solid rgba(212, 175, 55, 0.3)' }}
@@ -521,7 +526,7 @@ const Executor = () => {
                           <FileText size={20} />
                         </button>
                       )}
-                      {activeTab === 'records' && (
+                      {activeTab === 'records' && canWrite && (
                         <button
                           className="btn-icon"
                           style={{ width: '38px', height: '38px', color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
@@ -554,15 +559,17 @@ const Executor = () => {
                                   <label>{isID ? 'Nomor Kontainer' : 'Container Number'} <span style={{ color: '#ef4444' }}>*</span></label>
                                   {(localData[jo.id]?.containerNo || []).map((c, i, arr) => (
                                     <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
-                                      <input type="text" value={c} onChange={e => handleLocalListItemUpdate(jo.id, 'containerNo', i, e.target.value)} placeholder="CONT-123456" />
-                                      {arr.length > 1 && (
+                                      <input disabled={!canWrite} type="text" value={c} onChange={e => handleLocalListItemUpdate(jo.id, 'containerNo', i, e.target.value)} placeholder="CONT-123456" />
+                                      {arr.length > 1 && canWrite && (
                                         <button className="btn-icon" onClick={() => removeLocalListItem(jo.id, 'containerNo', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
                                           <X size={12} />
                                         </button>
                                       )}
-                                      <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'containerNo')} style={{ padding: '5px', height: 'auto', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} title={isID ? "Tambah Kontainer" : "Add Container"}>
-                                        <Plus size={12} />
-                                      </button>
+                                      {canWrite && (
+                                        <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'containerNo')} style={{ padding: '5px', height: 'auto', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} title={isID ? "Tambah Kontainer" : "Add Container"}>
+                                          <Plus size={12} />
+                                        </button>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -572,15 +579,17 @@ const Executor = () => {
                                   <label>{isID ? 'Nomor Kendaraan' : 'Vehicle Number'} <span style={{ color: '#ef4444' }}>*</span></label>
                                   {(localData[jo.id]?.vehicleNo || []).map((v, i, arr) => (
                                     <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
-                                      <input type="text" value={v} onChange={e => handleLocalListItemUpdate(jo.id, 'vehicleNo', i, e.target.value)} placeholder="B 1234 ABC" />
-                                      {arr.length > 1 && (
+                                      <input disabled={!canWrite} type="text" value={v} onChange={e => handleLocalListItemUpdate(jo.id, 'vehicleNo', i, e.target.value)} placeholder="B 1234 ABC" />
+                                      {arr.length > 1 && canWrite && (
                                         <button className="btn-icon" onClick={() => removeLocalListItem(jo.id, 'vehicleNo', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
                                           <X size={12} />
                                         </button>
                                       )}
-                                      <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'vehicleNo')} style={{ padding: '5px', height: 'auto', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} title={isID ? "Tambah Kendaraan" : "Add Vehicle"}>
-                                        <Plus size={12} />
-                                      </button>
+                                      {canWrite && (
+                                        <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'vehicleNo')} style={{ padding: '5px', height: 'auto', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} title={isID ? "Tambah Kendaraan" : "Add Vehicle"}>
+                                          <Plus size={12} />
+                                        </button>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -590,15 +599,17 @@ const Executor = () => {
                                   <label>{isID ? 'Nama Sopir' : 'Driver Name'} <span style={{ color: '#ef4444' }}>*</span></label>
                                   {(localData[jo.id]?.driverName || []).map((d, i, arr) => (
                                     <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
-                                      <input type="text" value={d} onChange={e => handleLocalListItemUpdate(jo.id, 'driverName', i, e.target.value)} placeholder={isID ? "Nama Sopir" : "Driver Name"} />
-                                      {arr.length > 1 && (
+                                      <input disabled={!canWrite} type="text" value={d} onChange={e => handleLocalListItemUpdate(jo.id, 'driverName', i, e.target.value)} placeholder={isID ? "Nama Sopir" : "Driver Name"} />
+                                      {arr.length > 1 && canWrite && (
                                         <button className="btn-icon" onClick={() => removeLocalListItem(jo.id, 'driverName', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
                                           <X size={12} />
                                         </button>
                                       )}
-                                      <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'driverName')} style={{ padding: '5px', height: 'auto', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} title={isID ? "Tambah Sopir" : "Add Driver"}>
-                                        <Plus size={12} />
-                                      </button>
+                                      {canWrite && (
+                                        <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'driverName')} style={{ padding: '5px', height: 'auto', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} title={isID ? "Tambah Sopir" : "Add Driver"}>
+                                          <Plus size={12} />
+                                        </button>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -606,18 +617,20 @@ const Executor = () => {
                               <div className="input-group">
                                 <label>{isID ? 'Status Aktivitas' : 'Activity Status'} <span style={{ color: '#ef4444' }}>*</span></label>
                                 <input 
+                                  disabled={!canWrite}
                                   type="text" 
                                   value={localData[jo.id]?.activityStatus || ''} 
                                   onChange={e => handleLocalUpdate(jo.id, 'activityStatus', e.target.value)} 
                                   placeholder={isID ? "Perbarui status operasional terakhir..." : "Update last operational status..."} 
                                 />
                               </div>
-
+ 
                               {/* Date Pickers Grid */}
                               <div className="grid-responsive-2">
                                 <div className="input-group">
                                   <label>{isID ? 'Waktu Pengiriman (Dispatched)' : 'Dispatched Date & Time'}</label>
                                   <input 
+                                    disabled={!canWrite}
                                     type="datetime-local" 
                                     value={localData[jo.id]?.dispatchedAtLocal || ''} 
                                     onChange={e => handleLocalUpdate(jo.id, 'dispatchedAtLocal', e.target.value)}
@@ -635,6 +648,7 @@ const Executor = () => {
                                   <div className="input-group">
                                     <label>{isID ? 'Waktu Selesai (Completed)' : 'Completed Date & Time'}</label>
                                     <input 
+                                      disabled={!canWrite}
                                       type="datetime-local" 
                                       value={localData[jo.id]?.completedAtLocal || ''} 
                                       onChange={e => handleLocalUpdate(jo.id, 'completedAtLocal', e.target.value)}
@@ -650,29 +664,31 @@ const Executor = () => {
                                   </div>
                                 )}
                               </div>
-
+ 
                               <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
                                 <strong style={{ color: 'var(--text)' }}>{isID ? 'Instruksi Lengkap:' : 'Full Instruction:'}</strong> {jo.jobDescription}
                               </div>
-
-                              <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
-                                <ButtonWithLoading
-                                  className="btn btn-gold"
-                                  style={{ padding: '10px 20px', fontSize: '0.85rem' }}
-                                  onClick={() => handleSaveChanges(jo)}
-                                >
-                                  {isID ? 'Simpan Perubahan' : 'Save Changes'}
-                                </ButtonWithLoading>
-                                {activeTab === 'active' && (
+ 
+                              {canWrite && (
+                                <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
                                   <ButtonWithLoading
-                                    className="btn btn-done"
-                                    style={{ padding: '10px 20px', fontSize: '0.85rem', background: '#10b981', color: 'white', border: 'none' }}
-                                    onClick={() => handleDone(jo)}
+                                    className="btn btn-gold"
+                                    style={{ padding: '10px 20px', fontSize: '0.85rem' }}
+                                    onClick={() => handleSaveChanges(jo)}
                                   >
-                                    {isID ? 'Selesaikan Pekerjaan' : 'Complete Job'}
+                                    {isID ? 'Simpan Perubahan' : 'Save Changes'}
                                   </ButtonWithLoading>
-                                )}
-                              </div>
+                                  {activeTab === 'active' && (
+                                    <ButtonWithLoading
+                                      className="btn btn-done"
+                                      style={{ padding: '10px 20px', fontSize: '0.85rem', background: '#10b981', color: 'white', border: 'none' }}
+                                      onClick={() => handleDone(jo)}
+                                    >
+                                      {isID ? 'Selesaikan Pekerjaan' : 'Complete Job'}
+                                    </ButtonWithLoading>
+                                  )}
+                                </div>
+                              )}
                             </div>
                             
                             <div>
@@ -681,12 +697,12 @@ const Executor = () => {
                                 {jo.photos?.map((photo, idx) => (
                                   <div key={idx} style={{ position: 'relative', width: '70px', height: '70px' }}>
                                     <img src={photo} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} />
-                                    {activeTab === 'active' && (
+                                    {activeTab === 'active' && canWrite && (
                                       <button onClick={() => removePhoto(jo.id, idx)} style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>×</button>
                                     )}
                                   </div>
                                 ))}
-                                {activeTab === 'active' && (
+                                {activeTab === 'active' && canWrite && (
                                   <div 
                                     onClick={() => fileInputRef.current.click()}
                                     style={{ width: '70px', height: '70px', border: '2px dashed var(--glass-border)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}

@@ -18,8 +18,10 @@ const QuotationList = () => {
     approveQuotation, 
     deleteQuotation, 
     user, 
-    t 
+    t,
+    hasAccess
   } = useApp();
+  const canWrite = hasAccess ? hasAccess('marketing', true) : false;
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDraft, setSelectedDraft] = useState(null);
@@ -265,7 +267,7 @@ const QuotationList = () => {
                     <button className="btn-icon" onClick={() => handleDownload(quote)}>
                       <Download size={16} />
                     </button>
-                    {quote.status === 'pending' && (
+                    {canWrite && quote.status === 'pending' && (
                       <ButtonWithLoading className="btn-icon" style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.1)' }} onClick={() => approveQuotation(quote.id)}>
                         <CheckCircle size={16} />
                       </ButtonWithLoading>

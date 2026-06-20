@@ -5,6 +5,27 @@ import { translations } from '../translations/translations';
 
 const AppContext = createContext();
 
+export const parsePermissions = (roleStr) => {
+  if (!roleStr) return {};
+  if (roleStr.startsWith('{')) {
+    try {
+      return JSON.parse(roleStr);
+    } catch (e) {
+      return {};
+    }
+  }
+  // Legacy role mapping
+  switch (roleStr) {
+    case 'marketing': return { marketing: 'write' };
+    case 'accounting': return { accounting: 'write' };
+    case 'executor': return { executor: 'write' };
+    case 'admin': return { admin: 'write', procurement: 'write' };
+    case 'hrd': return { hrd: 'write' };
+    case 'owner': return { marketing: 'write', admin: 'write', procurement: 'write', executor: 'write', accounting: 'write', hrd: 'write', systemControl: 'write' };
+    default: return {};
+  }
+};
+
 // const API_URL is now imported from ../api/api
 
 export const AppProvider = ({ children }) => {
@@ -48,45 +69,29 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('alp_theme', newTheme);
   };
 
-  const login = (username, password) => {
-    // 1. Check hardcoded/admin accounts
-    const rolesMap = {
-      'owner': { name: 'Owner', role: 'owner', key: 'Haiga1899.2003' },
-      'marketing': { name: 'Marketing', role: 'marketing', key: 'Haiga1899.2003' },
-      'admin': { name: 'Admin Office', role: 'admin', key: 'Haiga1899.2003' },
-      'executor': { name: 'Executor', role: 'executor', key: 'Haiga1899.2003' },
-      'accounting': { name: 'Accounting', role: 'accounting', key: 'Haiga1899.2003' }
-    };
-
-
-    const userMatch = rolesMap[username];
-    if (userMatch && password === userMatch.key) {
-      const userData = { name: userMatch.name, role: userMatch.role };
-      setUser(userData);
-      sessionStorage.setItem('alp_user', JSON.stringify(userData));
-      return true;
+  const login = async (username, password) => {
+    try {
+      const res = await apiRequest('login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password })
+      });
+      if (res && res.success && res.token) {
+        setUser(res.user);
+        sessionStorage.setItem('alp_user', JSON.stringify(res.user));
+        sessionStorage.setItem('alp_token', res.token);
+        return true;
+      }
+    } catch (err) {
+      console.error('Login failed:', err);
+      throw err;
     }
-
-    // 2. Check custom employee accounts
-    const empAccount = employeeAccounts.find(acc => acc.username === username && acc.password === password);
-    if (empAccount) {
-      const employee = employees.find(e => e.id === empAccount.id);
-      const userData = { 
-        name: employee?.name || empAccount.username, 
-        role: empAccount.role,
-        employeeId: empAccount.id 
-      };
-      setUser(userData);
-      sessionStorage.setItem('alp_user', JSON.stringify(userData));
-      return true;
-    }
-
     return false;
   };
 
   const logout = () => {
     setUser(null);
     sessionStorage.removeItem('alp_user');
+    sessionStorage.removeItem('alp_token');
   };
 
   // Fetch all data from API (excluding customers, which are handled by useCustomers)
@@ -193,8 +198,12 @@ export const AppProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user) {
+      fetchData();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
 
   const addCustomer = async (customer) => {
     const newCustomer = { ...customer, id: `CUST-${Date.now().toString().slice(-4)}` };
@@ -778,9 +787,24 @@ export const AppProvider = ({ children }) => {
     setCompanyBankAccounts(prev => prev.filter(b => b.id !== id));
   };
 
+  const hasAccess = (moduleKey, writeRequired = false) => {
+    if (!user) return false;
+    if (user.role === 'owner') return true;
+    
+    if (user.permissions && user.permissions[moduleKey]) {
+      const accessLevel = user.permissions[moduleKey];
+      if (writeRequired) {
+        return accessLevel === 'write';
+      }
+      return accessLevel === 'write' || accessLevel === 'read';
+    }
+    
+    return false;
+  };
+
   return (
     <AppContext.Provider value={{
-      user, login, logout,
+      user, login, logout, hasAccess,
       language, toggleLanguage, t,
       theme, toggleTheme, loading,
       customers, addCustomer, deleteCustomer,

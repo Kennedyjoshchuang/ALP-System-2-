@@ -21,7 +21,8 @@ export function useCustomers() {
     refetch,
   } = useQuery({
     queryKey: CUSTOMERS_QUERY_KEY,
-    queryFn: () => apiRequest("customers")
+    queryFn: () => apiRequest("customers"),
+    enabled: !!sessionStorage.getItem('alp_user')
   });
 
   const customers = Array.isArray(data) ? data : [];

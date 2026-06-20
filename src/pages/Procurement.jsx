@@ -8,7 +8,8 @@ import { ButtonWithLoading } from '../components/ButtonWithLoading';
 const emptyVendor = { name: '', phone: '', email: '', address: '', bankName: '', bankAccount: '', services: [{ description: '', price: '' }], assets: [''] };
 
 const Procurement = () => {
-  const { vendors: vendorsRaw, addVendor, updateVendor, deleteVendor, user, language } = useApp();
+  const { vendors: vendorsRaw, addVendor, updateVendor, deleteVendor, user, language, hasAccess } = useApp();
+  const canWrite = hasAccess ? hasAccess('procurement', true) : false;
   const isID = language === 'id';
   const vendors = vendorsRaw || [];
   const [showForm, setShowForm] = useState(false);
@@ -115,14 +116,17 @@ const Procurement = () => {
       </AnimatePresence>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h3 className="shimmer-text" style={{ fontSize: '1.8rem', margin: 0 }}>{isID ? 'Pengadaan & Tarif Vendor' : 'Procurement & Vendor Rates'}</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '6px' }}>{isID ? 'Kelola daftar vendor, harga layanan, dan aset operasional.' : 'Manage vendor lists, service rates, and operational assets.'}</p>
+      <div className="glass-card" style={{ padding: '25px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--secondary)' }}>
+            <Package size={28} /> {isID ? 'Manajemen Vendor' : 'Vendor Management'}
+          </h2>
+          {canWrite && (
+            <button className="btn btn-gold" onClick={() => { setForm(emptyVendor); setEditingId(null); setShowForm(!showForm); }}>
+              <Plus size={18} /> {showForm ? (isID ? 'Batal' : 'Cancel') : (isID ? 'Tambah Vendor' : 'Add Vendor')}
+            </button>
+          )}
         </div>
-        <button className="btn btn-gold" onClick={() => { setForm(emptyVendor); setEditingId(null); setShowForm(!showForm); }}>
-          <Plus size={18} /> {showForm && !editingId ? (isID ? 'Batal' : 'Cancel') : (isID ? 'Tambah Vendor' : 'Add Vendor')}
-        </button>
       </div>
 
       {/* Form */}
@@ -282,12 +286,14 @@ const Procurement = () => {
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{v.id} · {v.phone || (isID ? 'Tidak ada telp' : 'No Phone')} · {v.services?.length || 0} {isID ? 'layanan' : 'services'} · {v.assets?.filter(a=>a).length || 0} {isID ? 'aset' : 'assets'}</div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className="btn-icon" onClick={() => startEdit(v)} title="Edit"><Edit2 size={15} /></button>
-                    {user?.role === 'owner' && (
-                      <button className="btn-icon" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }} onClick={() => setDeleteConfirm(v)} title={isID ? 'Hapus' : 'Delete'}><Trash2 size={15} /></button>
-                    )}
-                  </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {canWrite && (
+                        <button className="btn-icon" onClick={() => startEdit(v)} title="Edit"><Edit2 size={15} /></button>
+                      )}
+                      {user?.role === 'owner' && (
+                        <button className="btn-icon" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }} onClick={() => setDeleteConfirm(v)} title={isID ? 'Hapus' : 'Delete'}><Trash2 size={15} /></button>
+                      )}
+                    </div>
                 </div>
 
                 {/* Expanded Detail */}

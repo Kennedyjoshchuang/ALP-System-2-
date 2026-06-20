@@ -11,12 +11,18 @@ const Login = () => {
   const { login, t, language, toggleLanguage, theme, toggleTheme } = useApp();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (login(role, password)) {
-      navigate('/dashboard');
-    } else {
-      setError(t('invalidKey'));
+    try {
+      const success = await login(role, password);
+      if (success) {
+        navigate('/dashboard');
+      } else {
+        setError(t('invalidKey'));
+        setPassword('');
+      }
+    } catch (err) {
+      setError(err.message || t('invalidKey'));
       setPassword('');
     }
   };

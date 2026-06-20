@@ -169,8 +169,11 @@ const Accounting = () => {
     getSystemConfig,
     loading,
     t,
-    language
+    language,
+    hasAccess
   } = context || {};
+
+  const canWrite = hasAccess ? hasAccess('accounting', true) : false;
 
   const isID = language === 'id';
 
@@ -333,6 +336,7 @@ const Accounting = () => {
   };
 
   const handleSaveOtherTransaction = async () => {
+    if (!canWrite) return;
     const finalCategory = otherExpenseForm.category === 'CUSTOM' ? otherExpenseForm.customCategory : otherExpenseForm.category;
     const finalSubcategory = otherExpenseForm.subcategory === 'CUSTOM' ? otherExpenseForm.customSubcategory : otherExpenseForm.subcategory;
     const serializedDescription = JSON.stringify({
@@ -414,6 +418,7 @@ const Accounting = () => {
   };
 
   const handleSaveReimbursement = async () => {
+    if (!canWrite) return;
     const totalAmount = reimbursementForm.items.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
     const serializedDescription = JSON.stringify({
       type: 'reimbursement',
@@ -454,6 +459,7 @@ const Accounting = () => {
   };
 
   const handleUpdateReimbursementStatus = async (r, newStatus) => {
+    if (!canWrite) return;
     const serializedDescription = JSON.stringify({
       type: 'reimbursement',
       items: Array.isArray(r.items) ? r.items : [],
@@ -597,6 +603,7 @@ const Accounting = () => {
   };
 
   const handleSavePODraft = async () => {
+    if (!canWrite) return;
     try {
       const payload = buildPOPayload();
       if (!payload) return;
@@ -608,6 +615,7 @@ const Accounting = () => {
   };
 
   const handleIssuePO = async () => {
+    if (!canWrite) return;
     try {
       const payload = buildPOPayload();
       if (!payload) return;
@@ -622,12 +630,14 @@ const Accounting = () => {
   };
 
   const handleUploadVendorInvoice = async (poId, photos) => {
+    if (!canWrite) return;
     await updatePurchaseOrder(poId, { vendorInvoicePhoto: photos });
     setVendorInvoiceModal(null);
     setModalPhotos([]);
   };
 
   const handleSettlePayable = async (poId, data) => {
+    if (!canWrite) return;
     if (!data.paymentProofPhoto || data.paymentProofPhoto.length === 0) {
       if (!window.confirm("Anda belum melampirkan Bukti Bayar. Lanjutkan proses pelunasan tanpa bukti?")) return;
     }
@@ -1002,6 +1012,7 @@ const Accounting = () => {
   };
 
   const confirmSettle = async () => {
+    if (!canWrite) return;
     if (!settleModal) return;
     try {
       await settleInvoice(settleModal.id, settleForm.paymentProof, settleForm.taxes, settleForm.taxProof);
@@ -1013,6 +1024,7 @@ const Accounting = () => {
   };
 
   const handleUndoInvoice = async (joId) => {
+    if (!canWrite) return;
     const inv = invoices.find(i => i.joId === joId);
     if (!inv) {
       alert('Invoice tidak ditemukan.');
@@ -1028,6 +1040,7 @@ const Accounting = () => {
   };
 
   const handleUndoPaidInvoice = async (inv) => {
+    if (!canWrite) return;
     if (window.confirm(`Undo payment for Invoice ${inv.id}? It will be moved back to Outstanding Receivables.`)) {
       try {
         await updateInvoice(inv.id, { status: 'issued' });
@@ -1038,6 +1051,7 @@ const Accounting = () => {
   };
 
   const handleUndoPaidPO = async (po) => {
+    if (!canWrite) return;
     if (window.confirm(`Undo payment for PO ${po.id}? It will be moved back to Outstanding Payables.`)) {
       try {
         await updatePurchaseOrder(po.id, { status: 'issued' });
@@ -2326,19 +2340,21 @@ const Accounting = () => {
           <FileText size={17} /> {isID ? 'Laporan Rinci' : 'Detail Report'}
         </button>
 
-        <button
-          onClick={() => setShowBankSettings(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
-            background: 'rgba(255,255,255,0.05)',
-            color: 'var(--text-muted)',
-            border: '1px solid var(--glass-border)',
-            marginLeft: 'auto'
-          }}
-        >
-          <Settings size={17} /> {isID ? 'Rekening Bank' : 'Bank Accounts'}
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => setShowBankSettings(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
+              background: 'rgba(255,255,255,0.05)',
+              color: 'var(--text-muted)',
+              border: '1px solid var(--glass-border)',
+              marginLeft: 'auto'
+            }}
+          >
+            <Settings size={17} /> {isID ? 'Rekening Bank' : 'Bank Accounts'}
+          </button>
+        )}
       </div>
 
       {/* Filter Bar */}
@@ -2437,10 +2453,12 @@ const Accounting = () => {
                       </td>
                       <td style={{padding:'12px', textAlign:'center'}}>
                         <div style={{display:'flex', gap:'8px', justifyContent:'center'}}>
-                          <button className="btn" style={{padding:'7px 14px',fontSize:'0.8rem',gap:'6px', background:'rgba(212,175,55,0.1)', color:'var(--secondary)', border:'1px solid var(--secondary)'}} onClick={()=>{ setCostModal(jo); setCostLines([{vendorId:'',serviceIdx:'',qty:1,customVendorName:'',customServiceDescription:'',customPrice:''}]); }}>
-                            <Plus size={14}/> {isID ? 'Biaya' : 'Costs'}
-                          </button>
-                          {!invoice && (
+                          {canWrite && (
+                            <button className="btn" style={{padding:'7px 14px',fontSize:'0.8rem',gap:'6px', background:'rgba(212,175,55,0.1)', color:'var(--secondary)', border:'1px solid var(--secondary)'}} onClick={()=>{ setCostModal(jo); setCostLines([{vendorId:'',serviceIdx:'',qty:1,customVendorName:'',customServiceDescription:'',customPrice:''}]); }}>
+                              <Plus size={14}/> {isID ? 'Biaya' : 'Costs'}
+                            </button>
+                          )}
+                          {!invoice && canWrite && (
                             <ButtonWithLoading className="btn btn-gold" style={{padding:'7px 14px',fontSize:'0.8rem',gap:'6px'}} onClick={() => handleIssueInvoice(jo.id)}>
                               <Receipt size={14}/> {isID ? 'Invoice' : 'Invoice'}
                             </ButtonWithLoading>
@@ -2499,7 +2517,7 @@ const Accounting = () => {
                       </td>
                       <td style={{ padding: '15px' }}>
                         <div style={{ display: 'flex', gap: '10px' }}>
-                          {!hasInvoice ? (
+                          {!hasInvoice && canWrite ? (
                             <ButtonWithLoading className="btn btn-gold" style={{ padding: '8px 16px', fontSize: '0.85rem' }} onClick={() => handleIssueInvoice(jo.id)}>
                               {isID ? 'Terbitkan Invoice' : 'Issue Invoice'}
                             </ButtonWithLoading>
@@ -2509,8 +2527,9 @@ const Accounting = () => {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '4px 10px' }}>
                                   <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: '600' }}>{isID ? 'Batalkan invoice ini?' : 'Cancel this invoice?'}</span>
                                   <button
+                                    disabled={!canWrite}
                                     onClick={() => handleUndoInvoice(jo.id)}
-                                    style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '5px', padding: '3px 10px', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer' }}
+                                    style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '5px', padding: '3px 10px', fontSize: '0.72rem', fontWeight: '700', cursor: canWrite ? 'pointer' : 'not-allowed', opacity: canWrite ? 1 : 0.5 }}
                                   >
                                     {isID ? 'Ya, Batalkan' : 'Yes, Cancel'}
                                   </button>
@@ -2691,13 +2710,15 @@ const Accounting = () => {
                           <button className="btn btn-primary" style={{ padding: '6px 10px', fontSize: '0.75rem', gap: '5px' }} onClick={() => handleDownloadInvoice(inv)}>
                             <Download size={14} /> {isID ? 'Lihat (Inv + Lampiran)' : 'View (Inv + Att)'}
                           </button>
-                          <button 
-                            className="btn" 
-                            style={{ padding: '6px 10px', fontSize: '0.75rem', gap: '5px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }} 
-                            onClick={() => setEditingInvoice(inv)}
-                          >
-                            <Edit3 size={14} /> Edit
-                          </button>
+                          {canWrite && (
+                            <button 
+                              className="btn" 
+                              style={{ padding: '6px 10px', fontSize: '0.75rem', gap: '5px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }} 
+                              onClick={() => setEditingInvoice(inv)}
+                            >
+                              <Edit3 size={14} /> Edit
+                            </button>
+                          )}
                           <button 
                             className="btn" 
                             style={{ padding: '6px 10px', fontSize: '0.75rem', gap: '5px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.2)' }} 
@@ -2732,18 +2753,20 @@ const Accounting = () => {
                           >
                             <Image size={14} /> Ops
                           </button>
-                          <button 
-                            className="btn" 
-                            style={{ padding: '6px 10px', fontSize: '0.75rem', gap: '5px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }} 
-                            onClick={() => {
-                              setDeleteConfirmModal(inv);
-                              setVerifyStep(1);
-                              setVerifyText('');
-                              setOtpInput('');
-                            }}
-                          >
-                            <Trash2 size={14} /> {isID ? 'Hapus' : 'Delete'}
-                          </button>
+                          {canWrite && (
+                            <button 
+                              className="btn" 
+                              style={{ padding: '6px 10px', fontSize: '0.75rem', gap: '5px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }} 
+                              onClick={() => {
+                                setDeleteConfirmModal(inv);
+                                setVerifyStep(1);
+                                setVerifyText('');
+                                setOtpInput('');
+                              }}
+                            >
+                              <Trash2 size={14} /> {isID ? 'Hapus' : 'Delete'}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -2908,57 +2931,65 @@ const Accounting = () => {
                           >
                             <ShieldCheck size={14} /> {isID ? 'Dokumen' : 'Doc'}
                           </button>
-                          <button 
-                            className="btn" 
-                            style={{ padding: '6px 12px', fontSize: '0.8rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}
-                            onClick={() => {
-                              const originalInv = invoices.find(i => i.id === item.id || i.id === item.invoiceId);
-                              setEditingInvoice(originalInv || item);
-                            }}
-                          >
-                            <Edit3 size={14} /> {isID ? 'Ubah' : 'Edit'}
-                          </button>
+                          {canWrite && (
+                            <button 
+                              className="btn" 
+                              style={{ padding: '6px 12px', fontSize: '0.8rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}
+                              onClick={() => {
+                                const originalInv = invoices.find(i => i.id === item.id || i.id === item.invoiceId);
+                                setEditingInvoice(originalInv || item);
+                              }}
+                            >
+                              <Edit3 size={14} /> {isID ? 'Ubah' : 'Edit'}
+                            </button>
+                          )}
 
                           {receivableSubTab === 'outstanding' ? (
-                            <>
-                              <ButtonWithLoading className="btn btn-gold" style={{ padding: '8px 16px', fontSize: '0.85rem' }} onClick={() => handleSettle(item)}>
-                                {isID ? 'Lunasi' : 'Settle'}
-                              </ButtonWithLoading>
-                              <button 
-                                className="btn" 
-                                style={{ padding: '8px 12px', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }} 
-                                onClick={() => {
-                                  setDeleteConfirmModal(item);
-                                  setVerifyStep(1);
-                                  setVerifyText('');
-                                  setOtpInput('');
-                                }}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </>
+                            canWrite && (
+                              <>
+                                <ButtonWithLoading className="btn btn-gold" style={{ padding: '8px 16px', fontSize: '0.85rem' }} onClick={() => handleSettle(item)}>
+                                  {isID ? 'Lunasi' : 'Settle'}
+                                </ButtonWithLoading>
+                                <button 
+                                  className="btn" 
+                                  style={{ padding: '8px 12px', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }} 
+                                  onClick={() => {
+                                    setDeleteConfirmModal(item);
+                                    setVerifyStep(1);
+                                    setVerifyText('');
+                                    setOtpInput('');
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </>
+                            )
                           ) : (
                             <>
-                              <button 
-                                className="btn btn-gold" 
-                                style={{ padding: '8px 12px', fontSize: '0.8rem', gap: '5px' }} 
-                                onClick={() => {
-                                  setReceivableProofModal(item);
-                                  setModalPhotos(item.paymentProofPhoto ? (Array.isArray(item.paymentProofPhoto) ? item.paymentProofPhoto : [item.paymentProofPhoto]) : []);
-                                  setModalTaxPhotos(item.tax_deduction_proof ? (Array.isArray(item.tax_deduction_proof) ? item.tax_deduction_proof : [item.tax_deduction_proof]) : []);
-                                }}
-                                title={isID ? "Unggah Bukti Pajak / Bukti Bayar" : "Upload Tax Proof / Payment Proof"}
-                              >
-                                <Image size={14} /> {isID ? 'Bukti Pajak' : 'Upload Tax Proof'}
-                              </button>
-                              <button 
-                                className="btn" 
-                                style={{ padding: '8px 12px', fontSize: '0.8rem', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.2)', gap: '5px' }} 
-                                onClick={() => handleUndoPaidInvoice(item)}
-                                title={isID ? "Batal Pembayaran" : "Undo Payment"}
-                              >
-                                <RotateCcw size={14} /> {isID ? 'Batal' : 'Undo'}
-                              </button>
+                              {canWrite && (
+                                <>
+                                  <button 
+                                    className="btn btn-gold" 
+                                    style={{ padding: '8px 12px', fontSize: '0.8rem', gap: '5px' }} 
+                                    onClick={() => {
+                                      setReceivableProofModal(item);
+                                      setModalPhotos(item.paymentProofPhoto ? (Array.isArray(item.paymentProofPhoto) ? item.paymentProofPhoto : [item.paymentProofPhoto]) : []);
+                                      setModalTaxPhotos(item.tax_deduction_proof ? (Array.isArray(item.tax_deduction_proof) ? item.tax_deduction_proof : [item.tax_deduction_proof]) : []);
+                                    }}
+                                    title={isID ? "Unggah Bukti Pajak / Bukti Bayar" : "Upload Tax Proof / Payment Proof"}
+                                  >
+                                    <Image size={14} /> {isID ? 'Bukti Pajak' : 'Upload Tax Proof'}
+                                  </button>
+                                  <button 
+                                    className="btn" 
+                                    style={{ padding: '8px 12px', fontSize: '0.8rem', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.2)', gap: '5px' }} 
+                                    onClick={() => handleUndoPaidInvoice(item)}
+                                    title={isID ? "Batal Pembayaran" : "Undo Payment"}
+                                  >
+                                    <RotateCcw size={14} /> {isID ? 'Batal' : 'Undo'}
+                                  </button>
+                                </>
+                              )}
                               <button 
                                 className="btn btn-primary" 
                                 style={{ padding: '8px 16px', fontSize: '0.85rem', gap: '5px' }} 
@@ -2966,18 +2997,20 @@ const Accounting = () => {
                               >
                                 <Download size={14} /> {isID ? 'Lihat (Dokumen Lengkap)' : 'View (Full Doc)'}
                               </button>
-                              <button 
-                                className="btn" 
-                                style={{ padding: '8px 12px', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }} 
-                                onClick={() => {
-                                  setDeleteConfirmModal(item);
-                                  setVerifyStep(1);
-                                  setVerifyText('');
-                                  setOtpInput('');
-                                }}
-                              >
-                                <Trash2 size={14} />
-                              </button>
+                              {canWrite && (
+                                <button 
+                                  className="btn" 
+                                  style={{ padding: '8px 12px', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }} 
+                                  onClick={() => {
+                                    setDeleteConfirmModal(item);
+                                    setVerifyStep(1);
+                                    setVerifyText('');
+                                    setOtpInput('');
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
                             </>
                           )}
                         </div>
@@ -3018,9 +3051,11 @@ const Accounting = () => {
               <h4 style={{ margin: 0, color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <User size={20} /> {isID ? 'Pengeluaran Biaya Gaji' : 'Payroll & Salary Expenses'}
               </h4>
-              <button className="btn btn-primary" style={{ background: '#8b5cf6' }} onClick={() => { setSalaryForm({ name: '', position: '', bankAccount: '', bankName: '', baseSalary: '', period: '', nik: '', npwp: '', taxes: [], proofPhoto: '', expenseDate: '' }); setSalaryModal(true); }}>
-                <Plus size={16} /> {isID ? 'Tambah Data Gaji' : 'Add Salary Data'}
-              </button>
+              {canWrite && (
+                <button className="btn btn-primary" style={{ background: '#8b5cf6' }} onClick={() => { setSalaryForm({ name: '', position: '', bankAccount: '', bankName: '', baseSalary: '', period: '', nik: '', npwp: '', taxes: [], proofPhoto: '', expenseDate: '' }); setSalaryModal(true); }}>
+                  <Plus size={16} /> {isID ? 'Tambah Data Gaji' : 'Add Salary Data'}
+                </button>
+              )}
             </div>
             
             <div className="table-container"><div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -3065,12 +3100,16 @@ const Accounting = () => {
                         <button className="btn btn-gold" style={{ padding: '5px 10px', fontSize: '0.75rem', gap: '5px' }} onClick={() => setSalarySlip(s)}>
                           <Download size={14} /> {isID ? 'Slip' : 'Slip'}
                         </button>
-                        <button className="btn btn-sm" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--secondary)', border: '1px solid var(--secondary)', display:'flex', alignItems:'center', justifyContent:'center', width:'32px', height:'32px', borderRadius:'6px', cursor:'pointer' }} onClick={() => { setSalaryForm(s); setSalaryModal(true); }}>
-                          <Edit3 size={14} />
-                        </button>
-                        <button className="btn btn-sm btn-danger" onClick={() => deleteSalary(s.id)} style={{ width:'32px', height:'32px' }}>
-                          <X size={14} />
-                        </button>
+                        {canWrite && (
+                          <button className="btn btn-sm" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--secondary)', border: '1px solid var(--secondary)', display:'flex', alignItems:'center', justifyContent:'center', width:'32px', height:'32px', borderRadius:'6px', cursor:'pointer' }} onClick={() => { setSalaryForm(s); setSalaryModal(true); }}>
+                            <Edit3 size={14} />
+                          </button>
+                        )}
+                        {canWrite && (
+                          <button className="btn btn-sm btn-danger" onClick={() => deleteSalary(s.id)} style={{ width:'32px', height:'32px' }}>
+                            <X size={14} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -3161,12 +3200,14 @@ const Accounting = () => {
                         </td>
                         <td style={{ padding: '15px', textAlign: 'center' }}>
                           <select 
+                            disabled={!canWrite}
                             value={r.status || 'pending'} 
                             onChange={(e) => handleUpdateReimbursementStatus(r, e.target.value)}
                             style={{ 
-                              padding: '6px 12px', borderRadius: '20px', border: 'none', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', cursor: 'pointer',
+                              padding: '6px 12px', borderRadius: '20px', border: 'none', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', cursor: canWrite ? 'pointer' : 'not-allowed',
                               background: r.status === 'paid' ? 'rgba(16,185,129,0.1)' : r.status === 'approved' ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)',
-                              color: r.status === 'paid' ? '#10b981' : r.status === 'approved' ? '#3b82f6' : '#f59e0b'
+                              color: r.status === 'paid' ? '#10b981' : r.status === 'approved' ? '#3b82f6' : '#f59e0b',
+                              opacity: canWrite ? 1 : 0.7
                             }}
                           >
                             <option value="pending">{isID ? 'Menunggu' : 'Pending'}</option>
@@ -3176,12 +3217,17 @@ const Accounting = () => {
                         </td>
                         <td style={{ padding: '15px', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                            <button onClick={() => handleEditReimbursement(r)} style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title={isID ? 'Edit Data' : 'Edit Data'}>
-                              <Edit3 size={16} />
-                            </button>
-                            <button onClick={() => { if(window.confirm(isID ? 'Yakin hapus data ini?' : 'Delete this record?')) deleteOtherExpense(r.id); }} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title={isID ? 'Hapus Data' : 'Delete Data'}>
-                              <Trash2 size={16} />
-                            </button>
+                            {canWrite && (
+                              <button onClick={() => handleEditReimbursement(r)} style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title={isID ? 'Edit Data' : 'Edit Data'}>
+                                <Edit3 size={16} />
+                              </button>
+                            )}
+                            {canWrite && (
+                              <button onClick={() => { if(window.confirm(isID ? 'Yakin hapus data ini?' : 'Delete this record?')) deleteOtherExpense(r.id); }} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title={isID ? 'Hapus Data' : 'Delete Data'}>
+                                <Trash2 size={16} />
+                              </button>
+                            )}
+                            {!canWrite && <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>-</span>}
                           </div>
                         </td>
                       </tr>
@@ -3200,12 +3246,16 @@ const Accounting = () => {
                 <Briefcase size={20} /> {isID ? 'Transaksi Pendapatan & Pengeluaran Lain' : 'Other Income & Expense Transactions'}
               </h4>
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button className="btn" style={{ background: 'linear-gradient(135deg, #10b981, #047857)', color: 'white', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={() => handleNewOtherTransaction('income')}>
-                  <Plus size={16} /> {isID ? 'Tambah Pendapatan' : 'Add Income'}
-                </button>
-                <button className="btn btn-primary" style={{ background: 'linear-gradient(135deg, #ec4899, #be185d)', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={() => handleNewOtherTransaction('expense')}>
-                  <Plus size={16} /> {isID ? 'Tambah Pengeluaran' : 'Add Expense'}
-                </button>
+                {canWrite && (
+                  <button className="btn" style={{ background: 'linear-gradient(135deg, #10b981, #047857)', color: 'white', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={() => handleNewOtherTransaction('income')}>
+                    <Plus size={16} /> {isID ? 'Tambah Pendapatan' : 'Add Income'}
+                  </button>
+                )}
+                {canWrite && (
+                  <button className="btn btn-primary" style={{ background: 'linear-gradient(135deg, #ec4899, #be185d)', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={() => handleNewOtherTransaction('expense')}>
+                    <Plus size={16} /> {isID ? 'Tambah Pengeluaran' : 'Add Expense'}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -3359,12 +3409,17 @@ const Accounting = () => {
                     </td>
                     <td style={{ padding: '15px', textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                        <button className="btn btn-sm" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--secondary)', border: '1px solid var(--secondary)', display:'flex', alignItems:'center', justifyContent:'center', width:'32px', height:'32px', borderRadius:'6px', cursor:'pointer' }} onClick={() => handleEditOtherTransaction(t)}>
-                          <Edit3 size={14} />
-                        </button>
-                        <button className="btn btn-sm btn-danger" onClick={() => deleteOtherExpense(t.id)} style={{ width:'32px', height:'32px' }}>
-                          <Trash2 size={14} />
-                        </button>
+                        {canWrite && (
+                          <button className="btn btn-sm" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--secondary)', border: '1px solid var(--secondary)', display:'flex', alignItems:'center', justifyContent:'center', width:'32px', height:'32px', borderRadius:'6px', cursor:'pointer' }} onClick={() => handleEditOtherTransaction(t)}>
+                            <Edit3 size={14} />
+                          </button>
+                        )}
+                        {canWrite && (
+                          <button className="btn btn-sm btn-danger" onClick={() => deleteOtherExpense(t.id)} style={{ width:'32px', height:'32px' }}>
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                        {!canWrite && <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>-</span>}
                       </div>
                     </td>
                   </tr>
@@ -3405,16 +3460,18 @@ const Accounting = () => {
               </button>
             </div>
             <div style={{ width: '1px', height: '24px', background: 'var(--glass-border)', margin: '0 5px' }}></div>
-            <button 
-              onClick={() => { setPoJoId(''); setPoVendorId(''); setShowPOModal(true); }}
-              style={{
-                padding: '8px 20px', borderRadius: '8px', border: 'none',
-                background: 'var(--secondary)', color: 'black',
-                fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
-              }}
-            >
-              <Plus size={16}/> {isID ? 'Tambah Hutang (PO)' : 'Add Payable (PO)'}
-            </button>
+            {payableSubTab === 'outstanding' && canWrite && (
+              <button 
+                onClick={() => { setPoJoId(''); setPoVendorId(''); setShowPOModal(true); }}
+                style={{
+                  padding: '8px 20px', borderRadius: '8px', border: 'none',
+                  background: 'var(--secondary)', color: 'black',
+                  fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
+                }}
+              >
+                <Plus size={16}/> {isID ? 'Tambah Hutang (PO)' : 'Add Payable (PO)'}
+              </button>
+            )}
           </div>
 
           <div className="glass-card" style={{ padding: '25px' }}>
@@ -3493,11 +3550,19 @@ const Accounting = () => {
                               <Image size={18}/> 
                               <span style={{ fontSize:'0.7rem', fontWeight:'700' }}>({po.vendorInvoicePhoto.length})</span>
                             </button>
-                            <button onClick={() => { setModalPhotos(po.vendorInvoicePhoto); setVendorInvoiceModal(po); }} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}><Edit3 size={14}/></button>
-                            <button onClick={() => { if(window.confirm(isID ? 'Hapus semua lampiran invoice vendor?' : 'Delete all vendor invoice attachments?')) handleUploadVendorInvoice(po.id, []); }} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer' }}><Trash2 size={14}/></button>
+                            {canWrite && (
+                              <>
+                                <button onClick={() => { setModalPhotos(po.vendorInvoicePhoto); setVendorInvoiceModal(po); }} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}><Edit3 size={14}/></button>
+                                <button onClick={() => { if(window.confirm(isID ? 'Hapus semua lampiran invoice vendor?' : 'Delete all vendor invoice attachments?')) handleUploadVendorInvoice(po.id, []); }} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer' }}><Trash2 size={14}/></button>
+                              </>
+                            )}
                           </div>
                         ) : (
-                          <button onClick={() => { setModalPhotos([]); setVendorInvoiceModal(po); }} style={{ background:'rgba(59,130,246,0.1)', color:'#3b82f6', border:'1px dashed #3b82f6', padding:'4px 8px', borderRadius:'6px', fontSize:'0.7rem', cursor:'pointer' }}>{isID ? '+ Unggah' : '+ Upload'}</button>
+                          canWrite ? (
+                            <button onClick={() => { setModalPhotos([]); setVendorInvoiceModal(po); }} style={{ background:'rgba(59,130,246,0.1)', color:'#3b82f6', border:'1px dashed #3b82f6', padding:'4px 8px', borderRadius:'6px', fontSize:'0.7rem', cursor:'pointer' }}>{isID ? '+ Unggah' : '+ Upload'}</button>
+                          ) : (
+                            <span style={{ color:'var(--text-muted)', fontSize:'0.75rem' }}>—</span>
+                          )
                         )}
                       </td>
                       <td style={{ padding: '15px', textAlign: 'center' }}>
@@ -3526,63 +3591,77 @@ const Accounting = () => {
                         {po.tax_proof_photo && po.tax_proof_photo.length > 0 ? (
                            <div style={{ display:'flex', gap:'5px', justifyContent:'center' }}>
                               <button onClick={() => setPhotoViewer({ title: `${isID ? 'Bukti Potong Pajak' : 'Tax Deduction Proof'} - ${po.vendorName}`, photos: po.tax_proof_photo })} style={{ background:'none', border:'none', color:'var(--secondary)', cursor:'pointer', display:'flex', alignItems:'center', gap:'4px' }}>
-                                <ShieldCheck size={18}/>
-                                <span style={{ fontSize:'0.7rem', fontWeight:'700' }}>({po.tax_proof_photo.length})</span>
+                                 <ShieldCheck size={18}/>
+                                 <span style={{ fontSize:'0.7rem', fontWeight:'700' }}>({po.tax_proof_photo.length})</span>
                               </button>
-                              <button onClick={() => { 
-                                 setSettlePayableModal(po);
-                                 setSettlePayableForm({
-                                    paymentProof: po.paymentProofPhoto || [],
-                                    taxName: po.tax_name || '',
-                                    taxAmount: po.tax_amount || 0,
-                                    taxProof: po.tax_proof_photo || []
-                                 });
-                              }} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}><Edit3 size={14}/></button>
-                              <button onClick={() => { if(window.confirm(isID ? 'Hapus bukti potong pajak?' : 'Delete tax deduction proof?')) handleSettlePayable(po.id, { tax_proof_photo: [] }); }} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer' }}><Trash2 size={14}/></button>
+                              {canWrite && (
+                                <>
+                                  <button onClick={() => { 
+                                     setSettlePayableModal(po);
+                                     setSettlePayableForm({
+                                        paymentProof: po.paymentProofPhoto || [],
+                                        taxName: po.tax_name || '',
+                                        taxAmount: po.tax_amount || 0,
+                                        taxProof: po.tax_proof_photo || []
+                                     });
+                                  }} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}><Edit3 size={14}/></button>
+                                  <button onClick={() => { if(window.confirm(isID ? 'Hapus bukti potong pajak?' : 'Delete tax deduction proof?')) handleSettlePayable(po.id, { tax_proof_photo: [] }); }} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer' }}><Trash2 size={14}/></button>
+                                </>
+                              )}
                            </div>
                         ) : po.status === 'paid' && po.tax_amount > 0 ? (
-                           <button onClick={() => { 
-                              setSettlePayableModal(po);
-                              setSettlePayableForm({
-                                 paymentProof: po.paymentProofPhoto || [],
-                                 taxName: po.tax_name || '',
-                                 taxAmount: po.tax_amount || 0,
-                                 taxProof: po.tax_proof_photo || []
-                              });
-                           }} style={{ background:'rgba(255,193,7,0.1)', color:'var(--secondary)', border:'1px dashed var(--secondary)', padding:'4px 8px', borderRadius:'6px', fontSize:'0.7rem', cursor:'pointer' }}>{isID ? '+ Bukti Pajak' : '+ Tax Proof'}</button>
+                           canWrite ? (
+                             <button onClick={() => { 
+                                setSettlePayableModal(po);
+                                setSettlePayableForm({
+                                   paymentProof: po.paymentProofPhoto || [],
+                                   taxName: po.tax_name || '',
+                                   taxAmount: po.tax_amount || 0,
+                                   taxProof: po.tax_proof_photo || []
+                                });
+                             }} style={{ background:'rgba(255,193,7,0.1)', color:'var(--secondary)', border:'1px dashed var(--secondary)', padding:'4px 8px', borderRadius:'6px', fontSize:'0.7rem', cursor:'pointer' }}>{isID ? '+ Bukti Pajak' : '+ Tax Proof'}</button>
+                           ) : (
+                             <span style={{ color:'var(--text-muted)', fontSize:'0.75rem' }}>—</span>
+                           )
                         ) : (
                            <span style={{ color:'var(--text-muted)', fontSize:'0.75rem' }}>—</span>
                         )}
                       </td>
                       <td style={{ padding: '15px', textAlign: 'center' }}>
                         {payableSubTab === 'outstanding' ? (
-                          <button 
-                            className="btn btn-gold" 
-                            style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                            onClick={() => {
-                              setSettlePayableModal(po);
-                              setSettlePayableForm({
-                                paymentProof: po.paymentProofPhoto || [],
-                                taxName: po.tax_name || '',
-                                taxAmount: po.tax_amount || 0,
-                                taxProof: po.tax_proof_photo || []
-                              });
-                            }}
-                          >
-                            {isID ? 'Tandai Lunas' : 'Mark as Paid'}
-                          </button>
+                          canWrite ? (
+                            <button 
+                              className="btn btn-gold" 
+                              style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                              onClick={() => {
+                                setSettlePayableModal(po);
+                                setSettlePayableForm({
+                                  paymentProof: po.paymentProofPhoto || [],
+                                  taxName: po.tax_name || '',
+                                  taxAmount: po.tax_amount || 0,
+                                  taxProof: po.tax_proof_photo || []
+                                });
+                              }}
+                            >
+                              {isID ? 'Tandai Lunas' : 'Mark as Paid'}
+                            </button>
+                          ) : (
+                            <span style={{ color:'var(--text-muted)', fontSize:'0.75rem' }}>—</span>
+                          )
                         ) : (
                           <div style={{ textAlign:'center' }}>
                             <div style={{ color:'#10b981', fontWeight:'700', fontSize:'0.8rem' }}>{isID ? 'Dilunasi pada' : 'Settled on'} {po.paidDate}</div>
                             <div style={{ display: 'flex', justifyContent: 'center', gap: '5px', marginTop: '6px' }}>
-                              <button 
-                                className="btn" 
-                                style={{ padding: '4px 10px', fontSize: '0.65rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius:'6px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.2)' }}
-                                onClick={() => handleUndoPaidPO(po)}
-                                title={isID ? "Batal Pembayaran" : "Undo Payment"}
-                              >
-                                <RotateCcw size={12}/> {isID ? 'Batal' : 'Undo'}
-                              </button>
+                              {canWrite && (
+                                <button 
+                                  className="btn" 
+                                  style={{ padding: '4px 10px', fontSize: '0.65rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius:'6px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.2)' }}
+                                  onClick={() => handleUndoPaidPO(po)}
+                                  title={isID ? "Batal Pembayaran" : "Undo Payment"}
+                                >
+                                  <RotateCcw size={12}/> {isID ? 'Batal' : 'Undo'}
+                                </button>
+                              )}
                               <button 
                                 className="btn btn-gold" 
                                 style={{ padding: '4px 10px', fontSize: '0.65rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius:'6px' }}
@@ -5226,40 +5305,42 @@ const Accounting = () => {
               <button onClick={() => setShowBankSettings(false)} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}><X size={24}/></button>
             </div>
 
-            <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:'12px', padding:'20px', border:'1px solid var(--glass-border)', marginBottom:'30px' }}>
-              <h4 style={{ fontSize:'0.9rem', marginBottom:'20px', color:'var(--text-muted)' }}>{isID ? 'Tambah / Edit Rekening' : 'Add / Edit Account'}</h4>
-              <div className="grid-responsive-3" style={{ gap:'15px', marginBottom:'15px' }}>
-                <input type="text" placeholder={isID ? 'Nama Bank (misal Mandiri IDR)' : 'Bank Name (e.g. Mandiri IDR)'} value={bankModal?.bankName || ''} onChange={e => setBankModal({...bankModal, bankName: e.target.value})} style={{ padding:'10px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)' }} />
-                <input type="text" placeholder={isID ? 'Nomor Rekening' : 'Account Number'} value={bankModal?.accountNumber || ''} onChange={e => setBankModal({...bankModal, accountNumber: e.target.value})} style={{ padding:'10px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)' }} />
-                <input type="text" placeholder={isID ? 'Atas Nama' : 'Account Holder Name'} value={bankModal?.accountName || ''} onChange={e => setBankModal({...bankModal, accountName: e.target.value})} style={{ padding:'10px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)' }} />
+            {canWrite && (
+              <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:'12px', padding:'20px', border:'1px solid var(--glass-border)', marginBottom:'30px' }}>
+                <h4 style={{ fontSize:'0.9rem', marginBottom:'20px', color:'var(--text-muted)' }}>{isID ? 'Tambah / Edit Rekening' : 'Add / Edit Account'}</h4>
+                <div className="grid-responsive-3" style={{ gap:'15px', marginBottom:'15px' }}>
+                  <input type="text" placeholder={isID ? 'Nama Bank (misal Mandiri IDR)' : 'Bank Name (e.g. Mandiri IDR)'} value={bankModal?.bankName || ''} onChange={e => setBankModal({...bankModal, bankName: e.target.value})} style={{ padding:'10px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)' }} />
+                  <input type="text" placeholder={isID ? 'Nomor Rekening' : 'Account Number'} value={bankModal?.accountNumber || ''} onChange={e => setBankModal({...bankModal, accountNumber: e.target.value})} style={{ padding:'10px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)' }} />
+                  <input type="text" placeholder={isID ? 'Atas Nama' : 'Account Holder Name'} value={bankModal?.accountName || ''} onChange={e => setBankModal({...bankModal, accountName: e.target.value})} style={{ padding:'10px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)' }} />
+                </div>
+                <div style={{ display:'flex', gap:'10px' }}>
+                  <ButtonWithLoading 
+                    className="btn btn-primary" 
+                    style={{ flex:1 }}
+                    loading={isSavingBank}
+                    onClick={async () => {
+                      if (!bankModal?.bankName || !bankModal?.accountNumber || !bankModal?.accountName) return alert(isID ? 'Data tidak lengkap' : 'Data is incomplete');
+                      setIsSavingBank(true);
+                      try {
+                        await updateCompanyBank({ ...bankModal, id: bankModal.id || `BANK-${Date.now()}` });
+                        setBankModal(null);
+                      } catch (err) {
+                        alert((isID ? "Gagal menyimpan rekening: " : "Failed to save account: ") + err.message);
+                      } finally {
+                        setIsSavingBank(false);
+                      }
+                    }}
+                  >
+                    <Save size={18}/> {isID ? 'Simpan Rekening' : 'Save Account'}
+                  </ButtonWithLoading>
+                  {bankModal && (
+                    <button className="btn" style={{ background:'rgba(255,255,255,0.1)', color:'var(--text)' }} onClick={() => setBankModal(null)}>
+                      {isID ? 'Batal / Tambah Baru' : 'Reset / Add New'}
+                    </button>
+                  )}
+                </div>
               </div>
-              <div style={{ display:'flex', gap:'10px' }}>
-                <ButtonWithLoading 
-                  className="btn btn-primary" 
-                  style={{ flex:1 }}
-                  loading={isSavingBank}
-                  onClick={async () => {
-                    if (!bankModal?.bankName || !bankModal?.accountNumber || !bankModal?.accountName) return alert(isID ? 'Data tidak lengkap' : 'Data is incomplete');
-                    setIsSavingBank(true);
-                    try {
-                      await updateCompanyBank({ ...bankModal, id: bankModal.id || `BANK-${Date.now()}` });
-                      setBankModal(null);
-                    } catch (err) {
-                      alert((isID ? "Gagal menyimpan rekening: " : "Failed to save account: ") + err.message);
-                    } finally {
-                      setIsSavingBank(false);
-                    }
-                  }}
-                >
-                  <Save size={18}/> {isID ? 'Simpan Rekening' : 'Save Account'}
-                </ButtonWithLoading>
-                {bankModal && (
-                  <button className="btn" style={{ background:'rgba(255,255,255,0.1)', color:'var(--text)' }} onClick={() => setBankModal(null)}>
-                    {isID ? 'Batal / Tambah Baru' : 'Reset / Add New'}
-                  </button>
-                )}
-              </div>
-            </div>
+            )}
 
             <div style={{ display:'grid', gap:'15px' }}>
               {companyBankAccounts.map(bank => (
@@ -5268,35 +5349,37 @@ const Accounting = () => {
                     <div style={{ fontWeight:'700', fontSize:'1rem' }}>{bank.bankName}</div>
                     <div style={{ color:'var(--text-muted)', fontSize:'0.85rem' }}>{bank.accountNumber} - {bank.accountName}</div>
                   </div>
-                  <div style={{ display:'flex', gap:'10px', alignItems: 'center' }}>
-                    {bankToDelete === bank.id ? (
-                      <div style={{ display:'flex', gap:'8px', background:'rgba(239,68,68,0.1)', padding:'5px 10px', borderRadius:'8px', border:'1px solid rgba(239,68,68,0.2)' }}>
-                        <span style={{ fontSize:'0.75rem', color:'#ef4444', fontWeight:'700' }}>{isID ? 'Hapus?' : 'Delete?'}</span>
-                        <button 
-                          className="btn btn-sm" 
-                          style={{ background:'#ef4444', color:'white', border:'none', padding:'2px 8px', fontSize:'0.7rem' }}
-                          onClick={async () => {
-                            try {
-                              await deleteCompanyBank(bank.id);
-                              setBankToDelete(null);
-                            } catch (err) {
-                              alert((isID ? "Gagal menghapus: " : "Failed to delete: ") + err.message);
-                            }
-                          }}
-                        >{isID ? 'Ya' : 'Yes'}</button>
-                        <button 
-                          className="btn btn-sm" 
-                          style={{ background:'rgba(255,255,255,0.1)', color:'var(--text)', border:'none', padding:'2px 8px', fontSize:'0.7rem' }}
-                          onClick={() => setBankToDelete(null)}
-                        >{isID ? 'Batal' : 'Cancel'}</button>
-                      </div>
-                    ) : (
-                      <>
-                        <button className="btn" style={{ padding:'6px 12px', fontSize:'0.75rem', background:'rgba(59, 130, 246, 0.1)', color:'#3b82f6' }} onClick={() => setBankModal(bank)}><Edit3 size={14}/> {isID ? 'Ubah' : 'Edit'}</button>
-                        <button className="btn" style={{ padding:'6px 12px', fontSize:'0.75rem', background:'rgba(239, 68, 68, 0.1)', color:'#ef4444' }} onClick={() => setBankToDelete(bank.id)}><Trash2 size={14}/> {isID ? 'Hapus' : 'Delete'}</button>
-                      </>
-                    )}
-                  </div>
+                  {canWrite && (
+                    <div style={{ display:'flex', gap:'10px', alignItems: 'center' }}>
+                      {bankToDelete === bank.id ? (
+                        <div style={{ display:'flex', gap:'8px', background:'rgba(239,68,68,0.1)', padding:'5px 10px', borderRadius:'8px', border:'1px solid rgba(239,68,68,0.2)' }}>
+                          <span style={{ fontSize:'0.75rem', color:'#ef4444', fontWeight:'700' }}>{isID ? 'Hapus?' : 'Delete?'}</span>
+                          <button 
+                            className="btn btn-sm" 
+                            style={{ background:'#ef4444', color:'white', border:'none', padding:'2px 8px', fontSize:'0.7rem' }}
+                            onClick={async () => {
+                              try {
+                                await deleteCompanyBank(bank.id);
+                                setBankToDelete(null);
+                              } catch (err) {
+                                alert((isID ? "Gagal menghapus: " : "Failed to delete: ") + err.message);
+                              }
+                            }}
+                          >{isID ? 'Ya' : 'Yes'}</button>
+                          <button 
+                            className="btn btn-sm" 
+                            style={{ background:'rgba(255,255,255,0.1)', color:'var(--text)', border:'none', padding:'2px 8px', fontSize:'0.7rem' }}
+                            onClick={() => setBankToDelete(null)}
+                          >{isID ? 'Batal' : 'Cancel'}</button>
+                        </div>
+                      ) : (
+                        <>
+                          <button className="btn" style={{ padding:'6px 12px', fontSize:'0.75rem', background:'rgba(59, 130, 246, 0.1)', color:'#3b82f6' }} onClick={() => setBankModal(bank)}><Edit3 size={14}/> {isID ? 'Ubah' : 'Edit'}</button>
+                          <button className="btn" style={{ padding:'6px 12px', fontSize:'0.75rem', background:'rgba(239, 68, 68, 0.1)', color:'#ef4444' }} onClick={() => setBankToDelete(bank.id)}><Trash2 size={14}/> {isID ? 'Hapus' : 'Delete'}</button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
               {companyBankAccounts.length === 0 && <div style={{ textAlign:'center', color:'var(--text-muted)', padding:'20px' }}>{isID ? 'Belum ada rekening terdaftar.' : 'No registered bank accounts yet.'}</div>}
@@ -5518,6 +5601,7 @@ const Accounting = () => {
                     setVerifyStep(2);
                   } else {
                     if (otpInput.length < 4) return alert(isID ? 'Masukkan 4 digit security key.' : 'Please enter the 4-digit security key.');
+                    if (!canWrite) return;
                     setIsAuthorizing(true);
                     try {
                       const config = await getSystemConfig();

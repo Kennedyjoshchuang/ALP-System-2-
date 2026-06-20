@@ -65,9 +65,12 @@ const Marketing = () => {
     quotations = [], createQuotation, updateQuotation, approveQuotation, unapproveQuotation, deleteQuotation,
     employees = [],
     user,
+    hasAccess,
     t,
     loading
   } = context;
+
+  const canWrite = hasAccess ? hasAccess('marketing', true) : false;
 
   if (loading) {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'var(--secondary)' }}>Loading Marketing Portal...</div>;
@@ -949,12 +952,13 @@ const Marketing = () => {
         </div>
 
         <div>
-          {activeTab === 'prospects' ? (
-            <button className="btn btn-gold" onClick={() => setShowProspectForm(!showProspectForm)} style={{ marginBottom: '10px' }}>
-              <Plus size={18} />
-              {showProspectForm ? t('cancel') : t('addProspect')}
-            </button>
-          ) : null}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'center' }}>
+            {canWrite && activeTab === 'prospects' && (
+              <button className="btn btn-gold" onClick={() => setShowProspectForm(!showProspectForm)} style={{ marginBottom: '10px' }}>
+                <Plus size={18} /> {showProspectForm ? t('cancel') : t('addProspect')}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1120,14 +1124,16 @@ const Marketing = () => {
                         </td>
                         <td style={{ padding: '15px' }}>
                           <div style={{ display: 'flex', gap: '8px' }}>
-                            <ButtonWithLoading
-                              className="btn-icon"
-                              style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)' }}
-                              onClick={() => unapproveQuotation(quote.id)}
-                              title="Batalkan Approval (kembalikan ke Pending)"
-                            >
-                              <XCircle size={16} />
-                            </ButtonWithLoading>
+                            {canWrite && (
+                              <ButtonWithLoading
+                                className="btn-icon"
+                                style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)' }}
+                                onClick={() => unapproveQuotation(quote.id)}
+                                title="Batalkan Approval (kembalikan ke Pending)"
+                              >
+                                <XCircle size={16} />
+                              </ButtonWithLoading>
+                            )}
                             {user?.role === 'owner' && (
                               <button
                                 className="btn-icon"
@@ -1213,7 +1219,7 @@ const Marketing = () => {
                       </td>
                       <td style={{ padding: '15px' }}>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                          {quote.status === 'pending' && (
+                          {canWrite && quote.status === 'pending' && (
                             <ButtonWithLoading
                               className="btn-icon"
                               style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.1)' }}
@@ -1226,7 +1232,7 @@ const Marketing = () => {
                               <CheckCircle size={16} />
                             </ButtonWithLoading>
                           )}
-                          {quote.status === 'approved' && (
+                          {canWrite && quote.status === 'approved' && (
                             <ButtonWithLoading
                               className="btn-icon"
                               style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)' }}
@@ -1239,19 +1245,24 @@ const Marketing = () => {
                           <button
                             className="btn-icon"
                             style={{ color: 'var(--secondary)', background: 'rgba(212, 175, 55, 0.1)' }}
-                            onClick={() => handleDownload(quote)}
-                            title="Print Draft Quotation"
+                            onClick={() => {
+                              setSelectedDraft(quote);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            title="Print Preview / Export PDF"
                           >
                             <FileText size={16} />
                           </button>
-                          <button
-                            className="btn-icon"
-                            style={{ color: 'var(--secondary)', background: 'rgba(212, 175, 55, 0.1)' }}
-                            onClick={() => handleOpenEditQuotationModal(quote)}
-                            title="Edit Quotation"
-                          >
-                            <Edit size={16} />
-                          </button>
+                          {canWrite && (
+                            <button
+                              className="btn-icon"
+                              style={{ color: 'var(--secondary)', background: 'rgba(212, 175, 55, 0.1)' }}
+                              onClick={() => handleOpenEditQuotationModal(quote)}
+                              title="Edit Quotation"
+                            >
+                              <Edit size={16} />
+                            </button>
+                          )}
                           {user?.role === 'owner' && (
                             <button
                               className="btn-icon"
@@ -1311,7 +1322,12 @@ const Marketing = () => {
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{prospect.marketingEmail || ''}</div>
                     </td>
                     <td style={{ padding: '15px' }}>
-                      <select value={prospect.status} onChange={(e) => updateProspectStatus(prospect.id, e.target.value)} style={{ padding: '6px 10px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--secondary)', fontSize: '0.8rem' }}>
+                      <select 
+                        disabled={!canWrite}
+                        value={prospect.status} 
+                        onChange={(e) => updateProspectStatus(prospect.id, e.target.value)} 
+                        style={{ padding: '6px 10px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--secondary)', fontSize: '0.8rem', cursor: canWrite ? 'pointer' : 'not-allowed' }}
+                      >
                         <option value="followUp" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{t('followUp')}</option>
                         <option value="negotiation" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{t('negotiation')}</option>
                         <option value="deal" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{t('deal')}</option>
@@ -1320,19 +1336,22 @@ const Marketing = () => {
                     </td>
                     <td style={{ padding: '15px' }}>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="btn btn-gold" style={{ padding: '8px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={() => setActiveProspectForQuote(prospect)}>
-                          <FileText size={14} />
-                          {t('createQuotation')}
-                        </button>
-                        <button
-                          className="btn-icon"
-                          style={{ color: 'var(--secondary)', background: 'rgba(212, 175, 55, 0.1)', height: '28px', width: '28px' }}
-                          onClick={() => handleOpenEditModal(prospect)}
-                          title="Edit Calon Pelanggan"
-                        >
-                          <Edit size={14} />
-                        </button>
-                        {prospect.status === 'deal' && (
+                        {canWrite && prospect.status !== 'deal' && prospect.status !== 'lost' && (
+                          <button className="btn btn-gold" style={{ padding: '8px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={() => setActiveProspectForQuote(prospect)}>
+                            <Plus size={14} /> {t('createQuotation')}
+                          </button>
+                        )}
+                        {canWrite && (
+                          <button
+                            className="btn-icon"
+                            style={{ color: 'var(--secondary)', background: 'rgba(212, 175, 55, 0.1)', height: '28px', width: '28px' }}
+                            onClick={() => handleOpenEditProspectModal(prospect)}
+                            title="Edit Prospect"
+                          >
+                            <Edit size={14} />
+                          </button>
+                        )}
+                        {canWrite && prospect.status === 'deal' && (
                           <button
                             className="btn-icon"
                             style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)', height: '28px', width: '28px' }}

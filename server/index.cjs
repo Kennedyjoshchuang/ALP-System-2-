@@ -20,6 +20,254 @@ app.use(cors());
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
+// --- SECURITY & TOKEN MODULES ---
+const crypto = require('crypto');
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
+
+function generateToken(payload) {
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(JWT_SECRET, 'hex'), iv);
+  let encrypted = cipher.update(JSON.stringify({ ...payload, exp: Date.now() + 24 * 60 * 60 * 1000 }), 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  return iv.toString('hex') + ':' + encrypted;
+}
+
+function verifyToken(token) {
+  try {
+    const [ivHex, encrypted] = token.split(':');
+    if (!ivHex || !encrypted) return null;
+    const iv = Buffer.from(ivHex, 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(JWT_SECRET, 'hex'), iv);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    const payload = JSON.parse(decrypted);
+    if (payload.exp < Date.now()) return null;
+    return payload;
+  } catch (e) {
+    return null;
+  }
+}
+
+function parsePermissions(roleStr) {
+  if (!roleStr) return {};
+  if (roleStr.startsWith('{')) {
+    try {
+      return JSON.parse(roleStr);
+    } catch (e) {
+      return {};
+    }
+  }
+  switch (roleStr) {
+    case 'marketing': return { marketing: 'write' };
+    case 'accounting': return { accounting: 'write' };
+    case 'executor': return { executor: 'write' };
+    case 'admin': return { admin: 'write', procurement: 'write' };
+    case 'hrd': return { hrd: 'write' };
+    case 'owner': return { marketing: 'write', admin: 'write', procurement: 'write', executor: 'write', accounting: 'write', hrd: 'write', systemControl: 'write' };
+    default: return {};
+  }
+}
+
+// Route: Login (Public)
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username dan password diperlukan.' });
+  }
+
+  // 1. Check hardcoded/admin accounts
+  const rolesMap = {
+    'owner': { name: 'Owner', role: 'owner', key: 'Haiga1899.2003' },
+    'marketing': { name: 'Marketing', role: 'marketing', key: 'Haiga1899.2003' },
+    'admin': { name: 'Admin Office', role: 'admin', key: 'Haiga1899.2003' },
+    'executor': { name: 'Executor', role: 'executor', key: 'Haiga1899.2003' },
+    'accounting': { name: 'Accounting', role: 'accounting', key: 'Haiga1899.2003' }
+  };
+
+  const userMatch = rolesMap[username];
+  if (userMatch && password === userMatch.key) {
+    const userData = { 
+      name: userMatch.name, 
+      role: userMatch.role,
+      permissions: parsePermissions(userMatch.role)
+    };
+    return res.json({
+      success: true,
+      token: generateToken(userData),
+      user: userData
+    });
+  }
+
+  // 2. Check custom employee accounts
+  const { data: accounts, error: accError } = await supabase
+    .from('employee_accounts')
+    .select('*')
+    .eq('username', username)
+    .eq('password', password);
+
+  if (accError) return handleError(res, accError, 'login db check');
+  
+  if (accounts && accounts.length > 0) {
+    const empAccount = accounts[0];
+    
+    // Find employee name
+    const { data: employee } = await supabase
+      .from('employees')
+      .select('name')
+      .eq('id', empAccount.id)
+      .single();
+
+    const userData = { 
+      name: employee?.name || empAccount.username, 
+      role: empAccount.role,
+      employeeId: empAccount.id,
+      permissions: parsePermissions(empAccount.role)
+    };
+    return res.json({
+      success: true,
+      token: generateToken(userData),
+      user: userData
+    });
+  }
+
+  return res.status(401).json({ error: 'Username atau password salah.' });
+});
+
+// Middleware: Authentication
+const authenticate = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Akses ditolak: Token autentikasi diperlukan.' });
+  }
+  const token = authHeader.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: 'Akses ditolak: Format token salah.' });
+  }
+  const payload = verifyToken(token);
+  if (!payload) {
+    return res.status(401).json({ error: 'Akses ditolak: Token tidak valid atau kedaluwarsa.' });
+  }
+  req.user = payload;
+  next();
+};
+
+// Privilege escalation and self-modification check helper
+const validateRoleUpdate = (editor, targetId, newRoleStr) => {
+  if (editor.role === 'owner') return true;
+
+  // Cannot modify own account
+  if (targetId && targetId === editor.employeeId) {
+    return false;
+  }
+
+  // Cannot grant owner role
+  if (newRoleStr === 'owner') {
+    return false;
+  }
+
+  // Cannot grant permissions higher than the editor's
+  const newPermissions = parsePermissions(newRoleStr);
+  for (const [moduleKey, newLevel] of Object.entries(newPermissions)) {
+    const editorLevel = editor.permissions?.[moduleKey];
+    if (!editorLevel) return false;
+    if (newLevel === 'write' && editorLevel !== 'write') return false;
+  }
+
+  return true;
+};
+
+// Helper for module access check
+function hasModuleAccess(user, moduleKey, isWrite) {
+  const perm = user.permissions?.[moduleKey];
+  if (!perm) return false;
+  if (isWrite) {
+    return perm === 'write';
+  }
+  return perm === 'write' || perm === 'read';
+}
+
+// Middleware: Authorization and security checks
+const authorize = (req, res, next) => {
+  if (req.user.role === 'owner') {
+    return next();
+  }
+
+  const method = req.method;
+  const path = req.path.replace(/^\/api/, '').toLowerCase();
+  const isWrite = ['POST', 'PUT', 'DELETE'].includes(method);
+
+  // 1. Prevent self-modification of employees or employee-accounts on POST/PUT/DELETE
+  if (isWrite) {
+    if (path.startsWith('/employee-accounts') || path.startsWith('/employees')) {
+      const parts = path.split('/');
+      const targetId = parts[2];
+      if (targetId && targetId === req.user.employeeId) {
+        return res.status(403).json({ error: 'Akses ditolak: Anda tidak diperbolehkan mengubah akun Anda sendiri.' });
+      }
+    }
+  }
+
+  // 2. Prevent privilege escalation when creating/modifying employee accounts
+  if (isWrite && path.startsWith('/employee-accounts')) {
+    const parts = path.split('/');
+    const targetId = parts[2];
+    const newRole = req.body.role;
+    if (newRole && !validateRoleUpdate(req.user, targetId, newRole)) {
+      return res.status(403).json({ error: 'Akses ditolak: Anda tidak dapat memberikan hak akses yang melebihi wewenang Anda.' });
+    }
+  }
+
+  // 3. Standard route checks
+  let moduleKey = null;
+
+  if (path.startsWith('/customers') || path.startsWith('/prospects') || path.startsWith('/quotations')) {
+    moduleKey = 'marketing';
+  } else if (path.startsWith('/vendors')) {
+    moduleKey = 'procurement';
+  } else if (path.startsWith('/invoices') || path.startsWith('/receivables') || path.startsWith('/salaries') || path.startsWith('/other-expenses') || path.startsWith('/company-bank-accounts')) {
+    moduleKey = 'accounting';
+  } else if (path.startsWith('/employees') || path.startsWith('/employee-accounts')) {
+    moduleKey = 'hrd';
+  } else if (path.startsWith('/system')) {
+    moduleKey = 'systemControl';
+  } else if (path.startsWith('/purchase-orders')) {
+    const hasAdmin = hasModuleAccess(req.user, 'admin', isWrite);
+    const hasAccounting = hasModuleAccess(req.user, 'accounting', isWrite);
+    if (hasAdmin || hasAccounting) {
+      return next();
+    }
+    return res.status(403).json({ error: 'Akses ditolak: Anda tidak memiliki wewenang untuk aksi ini.' });
+  } else if (path.startsWith('/job-orders')) {
+    const hasAdmin = hasModuleAccess(req.user, 'admin', isWrite);
+    const hasExecutor = hasModuleAccess(req.user, 'executor', isWrite);
+    if (hasAdmin || hasExecutor) {
+      return next();
+    }
+    return res.status(403).json({ error: 'Akses ditolak: Anda tidak memiliki wewenang untuk aksi ini.' });
+  }
+
+  if (moduleKey) {
+    if (hasModuleAccess(req.user, moduleKey, isWrite)) {
+      return next();
+    }
+  }
+
+  return res.status(403).json({ error: 'Akses ditolak: Anda tidak memiliki wewenang untuk aksi ini.' });
+};
+
+// Protect all /api endpoints except /api/login
+app.use((req, res, next) => {
+  if (req.path === '/api/login') return next();
+  if (!req.path.startsWith('/api')) return next();
+  authenticate(req, res, next);
+});
+
+app.use((req, res, next) => {
+  if (req.path === '/api/login') return next();
+  if (!req.path.startsWith('/api')) return next();
+  authorize(req, res, next);
+});
+
 // Helper to send supabase errors
 const handleError = (res, error, context = '') => {
   console.error(`Error ${context}:`, error.message);
@@ -640,7 +888,7 @@ app.delete('/api/employees/:id', async (req, res) => {
 
 // --- EMPLOYEE ACCOUNTS ---
 app.get('/api/employee-accounts', async (req, res) => {
-  const { data, error } = await supabase.from('employee_accounts').select('*');
+  const { data, error } = await supabase.from('employee_accounts').select('id, username, role');
   if (error) return handleError(res, error, 'GET employee-accounts');
   res.json(data);
 });

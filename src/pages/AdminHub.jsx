@@ -33,8 +33,9 @@ const AdminHub = () => {
   const [poNotes, setPoNotes] = useState('');
 
   if (!context) return null;
-  const { quotations = [], jobOrders = [], createJO, dispatchJO, vendors = [], purchaseOrders = [], createPurchaseOrder, updatePurchaseOrder, issuePurchaseOrder, deletePurchaseOrder, user, t, loading, language } = context;
+  const { quotations = [], jobOrders = [], createJO, dispatchJO, vendors = [], purchaseOrders = [], createPurchaseOrder, updatePurchaseOrder, issuePurchaseOrder, deletePurchaseOrder, user, t, loading, language, hasAccess } = context;
   const isID = language === 'id';
+  const canWrite = hasAccess ? hasAccess('admin', true) : false;
   
   if (loading) {
     return <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'var(--secondary)' }}>{isID ? 'Memuat Dasbor Admin...' : 'Loading Admin Hub...'}</div>;
@@ -194,6 +195,7 @@ const AdminHub = () => {
 
   // Button: Simpan Draft
   const handleSaveDraft = async () => {
+    if (!canWrite) return;
     try {
       const payload = buildPOPayload();
       if (!payload) return;
@@ -211,6 +213,7 @@ const AdminHub = () => {
 
   // Button: Langsung Terbitkan
   const handleIssueDirectly = async () => {
+    if (!canWrite) return;
     try {
       const payload = buildPOPayload();
       if (!payload) return;
@@ -240,6 +243,7 @@ const AdminHub = () => {
   const approvedQuotes = quotations.filter(q => q.status === 'approved');
 
   const handleCreateJO = (quote) => {
+    if (!canWrite) return;
     // If the quote has items array, use the selected one
     const hasItems = quote.items && quote.items.length > 0;
     const activityDetail = hasItems ? quote.items[selectedActivityIndex].description : quote.jobDescription;
@@ -269,6 +273,7 @@ const AdminHub = () => {
   };
 
   const handleDispatch = async (joId) => {
+    if (!canWrite) return;
     const jo = jobOrders.find(j => j.id === joId);
     const qty = quantities[joId] || jo.quantity || 1;
     await dispatchJO(joId, parseInt(qty));
@@ -377,7 +382,7 @@ const AdminHub = () => {
               <p style={{color:'var(--text-muted)',marginBottom:'25px'}}>{isID ? 'PO ' : 'PO '}<strong style={{color:'var(--text)'}}>{deletePOConfirm.id}</strong>{isID ? ' akan dihapus permanen.' : ' will be permanently deleted.'}</p>
               <div style={{display: 'flex', flexWrap: 'wrap',gap:'12px'}}>
                 <button className="btn" style={{flex:1,background:'rgba(255,255,255,0.05)',border:'1px solid var(--border)',color:'var(--text)'}} onClick={()=>setDeletePOConfirm(null)}>{isID ? 'Batal' : 'Cancel'}</button>
-                <ButtonWithLoading className="btn" style={{flex:1,background:'#ef4444',color:'white',border:'none'}} onClick={async()=>{await deletePurchaseOrder(deletePOConfirm.id);setDeletePOConfirm(null);}}>{isID ? 'Hapus' : 'Delete'}</ButtonWithLoading>
+                <ButtonWithLoading className="btn" style={{flex:1,background:'#ef4444',color:'white',border:'none'}} onClick={async()=>{if (!canWrite) return; await deletePurchaseOrder(deletePOConfirm.id);setDeletePOConfirm(null);}}>{isID ? 'Hapus' : 'Delete'}</ButtonWithLoading>
               </div>
             </motion.div>
           </motion.div>
@@ -394,7 +399,7 @@ const AdminHub = () => {
               <p style={{color:'var(--text-muted)',marginBottom:'25px'}}>{isID ? 'Job Order draft ' : 'Draft Job Order '}<strong style={{color:'var(--text)'}}>{deleteJOConfirm.id}</strong> ({deleteJOConfirm.customerName}){isID ? ' akan dihapus permanen.' : ' will be permanently deleted.'}</p>
               <div style={{display: 'flex', flexWrap: 'wrap',gap:'12px'}}>
                 <button className="btn" style={{flex:1,background:'rgba(255,255,255,0.05)',border:'1px solid var(--border)',color:'var(--text)'}} onClick={()=>setDeleteJOConfirm(null)}>{isID ? 'Batal' : 'Cancel'}</button>
-                <ButtonWithLoading className="btn" style={{flex:1,background:'#ef4444',color:'white',border:'none'}} onClick={async()=>{await context.deleteJO(deleteJOConfirm.id);setDeleteJOConfirm(null);}}>{isID ? 'Hapus Draft' : 'Delete Draft'}</ButtonWithLoading>
+                <ButtonWithLoading className="btn" style={{flex:1,background:'#ef4444',color:'white',border:'none'}} onClick={async()=>{if (!canWrite) return; await context.deleteJO(deleteJOConfirm.id);setDeleteJOConfirm(null);}}>{isID ? 'Hapus Draft' : 'Delete Draft'}</ButtonWithLoading>
               </div>
             </motion.div>
           </motion.div>
@@ -561,21 +566,23 @@ const AdminHub = () => {
           <h3 className="shimmer-text" style={{ fontSize: '1.8rem', margin: 0 }}>{isID ? 'Hub Instruksi Operasional' : 'Operational Instruction Hub'}</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{isID ? 'Kirim pekerjaan ke pelaksana berdasarkan kontrak marketing yang disetujui.' : 'Dispatch jobs to executors based on approved marketing contracts.'}</p>
         </div>
-        <div style={{display: 'flex', flexWrap: 'wrap',gap:'10px'}}>
-          <button 
-            className="btn btn-gold" 
-            style={{ padding: '10px 22px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', borderRadius: '12px', fontWeight: '700', boxShadow: '0 4px 15px rgba(212,175,55,0.2)' }} 
-            onClick={() => {
-              setShowPOModal(true);
-            }}
-          >
-            <ShoppingCart size={18}/> {isID ? 'Buat Purchase Order' : 'Create Purchase Order'}
-          </button>
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            <Plus size={18} />
-            {isID ? 'Buat Job Order' : 'Create Job Order'}
-          </button>
-        </div>
+        {canWrite && (
+          <div style={{display: 'flex', flexWrap: 'wrap',gap:'10px'}}>
+            <button 
+              className="btn btn-gold" 
+              style={{ padding: '10px 22px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', borderRadius: '12px', fontWeight: '700', boxShadow: '0 4px 15px rgba(212,175,55,0.2)' }} 
+              onClick={() => {
+                setShowPOModal(true);
+              }}
+            >
+              <ShoppingCart size={18}/> {isID ? 'Buat Purchase Order' : 'Create Purchase Order'}
+            </button>
+            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+              <Plus size={18} />
+              {isID ? 'Buat Job Order' : 'Create Job Order'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filter Bar */}
@@ -873,20 +880,24 @@ const AdminHub = () => {
                   </td>
                   <td style={{ padding: '12px', textAlign: 'center' }}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
-                      <button className="btn-icon" onClick={() => handleEditPO(po)} title={isID ? "Ubah PO" : "Edit PO"} style={{ color: '#3b82f6', background: 'rgba(59,130,246,0.1)' }}>
-                        <Edit size={15} />
-                      </button>
+                      {canWrite && (
+                        <button className="btn-icon" onClick={() => handleEditPO(po)} title={isID ? "Ubah PO" : "Edit PO"} style={{ color: '#3b82f6', background: 'rgba(59,130,246,0.1)' }}>
+                          <Edit size={15} />
+                        </button>
+                      )}
                       <button className="btn-icon" onClick={() => setPrintPO(po)} title={isID ? "Cetak PO" : "Print PO"} style={{ color: 'var(--secondary)', background: 'rgba(212,175,55,0.1)' }}>
                         <FileText size={15} />
                       </button>
-                      {po.status !== 'issued' && (
+                      {canWrite && po.status !== 'issued' && (
                         <ButtonWithLoading className="btn-icon" onClick={() => issuePurchaseOrder(po.id)} title={isID ? "Terbitkan PO" : "Issue PO"} style={{ color: '#10b981', background: 'rgba(16,185,129,0.1)' }}>
                           <CheckCircle size={15} />
                         </ButtonWithLoading>
                       )}
-                      <button className="btn-icon" onClick={() => setDeletePOConfirm(po)} title={isID ? "Hapus PO" : "Delete PO"} style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }}>
-                        <Trash2 size={15} />
-                      </button>
+                      {canWrite && (
+                        <button className="btn-icon" onClick={() => setDeletePOConfirm(po)} title={isID ? "Hapus PO" : "Delete PO"} style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }}>
+                          <Trash2 size={15} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -923,14 +934,16 @@ const AdminHub = () => {
                   <span style={{ color: 'var(--secondary)', fontWeight: 'bold' }}>{jo.id}</span>
                   <span className="badge badge-pending" style={{ fontSize: '0.7rem' }}>Draft</span>
                 </div>
-                <button 
-                  className="btn-icon" 
-                  style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', width: '32px', height: '32px' }} 
-                  onClick={() => setDeleteJOConfirm(jo)}
-                  title={isID ? "Batalkan / Hapus JO Draft" : "Cancel / Delete JO Draft"}
-                >
-                  <Trash2 size={14} />
-                </button>
+                {canWrite && (
+                  <button 
+                    className="btn-icon" 
+                    style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', width: '32px', height: '32px' }} 
+                    onClick={() => setDeleteJOConfirm(jo)}
+                    title={isID ? "Batalkan / Hapus JO Draft" : "Cancel / Delete JO Draft"}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
               <p style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '5px' }}>{jo.customerName}</p>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px', minHeight: '40px' }}>{jo.jobDescription}</p>
@@ -940,6 +953,7 @@ const AdminHub = () => {
                 <input
                   type="number"
                   min="1"
+                  disabled={!canWrite}
                   value={quantities[jo.id] || jo.quantity || ''}
                   onChange={e => setQuantities({ ...quantities, [jo.id]: e.target.value })}
                   placeholder={isID ? "Masukkan jumlah..." : "Enter quantity..."}
@@ -947,10 +961,12 @@ const AdminHub = () => {
                 />
               </div>
 
-              <ButtonWithLoading className="btn btn-gold" style={{ width: '100%' }} onClick={() => handleDispatch(jo.id)}>
-                <Send size={18} />
-                {isID ? 'Kirim ke Pelaksana' : 'Dispatch to Executor'}
-              </ButtonWithLoading>
+              {canWrite && (
+                <ButtonWithLoading className="btn btn-gold" style={{ width: '100%' }} onClick={() => handleDispatch(jo.id)}>
+                  <Send size={18} />
+                  {isID ? 'Kirim ke Pelaksana' : 'Dispatch to Executor'}
+                </ButtonWithLoading>
+              )}
             </div>
           ))}
           {jobOrders.filter(jo => jo.status === 'pending').length === 0 && (

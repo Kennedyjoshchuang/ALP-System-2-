@@ -25,9 +25,10 @@ const HRD = () => {
   const { 
     employees = [], addEmployee, updateEmployee, deleteEmployee,
     employeeAccounts = [], addEmployeeAccount, updateEmployeeAccount, deleteEmployeeAccount,
-    t, user, language 
+    t, user, language, hasAccess 
   } = useApp();
   const isID = language === 'id';
+  const canWrite = hasAccess ? hasAccess('hrd', true) : false;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -54,7 +55,7 @@ const HRD = () => {
   const [accountData, setAccountData] = useState({
     username: '',
     password: '',
-    role: 'staff'
+    permissions: {}
   });
 
   const filteredEmployees = (employees || []).filter(emp => 
@@ -99,20 +100,24 @@ const HRD = () => {
     setIsAccountSubmitting(true);
     setCreateAccountError('');
     try {
+      const finalRoleStr = JSON.stringify(accountData.permissions);
+      const payload = { username: accountData.username, password: accountData.password, role: finalRoleStr };
+
       if (isEditAccount) {
-        await updateEmployeeAccount(selectedEmployee.id, accountData);
+        if (!accountData.password) delete payload.password; // optional password update
+        await updateEmployeeAccount(selectedEmployee.id, payload);
         toast.success(isID ? 'Akses sistem berhasil diperbarui!' : 'System access successfully updated!');
       } else {
         await addEmployeeAccount({
           id: selectedEmployee.id,
-          ...accountData
+          ...payload
         });
         toast.success(isID ? 'Akses sistem berhasil diberikan!' : 'System access successfully granted!');
       }
       setIsAccountModalOpen(false);
       setIsEditAccount(false);
       setSelectedEmployee(null);
-      setAccountData({ username: '', password: '', role: 'staff' });
+      setAccountData({ username: '', password: '', permissions: {} });
     } catch (err) {
       console.error('Gagal membuat akun:', err);
       const msg = err.message || (isID ? 'Terjadi kesalahan. Coba lagi.' : 'An error occurred. Please try again.');
@@ -140,22 +145,24 @@ const HRD = () => {
           <Search size={20} style={{ position: 'absolute', left: '18px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
         </div>
         
-        <button 
-          className="btn btn-primary"
-          onClick={() => {
-            setSelectedEmployee(null);
-            setSubmitError('');
-            setFormData({
-              name: '', address: '', phone: '', nik: '', npwp: '',
-              position: '', email: '', accountNumber: '', bankName: ''
-            });
-            setIsAddModalOpen(true);
-          }}
-          style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 25px' }}
-        >
-          <UserPlus size={20} />
-          {isID ? 'Tambahkan Karyawan' : 'Add Employee'}
-        </button>
+        {canWrite && (
+          <button 
+            className="btn btn-primary"
+            onClick={() => {
+              setSelectedEmployee(null);
+              setSubmitError('');
+              setFormData({
+                name: '', address: '', phone: '', nik: '', npwp: '',
+                position: '', email: '', accountNumber: '', bankName: ''
+              });
+              setIsAddModalOpen(true);
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 25px' }}
+          >
+            <UserPlus size={20} />
+            {isID ? 'Tambahkan Karyawan' : 'Add Employee'}
+          </button>
+        )}
       </div>
 
       <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
@@ -174,6 +181,7 @@ const HRD = () => {
             <AnimatePresence>
               {filteredEmployees.map((emp) => {
                 const account = getAccount(emp.id);
+                const isSelf = user && user.employeeId === emp.id;
                 return (
                   <motion.tr 
                     key={emp.id}
@@ -212,71 +220,100 @@ const HRD = () => {
                             <ShieldCheck size={14} />
                             {account.username}
                           </div>
-                          <button 
-                            title={isID ? "Reset Akses" : "Reset Access"}
-                            onClick={() => {
-                              setSelectedEmployee(emp);
-                              setAccountData({ username: account.username, password: '', role: account.role });
-                              setIsEditAccount(true);
-                              setIsAccountModalOpen(true);
-                            }}
-                            className="btn-icon" 
-                            style={{ padding: '6px', width: '32px', height: '32px' }}
-                          >
-                            <RotateCcw size={14} />
-                          </button>
-                          <button 
-                            title={isID ? "Hapus Akses" : "Remove Access"}
-                            onClick={() => {
-                              if (confirm(isID ? `Hapus akses sistem untuk ${emp.name}?` : `Remove system access for ${emp.name}?`)) {
-                                deleteEmployeeAccount(emp.id);
-                              }
-                            }}
-                            className="btn-icon" 
-                            style={{ padding: '6px', width: '32px', height: '32px', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }}
-                          >
-                            <X size={14} />
-                          </button>
+                          {canWrite && !isSelf ? (
+                            <>
+                              <button 
+                                title={isID ? "Edit Akses" : "Edit Access"}
+                                onClick={() => {
+                                  setSelectedEmployee(emp);
+                                  let perms = {};
+                                  if (account.role && account.role.startsWith('{')) {
+                                    try { perms = JSON.parse(account.role); } catch(e) {}
+                                  } else {
+                                    const rm = account.role;
+                                    if (rm === 'marketing') perms = { marketing: 'write' };
+                                    else if (rm === 'accounting') perms = { accounting: 'write' };
+                                    else if (rm === 'executor') perms = { executor: 'write' };
+                                    else if (rm === 'admin') perms = { admin: 'write', procurement: 'write' };
+                                    else if (rm === 'hrd') perms = { hrd: 'write' };
+                                  }
+                                  setAccountData({ username: account.username, password: '', permissions: perms });
+                                  setIsEditAccount(true);
+                                  setIsAccountModalOpen(true);
+                                }}
+                                className="btn-icon" 
+                                style={{ padding: '6px', width: '32px', height: '32px' }}
+                              >
+                                <Settings2 size={14} />
+                              </button>
+                              <button 
+                                title={isID ? "Hapus Akses" : "Remove Access"}
+                                onClick={() => {
+                                  if (confirm(isID ? `Hapus akses sistem untuk ${emp.name}?` : `Remove system access for ${emp.name}?`)) {
+                                    deleteEmployeeAccount(emp.id);
+                                  }
+                                }}
+                                className="btn-icon" 
+                                style={{ padding: '6px', width: '32px', height: '32px', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }}
+                              >
+                                <X size={14} />
+                              </button>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                              {isSelf ? (isID ? 'Akun Anda' : 'Your Account') : (isID ? 'Hanya Baca' : 'Read Only')}
+                            </span>
+                          )}
                         </div>
                       ) : (
-                        <button 
-                          onClick={() => {
-                            setSelectedEmployee(emp);
-                            setIsEditAccount(false);
-                            setAccountData({ username: '', password: '', role: 'staff' });
-                            setIsAccountModalOpen(true);
-                          }}
-                          className="btn-text" 
-                          style={{ fontSize: '0.8rem', color: 'var(--secondary)', textDecoration: 'underline' }}
-                        >
-                          {isID ? 'Beri Akses' : 'Grant Access'}
-                        </button>
+                        canWrite ? (
+                          <button 
+                            onClick={() => {
+                              setSelectedEmployee(emp);
+                              setIsEditAccount(false);
+                              setAccountData({ username: '', password: '', permissions: {} });
+                              setIsAccountModalOpen(true);
+                            }}
+                            className="btn-text" 
+                            style={{ fontSize: '0.8rem', color: 'var(--secondary)', textDecoration: 'underline' }}
+                          >
+                            {isID ? 'Beri Akses' : 'Grant Access'}
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>-</span>
+                        )
                       )}
                     </td>
                     <td style={{ padding: '20px' }}>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button 
-                          className="btn-icon" 
-                          onClick={() => {
-                            setSelectedEmployee(emp);
-                            setFormData({ ...emp });
-                            setIsAddModalOpen(true);
-                          }}
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button 
-                          className="btn-icon" 
-                          style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }}
-                          onClick={() => {
-                            if (confirm(isID ? `Hapus karyawan ${emp.name}?` : `Delete employee ${emp.name}?`)) {
-                              deleteEmployee(emp.id);
-                            }
-                          }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
+                      {canWrite && !isSelf ? (
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <button 
+                            className="btn-icon" 
+                            onClick={() => {
+                              setSelectedEmployee(emp);
+                              setFormData({ ...emp });
+                              setIsAddModalOpen(true);
+                            }}
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button 
+                            className="btn-icon" 
+                            style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }}
+                            onClick={() => {
+                              if (confirm(isID ? `Hapus karyawan ${emp.name}?` : `Delete employee ${emp.name}?`)) {
+                                deleteEmployee(emp.id);
+                              }
+                            }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {isSelf ? (isID ? 'Akun Anda' : 'Your Account') : '-'}
+                        </span>
+                      )}
                     </td>
                   </motion.tr>
                 );
@@ -360,7 +397,7 @@ const HRD = () => {
         <div className="modal-overlay">
           <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="modal-content" style={{ maxWidth: '450px' }}>
             <div className="modal-header">
-              <h3>{isEditAccount ? 'Reset Akses Sistem' : 'Beri Akses Sistem'}</h3>
+              <h3>{isEditAccount ? (isID ? 'Edit Akses Sistem' : 'Edit System Access') : (isID ? 'Beri Akses Sistem' : 'Grant System Access')}</h3>
               <button className="close-btn" onClick={() => { setIsAccountModalOpen(false); setIsEditAccount(false); }}><X size={24} /></button>
             </div>
             <div style={{ padding: '20px 30px', background: 'rgba(212, 175, 55, 0.05)', borderBottom: '1px solid var(--border)' }}>
@@ -377,24 +414,72 @@ const HRD = () => {
               <div className="input-group" style={{ marginTop: '20px' }}>
                 <label>Password</label>
                 <div style={{ position: 'relative' }}>
-                  <input required type="password" value={accountData.password} onChange={e => setAccountData({ ...accountData, password: e.target.value })} placeholder="Minimal 6 karakter" style={{ paddingLeft: '45px' }} />
+                  <input 
+                    required={!isEditAccount} 
+                    type="password" 
+                    value={accountData.password} 
+                    onChange={e => setAccountData({ ...accountData, password: e.target.value })} 
+                    placeholder={isEditAccount ? (isID ? "Kosongkan jika tidak ingin mengubah password" : "Leave blank if you do not want to change password") : "Minimal 6 karakter"} 
+                    style={{ paddingLeft: '45px' }} 
+                  />
                   <Key size={18} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 </div>
               </div>
               <div className="input-group" style={{ marginTop: '20px' }}>
-                <label>Role / Akses</label>
-                <select 
-                  value={accountData.role} 
-                  onChange={e => setAccountData({ ...accountData, role: e.target.value })} 
-                  style={{ background: 'var(--input-bg)', color: 'var(--text)', border: '2px solid var(--secondary)', borderRadius: '12px', padding: '12px', width: '100%', fontWeight: '600' }}
-                >
-                  <option value="marketing" style={{ background: 'var(--bg)', color: 'var(--text)' }}>Marketing</option>
-                  <option value="accounting" style={{ background: 'var(--bg)', color: 'var(--text)' }}>Accounting</option>
-                  <option value="executor" style={{ background: 'var(--bg)', color: 'var(--text)' }}>Executor</option>
-                  <option value="admin" style={{ background: 'var(--bg)', color: 'var(--text)' }}>Admin Office</option>
-                  <option value="hrd" style={{ background: 'var(--bg)', color: 'var(--text)' }}>HRD</option>
-                  <option value="staff" style={{ background: 'var(--bg)', color: 'var(--text)' }}>Staff (View Only)</option>
-                </select>
+                <label style={{ display: 'block', marginBottom: '15px', fontWeight: 'bold' }}>Hak Akses Sistem (System Permissions)</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {[
+                    { key: 'marketing', label: 'Marketing (Pemasaran)' },
+                    { key: 'admin', label: 'Admin Office' },
+                    { key: 'procurement', label: 'Procurement (Pengadaan)' },
+                    { key: 'executor', label: 'Executor (Pelaksana)' },
+                    { key: 'accounting', label: 'Accounting (Akuntansi)' },
+                    { key: 'hrd', label: 'HRD' },
+                    { key: 'systemControl', label: 'System Control (Admin Sistem)', warning: true }
+                  ].map(mod => {
+                    const hasPerm = accountData.permissions[mod.key] && accountData.permissions[mod.key] !== 'none';
+                    const isWrite = accountData.permissions[mod.key] === 'write';
+                    
+                    return (
+                      <div key={mod.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={!!hasPerm}
+                            onChange={(e) => {
+                              const newPerms = { ...accountData.permissions };
+                              if (e.target.checked) newPerms[mod.key] = 'read';
+                              else delete newPerms[mod.key];
+                              setAccountData({ ...accountData, permissions: newPerms });
+                            }}
+                            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                          />
+                          <span style={{ fontWeight: '600', color: mod.warning ? '#ef4444' : 'var(--text)' }}>
+                            {mod.label}
+                          </span>
+                        </div>
+                        {hasPerm && (
+                          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); const newPerms = { ...accountData.permissions }; newPerms[mod.key] = 'read'; setAccountData({ ...accountData, permissions: newPerms }); }}
+                              style={{ padding: '6px 12px', fontSize: '0.8rem', background: !isWrite ? 'var(--secondary)' : 'transparent', color: !isWrite ? '#000' : 'var(--text-muted)', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+                            >
+                              Read Only
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); const newPerms = { ...accountData.permissions }; newPerms[mod.key] = 'write'; setAccountData({ ...accountData, permissions: newPerms }); }}
+                              style={{ padding: '6px 12px', fontSize: '0.8rem', background: isWrite ? '#10b981' : 'transparent', color: isWrite ? '#fff' : 'var(--text-muted)', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+                            >
+                              Read & Write
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
               {createAccountError && (
                 <div style={{ marginTop: '16px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '10px', color: '#ef4444', fontSize: '0.85rem' }}>
@@ -403,7 +488,7 @@ const HRD = () => {
               )}
               <div style={{ marginTop: '30px', display: 'flex', gap: '15px' }}>
                 <button type="submit" disabled={isAccountSubmitting} className="btn btn-primary" style={{ flex: 1 }}>
-                  {isAccountSubmitting ? 'Memproses...' : (isEditAccount ? 'Update Akses' : 'Buat Akun')}
+                  {isAccountSubmitting ? (isID ? 'Memproses...' : 'Processing...') : (isEditAccount ? (isID ? 'Simpan Perubahan' : 'Save Changes') : (isID ? 'Beri Akses' : 'Grant Access'))}
                 </button>
               </div>
             </form>
