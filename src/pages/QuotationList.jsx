@@ -19,12 +19,20 @@ const QuotationList = () => {
     deleteQuotation, 
     user, 
     t,
-    hasAccess
+    hasAccess,
+    language
   } = useApp();
   const canWrite = hasAccess ? hasAccess('marketing', true) : false;
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('created_desc');
   const [selectedDraft, setSelectedDraft] = useState(null);
+
+  const getQuotationTime = (q) => {
+    if (!q.date) return 0;
+    const d = new Date(q.date).getTime();
+    return isNaN(d) ? 0 : d;
+  };
 
   const filteredQuotations = quotations
     .filter(q => 
@@ -32,7 +40,33 @@ const QuotationList = () => {
       q.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (q.pic && q.pic.toLowerCase().includes(searchTerm.toLowerCase()))
     )
-    .sort((a, b) => b.id.localeCompare(a.id));
+    .sort((a, b) => {
+      if (sortBy === 'created_desc') {
+        return getQuotationTime(b) - getQuotationTime(a) || b.id.localeCompare(a.id);
+      }
+      if (sortBy === 'created_asc') {
+        return getQuotationTime(a) - getQuotationTime(b) || a.id.localeCompare(b.id);
+      }
+      if (sortBy === 'company_asc') {
+        return (a.customerName || '').localeCompare(b.customerName || '');
+      }
+      if (sortBy === 'company_desc') {
+        return (b.customerName || '').localeCompare(a.customerName || '');
+      }
+      if (sortBy === 'id_asc') {
+        return a.id.localeCompare(b.id);
+      }
+      if (sortBy === 'id_desc') {
+        return b.id.localeCompare(a.id);
+      }
+      if (sortBy === 'amount_desc') {
+        return (b.total || b.rate || 0) - (a.total || a.rate || 0);
+      }
+      if (sortBy === 'amount_asc') {
+        return (a.total || a.rate || 0) - (b.total || b.rate || 0);
+      }
+      return 0;
+    });
 
   const handleDownload = (quote) => {
     const printData = {
@@ -222,20 +256,39 @@ const QuotationList = () => {
         className="no-print glass-card" 
         style={{ padding: '25px', overflowX: 'auto' }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', flexWrap: 'wrap', gap: '15px' }}>
           <h4 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
             <FileText size={20} style={{ color: 'var(--gold-metallic)' }} />
             Quotation List
           </h4>
-          <div style={{ position: 'relative', width: '300px' }}>
-            <input 
-              type="text" 
-              placeholder="Search quotations..." 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)} 
-              style={{ padding: '10px 15px 10px 45px', borderRadius: '100px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', width: '100%' }} 
-            />
-            <Search size={18} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{isID ? 'Urutkan:' : 'Sort:'}</span>
+              <select 
+                value={sortBy} 
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem', outline: 'none', cursor: 'pointer' }}
+              >
+                <option value="created_desc">{isID ? 'Tanggal Pembuatan (Terbaru)' : 'Creation Date (Newest)'}</option>
+                <option value="created_asc">{isID ? 'Tanggal Pembuatan (Terlama)' : 'Creation Date (Oldest)'}</option>
+                <option value="company_asc">{isID ? 'Nama Perusahaan (A-Z)' : 'Company Name (A-Z)'}</option>
+                <option value="company_desc">{isID ? 'Nama Perusahaan (Z-A)' : 'Company Name (Z-A)'}</option>
+                <option value="id_asc">{isID ? 'No. Penawaran (Asc)' : 'Quotation # (Asc)'}</option>
+                <option value="id_desc">{isID ? 'No. Penawaran (Desc)' : 'Quotation # (Desc)'}</option>
+                <option value="amount_desc">{isID ? 'Total Nilai (Tertinggi)' : 'Amount (Highest)'}</option>
+                <option value="amount_asc">{isID ? 'Total Nilai (Terendah)' : 'Amount (Lowest)'}</option>
+              </select>
+            </div>
+            <div style={{ position: 'relative', width: '250px' }}>
+              <input 
+                type="text" 
+                placeholder="Search quotations..." 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+                style={{ padding: '10px 15px 10px 45px', borderRadius: '100px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', width: '100%' }} 
+              />
+              <Search size={18} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            </div>
           </div>
         </div>
 

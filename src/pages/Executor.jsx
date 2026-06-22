@@ -61,6 +61,7 @@ const Executor = () => {
   const fileInputRef = useRef(null);
   const [uploadingForId, setUploadingForId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('created_desc');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [joToDelete, setJoToDelete] = useState(null);
@@ -95,12 +96,49 @@ const Executor = () => {
     return true;
   };
 
-  const filteredJOs = jobOrders.filter(jo => {
-    const tabMatch = activeTab === 'active' ? jo.status === 'dispatched' : jo.status === 'done';
-    const searchMatch = (jo.id || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                      (jo.customerName || '').toLowerCase().includes(searchTerm.toLowerCase());
-    return tabMatch && searchMatch && filterByDate(jo.date);
-  });
+  const getJoTimestamp = (jo) => {
+    if (jo.id && jo.id.startsWith('JO-')) {
+      const tsStr = jo.id.substring(3);
+      const ts = parseInt(tsStr, 10);
+      if (!isNaN(ts) && ts > 1000000000000) {
+        return ts;
+      }
+    }
+    if (jo.date) {
+      const d = new Date(jo.date).getTime();
+      if (!isNaN(d)) return d;
+    }
+    return 0;
+  };
+
+  const filteredJOs = jobOrders
+    .filter(jo => {
+      const tabMatch = activeTab === 'active' ? jo.status === 'dispatched' : jo.status === 'done';
+      const searchMatch = (jo.id || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        (jo.customerName || '').toLowerCase().includes(searchTerm.toLowerCase());
+      return tabMatch && searchMatch && filterByDate(jo.date);
+    })
+    .sort((a, b) => {
+      if (sortBy === 'created_desc') {
+        return getJoTimestamp(b) - getJoTimestamp(a) || b.id.localeCompare(a.id);
+      }
+      if (sortBy === 'created_asc') {
+        return getJoTimestamp(a) - getJoTimestamp(b) || a.id.localeCompare(b.id);
+      }
+      if (sortBy === 'company_asc') {
+        return (a.customerName || '').localeCompare(b.customerName || '');
+      }
+      if (sortBy === 'company_desc') {
+        return (b.customerName || '').localeCompare(a.customerName || '');
+      }
+      if (sortBy === 'id_asc') {
+        return a.id.localeCompare(b.id);
+      }
+      if (sortBy === 'id_desc') {
+        return b.id.localeCompare(a.id);
+      }
+      return 0;
+    });
 
   const handleExport = () => {
     const dataToExport = filteredJOs.map(jo => ({
@@ -412,9 +450,24 @@ const Executor = () => {
 
       {/* Filter Bar */}
       <div className="glass-card" style={{ padding: '20px 25px', display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap', background: 'rgba(255,255,255,0.03)' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: '250px' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
           <input type="text" placeholder={isID ? "Cari Pekerjaan atau Pelanggan..." : "Search Jobs or Customers..."} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '10px 15px 10px 40px', borderRadius: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
           <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{isID ? 'Urutkan:' : 'Sort:'}</span>
+          <select 
+            value={sortBy} 
+            onChange={(e) => setSortBy(e.target.value)}
+            style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem', outline: 'none', cursor: 'pointer' }}
+          >
+            <option value="created_desc">{isID ? 'Tanggal Pembuatan (Terbaru)' : 'Creation Date (Newest)'}</option>
+            <option value="created_asc">{isID ? 'Tanggal Pembuatan (Terlama)' : 'Creation Date (Oldest)'}</option>
+            <option value="company_asc">{isID ? 'Nama Perusahaan (A-Z)' : 'Company Name (A-Z)'}</option>
+            <option value="company_desc">{isID ? 'Nama Perusahaan (Z-A)' : 'Company Name (Z-A)'}</option>
+            <option value="id_asc">{isID ? 'JO ID (Asc)' : 'JO ID (Asc)'}</option>
+            <option value="id_desc">{isID ? 'JO ID (Desc)' : 'JO ID (Desc)'}</option>
+          </select>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>{isID ? 'Filter Tanggal:' : 'Date Filter:'}</span>

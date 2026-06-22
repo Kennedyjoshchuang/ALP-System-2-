@@ -5,7 +5,7 @@
 set -e
 
 APP_DIR="/var/www/alpsystem"
-REPO_URL="https://github.com/Kennedyjoshchuang/OTLSystem.git"
+REPO_URL="https://github.com/Kennedyjoshchuang/ALP-System-2-.git"
 
 # Colors
 GREEN='\033[0;32m'

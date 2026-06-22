@@ -51,6 +51,7 @@ const Accounting = () => {
   const [costModal, setCostModal] = useState(null); // holds the JO being costed
   const [costLines, setCostLines] = useState([{ vendorId: '', serviceIdx: '', qty: 1 }]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [joSortBy, setJoSortBy] = useState('created_desc');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [editingInvoice, setEditingInvoice] = useState(null);
@@ -522,8 +523,43 @@ const Accounting = () => {
   }, [jobOrders, startDate, endDate, searchTerm]);
 
   const sortedActiveJOs = React.useMemo(() => {
-    return [...activeJOs].sort((a, b) => (b.id || '').localeCompare(a.id || ''));
-  }, [activeJOs]);
+    const getJoTimestamp = (jo) => {
+      if (jo.id && jo.id.startsWith('JO-')) {
+        const tsStr = jo.id.substring(3);
+        const ts = parseInt(tsStr, 10);
+        if (!isNaN(ts) && ts > 1000000000000) {
+          return ts;
+        }
+      }
+      if (jo.date) {
+        const d = new Date(jo.date).getTime();
+        if (!isNaN(d)) return d;
+      }
+      return 0;
+    };
+
+    return [...activeJOs].sort((a, b) => {
+      if (joSortBy === 'created_desc') {
+        return getJoTimestamp(b) - getJoTimestamp(a) || (b.id || '').localeCompare(a.id || '');
+      }
+      if (joSortBy === 'created_asc') {
+        return getJoTimestamp(a) - getJoTimestamp(b) || (a.id || '').localeCompare(b.id || '');
+      }
+      if (joSortBy === 'company_asc') {
+        return (a.customerName || '').localeCompare(b.customerName || '');
+      }
+      if (joSortBy === 'company_desc') {
+        return (b.customerName || '').localeCompare(a.customerName || '');
+      }
+      if (joSortBy === 'id_asc') {
+        return (a.id || '').localeCompare(b.id || '');
+      }
+      if (joSortBy === 'id_desc') {
+        return (b.id || '').localeCompare(a.id || '');
+      }
+      return 0;
+    });
+  }, [activeJOs, joSortBy]);
 
   const plFinancials = React.useMemo(() => {
     return activeJOs.reduce((acc, j) => {
@@ -864,6 +900,21 @@ const Accounting = () => {
   }
 
 
+  const getJoTimestamp = (jo) => {
+    if (jo.id && jo.id.startsWith('JO-')) {
+      const tsStr = jo.id.substring(3);
+      const ts = parseInt(tsStr, 10);
+      if (!isNaN(ts) && ts > 1000000000000) {
+        return ts;
+      }
+    }
+    if (jo.date) {
+      const d = new Date(jo.date).getTime();
+      if (!isNaN(d)) return d;
+    }
+    return 0;
+  };
+
   const completedJOs = jobOrders
     .filter(jo => jo.status === 'done')
     .filter(jo => filterByDate(jo.date))
@@ -872,6 +923,27 @@ const Accounting = () => {
       const name = jo.customerName || '';
       const term = searchTerm.toLowerCase();
       return id.toLowerCase().includes(term) || name.toLowerCase().includes(term);
+    })
+    .sort((a, b) => {
+      if (joSortBy === 'created_desc') {
+        return getJoTimestamp(b) - getJoTimestamp(a) || (b.id || '').localeCompare(a.id || '');
+      }
+      if (joSortBy === 'created_asc') {
+        return getJoTimestamp(a) - getJoTimestamp(b) || (a.id || '').localeCompare(b.id || '');
+      }
+      if (joSortBy === 'company_asc') {
+        return (a.customerName || '').localeCompare(b.customerName || '');
+      }
+      if (joSortBy === 'company_desc') {
+        return (b.customerName || '').localeCompare(a.customerName || '');
+      }
+      if (joSortBy === 'id_asc') {
+        return (a.id || '').localeCompare(b.id || '');
+      }
+      if (joSortBy === 'id_desc') {
+        return (b.id || '').localeCompare(a.id || '');
+      }
+      return 0;
     });
 
   const paidInvoices = invoices
@@ -2363,6 +2435,23 @@ const Accounting = () => {
           <input type="text" placeholder={isID ? "Cari Invoice, Pelanggan, JO..." : "Search Invoices, Customers, JOs..."} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '10px 15px 10px 40px', borderRadius: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
           <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
         </div>
+        {(activeTab === 'billing' || activeTab === 'costing') && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{isID ? 'Urutkan:' : 'Sort:'}</span>
+            <select 
+              value={joSortBy} 
+              onChange={(e) => setJoSortBy(e.target.value)}
+              style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem', outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="created_desc">{isID ? 'Tanggal Pembuatan (Terbaru)' : 'Creation Date (Newest)'}</option>
+              <option value="created_asc">{isID ? 'Tanggal Pembuatan (Terlama)' : 'Creation Date (Oldest)'}</option>
+              <option value="company_asc">{isID ? 'Nama Perusahaan (A-Z)' : 'Company Name (A-Z)'}</option>
+              <option value="company_desc">{isID ? 'Nama Perusahaan (Z-A)' : 'Company Name (Z-A)'}</option>
+              <option value="id_asc">{isID ? 'JO ID (Asc)' : 'JO ID (Asc)'}</option>
+              <option value="id_desc">{isID ? 'JO ID (Desc)' : 'JO ID (Desc)'}</option>
+            </select>
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>{isID ? 'Filter Tanggal:' : 'Date Filter:'}</span>
           <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
