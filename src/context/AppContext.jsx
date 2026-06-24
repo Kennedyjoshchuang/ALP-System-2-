@@ -30,7 +30,7 @@ export const parsePermissions = (roleStr) => {
 
 export const AppProvider = ({ children }) => {
   const [language, setLanguage] = useState(() => localStorage.getItem('alp_lang') || 'en');
-  const { customers, addCustomer: addCustomerHook, isLoading: customersLoading, error: customersError, refetch: refetchCustomers } = useCustomers();
+  const { customers, addCustomer: addCustomerHook, updateCustomer: updateCustomerHook, isLoading: customersLoading, error: customersError, refetch: refetchCustomers } = useCustomers();
   const [prospects, setProspects] = useState([]);
   const [prospectDrafts, setProspectDrafts] = useState([]);
   const [quotations, setQuotations] = useState([]);
@@ -206,10 +206,14 @@ export const AppProvider = ({ children }) => {
   }, [user]);
 
   const addCustomer = async (customer) => {
-    const newCustomer = { ...customer, id: `CUST-${Date.now().toString().slice(-4)}` };
+    const newCustomer = { ...customer, id: customer.id || `CUST-${Date.now().toString().slice(-4)}` };
     // Use the mutation provided by useCustomers (optimistic update handled there)
     await addCustomerHook(newCustomer);
     return newCustomer;
+  };
+
+  const updateCustomer = async (id, updates) => {
+    await updateCustomerHook({ id, ...updates });
   };
 
   const addProspect = async (prospectData) => {
@@ -250,7 +254,8 @@ export const AppProvider = ({ children }) => {
         name: prospect.name,
         phone: prospect.phone,
         email: prospect.email,
-        address: prospect.address
+        address: prospect.address,
+        customData: prospect.customData || {}
       });
       await updateProspectStatus(id, 'deal');
       return customer;
@@ -807,7 +812,7 @@ export const AppProvider = ({ children }) => {
       user, login, logout, hasAccess,
       language, toggleLanguage, t,
       theme, toggleTheme, loading,
-      customers, addCustomer, deleteCustomer,
+      customers, addCustomer, updateCustomer, deleteCustomer,
       vendors, addVendor, updateVendor, deleteVendor,
       purchaseOrders, createPurchaseOrder, issuePurchaseOrder, updatePurchaseOrder, deletePurchaseOrder, patchPurchaseOrderLocal,
       prospects, addProspect, updateProspectStatus, convertProspectToCustomer, deleteProspect, updateProspect,

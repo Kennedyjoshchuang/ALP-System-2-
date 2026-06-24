@@ -95,7 +95,16 @@ export const translations = {
     quotationListPage: "Quotation List",
     quotationList: "Quotation List",
     searchQuotations: "Search by customer name...",
-    searchJobOrders: "Search Job Orders..."
+    searchJobOrders: "Search Job Orders...",
+    savedCustomers: "Saved Customers",
+    loadCustomer: "Load Saved Customer",
+    addCustomer: "Add Saved Customer",
+    editCustomer: "Edit Saved Customer",
+    customFields: "Custom Fields",
+    addCustomField: "Add Custom Field",
+    fieldName: "Field Name",
+    fieldValue: "Field Value",
+    confirmDeleteCustomer: "Are you sure you want to delete this customer? This will not delete their related job orders or invoices."
   },
   id: {
     // Layout & General
@@ -156,6 +165,16 @@ export const translations = {
     lost: "Gagal",
     addProspect: "Tambah Prospek",
     prospectJob: "Deskripsi Job Prospek",
+    savedCustomers: "Pelanggan Tersimpan",
+    loadCustomer: "Muat Pelanggan Tersimpan",
+    addCustomer: "Tambah Pelanggan Baru",
+    editCustomer: "Ubah Pelanggan",
+    customFields: "Kolom Kustom",
+    addCustomField: "Tambah Kolom Kustom",
+    fieldName: "Nama Kolom",
+    fieldValue: "Nilai Kolom",
+    confirmDeleteCustomer: "Apakah Anda yakin ingin menghapus pelanggan ini? Ini tidak akan menghapus data job order atau faktur mereka."
+  ,
     
     // Admin
     jobOrderDispatch: "Pengiriman Job Order",

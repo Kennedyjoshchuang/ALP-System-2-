@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Plus, Download, CheckCircle, XCircle, FileText, UserPlus, Search, Trash2, FileSpreadsheet, Edit } from 'lucide-react';
+import { Plus, Download, CheckCircle, XCircle, FileText, UserPlus, Search, Trash2, FileSpreadsheet, Edit, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
+import toast from 'react-hot-toast';
 
 const Marketing = () => {
   const context = useApp();
@@ -37,6 +38,16 @@ const Marketing = () => {
     name: '', address: '', phone: '', email: '', pic: '', notes: '', description: '', marketingName: '', marketingPhone: '', marketingEmail: '', companyAddress: ''
   });
 
+  const [activeCustomerForEdit, setActiveCustomerForEdit] = useState(null);
+  const [editCustomerData, setEditCustomerData] = useState({ name: '', phone: '', email: '', address: '' });
+  const [editCustomerCustomFields, setEditCustomerCustomFields] = useState([{ key: '', value: '' }]);
+  const [showCustomerForm, setShowCustomerForm] = useState(false);
+  const [newCustomerData, setNewCustomerData] = useState({ name: '', phone: '', email: '', address: '' });
+  const [newCustomerCustomFields, setNewCustomerCustomFields] = useState([{ key: '', value: '' }]);
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [prospectCustomFields, setProspectCustomFields] = useState([{ key: '', value: '' }]);
+  const [editProspectCustomFields, setEditProspectCustomFields] = useState([{ key: '', value: '' }]);
+
   const [activeQuotationForEdit, setActiveQuotationForEdit] = useState(null);
   const [editQuotePic, setEditQuotePic] = useState('');
   const [editQuoteValidFrom, setEditQuoteValidFrom] = useState('');
@@ -61,7 +72,7 @@ const Marketing = () => {
 
   if (!context) return null;
   const {
-    customers = [], addCustomer,
+    customers = [], addCustomer, updateCustomer, deleteCustomer,
     prospects = [], addProspect, updateProspect, updateProspectStatus, deleteProspect,
     prospectDrafts = [], generateProspectDraft,
     quotations = [], createQuotation, updateQuotation, approveQuotation, unapproveQuotation, deleteQuotation,
@@ -132,12 +143,36 @@ const Marketing = () => {
       marketingEmail: prospect.marketingEmail || '',
       companyAddress: prospect.companyAddress || ''
     });
+
+    let fields = [];
+    try {
+      const parsed = typeof prospect.customData === 'string' 
+        ? JSON.parse(prospect.customData || '{}') 
+        : (prospect.customData || {});
+      fields = Object.entries(parsed).map(([k, v]) => ({ key: k, value: String(v) }));
+    } catch (e) {
+      console.error("Error parsing prospect customData:", e);
+    }
+    if (fields.length === 0) {
+      fields = [{ key: '', value: '' }];
+    }
+    setEditProspectCustomFields(fields);
   };
 
   const handleProspectEditSubmit = async (e) => {
     if (e) e.preventDefault();
+    const customDataObj = {};
+    editProspectCustomFields.forEach(f => {
+      if (f.key.trim()) {
+        customDataObj[f.key.trim()] = f.value;
+      }
+    });
+
     try {
-      await updateProspect(activeProspectForEdit.id, editProspectData);
+      await updateProspect(activeProspectForEdit.id, {
+        ...editProspectData,
+        customData: customDataObj
+      });
       setActiveProspectForEdit(null);
     } catch (error) {
       console.error("Gagal update prospek:", error);
@@ -147,8 +182,19 @@ const Marketing = () => {
 
   const handleProspectSubmit = (e) => {
     e.preventDefault();
-    addProspect(prospectData);
+    const customDataObj = {};
+    prospectCustomFields.forEach(f => {
+      if (f.key.trim()) {
+        customDataObj[f.key.trim()] = f.value;
+      }
+    });
+
+    addProspect({
+      ...prospectData,
+      customData: customDataObj
+    });
     setProspectData({ name: '', address: '', phone: '', email: '', pic: '', notes: '', description: '', marketingName: '', marketingPhone: '', marketingEmail: '', companyAddress: '' });
+    setProspectCustomFields([{ key: '', value: '' }]);
     setShowProspectForm(false);
   };
 
@@ -304,6 +350,8 @@ const Marketing = () => {
     try {
       if (deleteConfirm.type === 'prospect') {
         await deleteProspect(deleteConfirm.id);
+      } else if (deleteConfirm.type === 'customer') {
+        await deleteCustomer(deleteConfirm.id);
       } else {
         await deleteQuotation(deleteConfirm.id);
       }
@@ -329,7 +377,113 @@ const Marketing = () => {
              id.toLowerCase().includes(term) ||
              pic.toLowerCase().includes(term);
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  const filteredCustomers = customers
+    .filter(c => {
+      const name = c.name || c.customerName || '';
+      const email = c.email || '';
+      const phone = c.phone || '';
+      const id = c.id || '';
+      const address = c.address || '';
+      const term = customerSearchTerm.toLowerCase();
+      
+      let customMatch = false;
+      try {
+        const customObj = typeof c.customData === 'string' ? JSON.parse(c.customData || '{}') : (c.customData || {});
+        customMatch = Object.entries(customObj).some(([key, val]) => 
+          key.toLowerCase().includes(term) || String(val).toLowerCase().includes(term)
+        );
+      } catch (e) {
+        // ignore
+      }
+
+      return name.toLowerCase().includes(term) ||
+             email.toLowerCase().includes(term) ||
+             phone.toLowerCase().includes(term) ||
+             id.toLowerCase().includes(term) ||
+             address.toLowerCase().includes(term) ||
+             customMatch;
+    })
+    .sort((a, b) => (a.name || a.customerName || '').localeCompare(b.name || b.customerName || ''));
+
+  const handleCustomerSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!newCustomerData.name) {
+      alert("Nama pelanggan harus diisi.");
+      return;
+    }
+
+    const customDataObj = {};
+    newCustomerCustomFields.forEach(f => {
+      if (f.key.trim()) {
+        customDataObj[f.key.trim()] = f.value;
+      }
+    });
+
+    try {
+      await addCustomer({
+        ...newCustomerData,
+        customData: customDataObj
+      });
+      toast.success(isID ? 'Pelanggan berhasil ditambahkan!' : 'Customer successfully added!');
+      setNewCustomerData({ name: '', phone: '', email: '', address: '' });
+      setNewCustomerCustomFields([{ key: '', value: '' }]);
+      setShowCustomerForm(false);
+    } catch (error) {
+      console.error("Add customer failed:", error);
+      toast.error(isID ? 'Gagal menambahkan pelanggan' : 'Failed to add customer');
+    }
+  };
+
+  const handleCustomerEditSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!activeCustomerForEdit) return;
+
+    const customDataObj = {};
+    editCustomerCustomFields.forEach(f => {
+      if (f.key.trim()) {
+        customDataObj[f.key.trim()] = f.value;
+      }
+    });
+
+    try {
+      await updateCustomer(activeCustomerForEdit.id, {
+        ...editCustomerData,
+        customData: customDataObj
+      });
+      toast.success(isID ? 'Pelanggan berhasil diperbarui!' : 'Customer successfully updated!');
+      setActiveCustomerForEdit(null);
+    } catch (error) {
+      console.error("Edit customer failed:", error);
+      toast.error(isID ? 'Gagal memperbarui pelanggan' : 'Failed to update customer');
+    }
+  };
+
+  const handleOpenEditCustomerModal = (customer) => {
+    setActiveCustomerForEdit(customer);
+    setEditCustomerData({
+      name: customer.name || '',
+      phone: customer.phone || '',
+      email: customer.email || '',
+      address: customer.address || '',
+    });
+    
+    let fields = [];
+    try {
+      const parsed = typeof customer.customData === 'string' 
+        ? JSON.parse(customer.customData || '{}') 
+        : (customer.customData || {});
+      fields = Object.entries(parsed).map(([k, v]) => ({ key: k, value: String(v) }));
+    } catch (e) {
+      console.error("Error parsing customer customData:", e);
+    }
+    
+    if (fields.length === 0) {
+      fields = [{ key: '', value: '' }];
+    }
+    setEditCustomerCustomFields(fields);
+  };
 
   const handleDownload = (quote) => {
     const relatedProspect = prospects.find(p => p.id === quote.customerId);
@@ -425,7 +579,11 @@ const Marketing = () => {
             >
               <div style={{ fontSize: '3rem', marginBottom: '20px' }}>🗑️</div>
               <h3 style={{ marginBottom: '10px', color: '#ef4444' }}>
-                {deleteConfirm.type === 'prospect' ? 'Hapus Prospek?' : 'Hapus Penawaran?'}
+                {deleteConfirm.type === 'prospect' 
+                  ? 'Hapus Prospek?' 
+                  : deleteConfirm.type === 'customer' 
+                    ? 'Hapus Pelanggan Tersimpan?' 
+                    : 'Hapus Penawaran?'}
               </h3>
               <p style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>
                 <strong style={{ color: 'var(--text)' }}>{deleteConfirm.id}</strong> — {deleteConfirm.name}
@@ -433,7 +591,9 @@ const Marketing = () => {
               <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '30px' }}>
                 {deleteConfirm.type === 'prospect'
                   ? 'Data prospek ini akan dihapus secara permanen.'
-                  : 'Semua data Job Order dan Invoice terkait juga akan dihapus secara permanen.'}
+                  : deleteConfirm.type === 'customer'
+                    ? (t('confirmDeleteCustomer') || 'Apakah Anda yakin ingin menghapus pelanggan ini? Ini tidak akan menghapus data job order atau faktur mereka.')
+                    : 'Semua data Job Order dan Invoice terkait juga akan dihapus secara permanen.'}
                 Tindakan ini tidak dapat dibatalkan.
               </p>
               <div style={{ display: 'flex', gap: '12px' }}>
@@ -739,6 +899,57 @@ const Marketing = () => {
                   <label>{t('prospectJob')}</label>
                   <textarea required rows="2" value={editProspectData.description} onChange={e => setEditProspectData({ ...editProspectData, description: e.target.value })} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '15px', width: '100%', fontFamily: 'inherit' }} />
                 </div>
+                
+                <div style={{ gridColumn: 'span 3', borderTop: '1px solid var(--border)', paddingTop: '20px', marginTop: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h5 style={{ color: 'var(--secondary)', margin: 0, fontWeight: '600' }}>{t('customFields')}</h5>
+                    <button 
+                      type="button" 
+                      onClick={() => setEditProspectCustomFields([...editProspectCustomFields, { key: '', value: '' }])}
+                      className="btn btn-gold" 
+                      style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <Plus size={14} /> {t('addCustomField')}
+                    </button>
+                  </div>
+                  {editProspectCustomFields.map((field, index) => (
+                    <div key={index} style={{ display: 'flex', gap: '15px', marginBottom: '10px', alignItems: 'center' }}>
+                      <input 
+                        placeholder={isID ? "Nama Kolom (misal: NPWP)" : "Field Name (e.g. NPWP)"}
+                        type="text" 
+                        value={field.key} 
+                        onChange={e => {
+                          const updated = [...editProspectCustomFields];
+                          updated[index].key = e.target.value;
+                          setEditProspectCustomFields(updated);
+                        }}
+                        style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px' }}
+                      />
+                      <input 
+                        placeholder={isID ? "Nilai Kolom" : "Field Value"}
+                        type="text" 
+                        value={field.value} 
+                        onChange={e => {
+                          const updated = [...editProspectCustomFields];
+                          updated[index].value = e.target.value;
+                          setEditProspectCustomFields(updated);
+                        }}
+                        style={{ flex: 2, background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px' }}
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const updated = editProspectCustomFields.filter((_, i) => i !== index);
+                          setEditProspectCustomFields(updated.length ? updated : [{ key: '', value: '' }]);
+                        }}
+                        style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '12px', borderRadius: '12px', cursor: 'pointer' }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
                 <div style={{ display: 'flex', gap: '15px', gridColumn: 'span 3', marginTop: '20px' }}>
                   <button type="button" onClick={() => setActiveProspectForEdit(null)} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)' }}>Batal</button>
                   <ButtonWithLoading type="submit" className="btn btn-gold" style={{ flex: 1, background: 'var(--secondary)', color: 'white' }} onClick={handleProspectEditSubmit}>
@@ -751,7 +962,101 @@ const Marketing = () => {
         )}
       </AnimatePresence>
 
-    {/* Draft Modal */}
+      {/* Edit Customer Form Modal */}
+      <AnimatePresence>
+        {activeCustomerForEdit && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.8)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px'
+          }}>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="glass-card" style={{ width: '100%', maxWidth: '900px', padding: '40px', maxHeight: '90vh', overflowY: 'auto' , overflowX: 'auto' }}
+            >
+              <h3 style={{ marginBottom: '25px', color: 'var(--secondary)' }}>{t('editCustomer') || 'Edit Saved Customer'} - {activeCustomerForEdit.name}</h3>
+              <form onSubmit={handleCustomerEditSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+                <div className="input-group">
+                  <label>{t('customerName')}</label>
+                  <input required type="text" value={editCustomerData.name} onChange={e => setEditCustomerData({ ...editCustomerData, name: e.target.value })} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width: '100%' }} />
+                </div>
+                <div className="input-group">
+                  <label>{t('phoneNumber')}</label>
+                  <input type="text" value={editCustomerData.phone} onChange={e => setEditCustomerData({ ...editCustomerData, phone: e.target.value })} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width: '100%' }} />
+                </div>
+                <div className="input-group">
+                  <label>{t('emailAddress')}</label>
+                  <input type="email" value={editCustomerData.email} onChange={e => setEditCustomerData({ ...editCustomerData, email: e.target.value })} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width: '100%' }} />
+                </div>
+                <div className="input-group" style={{ gridColumn: 'span 3' }}>
+                  <label>{t('address')}</label>
+                  <input type="text" value={editCustomerData.address} onChange={e => setEditCustomerData({ ...editCustomerData, address: e.target.value })} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width: '100%' }} />
+                </div>
+                
+                <div style={{ gridColumn: 'span 3', borderTop: '1px solid var(--border)', paddingTop: '20px', marginTop: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h5 style={{ color: 'var(--secondary)', margin: 0, fontWeight: '600' }}>{t('customFields')}</h5>
+                    <button 
+                      type="button" 
+                      onClick={() => setEditCustomerCustomFields([...editCustomerCustomFields, { key: '', value: '' }])}
+                      className="btn btn-gold" 
+                      style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <Plus size={14} /> {t('addCustomField')}
+                    </button>
+                  </div>
+                  {editCustomerCustomFields.map((field, index) => (
+                    <div key={index} style={{ display: 'flex', gap: '15px', marginBottom: '10px', alignItems: 'center' }}>
+                      <input 
+                        placeholder={isID ? "Nama Kolom (misal: NPWP)" : "Field Name (e.g. NPWP)"}
+                        type="text" 
+                        value={field.key} 
+                        onChange={e => {
+                          const updated = [...editCustomerCustomFields];
+                          updated[index].key = e.target.value;
+                          setEditCustomerCustomFields(updated);
+                        }}
+                        style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px' }}
+                      />
+                      <input 
+                        placeholder={isID ? "Nilai Kolom" : "Field Value"}
+                        type="text" 
+                        value={field.value} 
+                        onChange={e => {
+                          const updated = [...editCustomerCustomFields];
+                          updated[index].value = e.target.value;
+                          setEditCustomerCustomFields(updated);
+                        }}
+                        style={{ flex: 2, background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px' }}
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const updated = editCustomerCustomFields.filter((_, i) => i !== index);
+                          setEditCustomerCustomFields(updated.length ? updated : [{ key: '', value: '' }]);
+                        }}
+                        style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '12px', borderRadius: '12px', cursor: 'pointer' }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', gap: '15px', gridColumn: 'span 3', marginTop: '20px' }}>
+                  <button type="button" onClick={() => setActiveCustomerForEdit(null)} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)' }}>Batal</button>
+                  <ButtonWithLoading type="submit" className="btn btn-gold" style={{ flex: 1, background: 'var(--secondary)', color: 'white' }} onClick={handleCustomerEditSubmit}>
+                    Simpan Perubahan
+                  </ButtonWithLoading>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Draft Modal */}
       <AnimatePresence>
         {selectedDraft && (
           <div style={{
@@ -959,6 +1264,17 @@ const Marketing = () => {
             {t('prospectCustomers')}
             {activeTab === 'prospects' && <motion.div layoutId="activeTab" style={{ position: 'absolute', bottom: -1, left: 0, right: 0, background: 'var(--secondary)', height: '2px' }} />}
           </button>
+          <button
+            onClick={() => setActiveTab('savedCustomers')}
+            style={{
+              background: 'none', border: 'none', padding: '10px 0',
+              color: activeTab === 'savedCustomers' ? 'var(--secondary)' : 'var(--text-muted)',
+              fontSize: '1rem', fontWeight: '600', cursor: 'pointer', position: 'relative', transition: 'all 0.3s'
+            }}
+          >
+            {t('savedCustomers') || 'Saved Customers'}
+            {activeTab === 'savedCustomers' && <motion.div layoutId="activeTab" style={{ position: 'absolute', bottom: -1, left: 0, right: 0, background: 'var(--secondary)', height: '2px' }} />}
+          </button>
         </div>
 
         <div>
@@ -966,6 +1282,11 @@ const Marketing = () => {
             {canWrite && activeTab === 'prospects' && (
               <button className="btn btn-gold" onClick={() => setShowProspectForm(!showProspectForm)} style={{ marginBottom: '10px' }}>
                 <Plus size={18} /> {showProspectForm ? t('cancel') : t('addProspect')}
+              </button>
+            )}
+            {canWrite && activeTab === 'savedCustomers' && (
+              <button className="btn btn-gold" onClick={() => setShowCustomerForm(!showCustomerForm)} style={{ marginBottom: '10px' }}>
+                <Plus size={18} /> {showCustomerForm ? t('cancel') : t('addCustomer')}
               </button>
             )}
           </div>
@@ -997,6 +1318,50 @@ const Marketing = () => {
             className="glass-card" style={{ padding: '30px', overflow: 'hidden' , overflowX: 'auto' }}
           >
             <form onSubmit={handleProspectSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+              <div className="input-group" style={{ gridColumn: 'span 3', borderBottom: '1px dashed var(--border)', paddingBottom: '15px', marginBottom: '10px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--secondary)' }}>
+                  <Users size={16} /> {t('loadCustomer') || 'Load Saved Customer Data'}
+                </label>
+                <select
+                  value=""
+                  onChange={e => {
+                    const selectedId = e.target.value;
+                    if (!selectedId) return;
+                    const cust = customers.find(c => c.id === selectedId);
+                    if (cust) {
+                      setProspectData({
+                        ...prospectData,
+                        name: cust.name || '',
+                        phone: cust.phone || '',
+                        email: cust.email || '',
+                        address: cust.address || '',
+                      });
+
+                      let fields = [];
+                      try {
+                        const parsed = typeof cust.customData === 'string' 
+                          ? JSON.parse(cust.customData || '{}') 
+                          : (cust.customData || {});
+                        fields = Object.entries(parsed).map(([k, v]) => ({ key: k, value: String(v) }));
+                      } catch (e) {
+                        console.error("Error parsing loaded customer customData:", e);
+                      }
+                      if (fields.length === 0) {
+                        fields = [{ key: '', value: '' }];
+                      }
+                      setProspectCustomFields(fields);
+
+                      toast.success(isID ? 'Data pelanggan berhasil dimuat!' : 'Customer data loaded successfully!');
+                    }
+                  }}
+                  style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width: '100%', cursor: 'pointer', fontWeight: '600' }}
+                >
+                  <option value="">{isID ? '-- Pilih Pelanggan untuk Memuat Data --' : '-- Select Customer to Load Data --'}</option>
+                  {customers.map(c => (
+                    <option key={c.id} value={c.id} style={{ background: 'var(--bg)', color: 'var(--text)' }}>{c.name} ({c.id})</option>
+                  ))}
+                </select>
+              </div>
               <div className="input-group">
                 <label>{t('customerName')}</label>
                 <input required type="text" value={prospectData.name} onChange={e => setProspectData({ ...prospectData, name: e.target.value })} />
@@ -1059,8 +1424,139 @@ const Marketing = () => {
                 <label>{t('prospectJob')}</label>
                 <textarea required rows="2" value={prospectData.description} onChange={e => setProspectData({ ...prospectData, description: e.target.value })} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '15px', width: '100%', fontFamily: 'inherit' }} />
               </div>
+              
+              <div style={{ gridColumn: 'span 3', borderTop: '1px solid var(--border)', paddingTop: '20px', marginTop: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                  <h5 style={{ color: 'var(--secondary)', margin: 0, fontWeight: '600' }}>{t('customFields')}</h5>
+                  <button 
+                    type="button" 
+                    onClick={() => setProspectCustomFields([...prospectCustomFields, { key: '', value: '' }])}
+                    className="btn btn-gold" 
+                    style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Plus size={14} /> {t('addCustomField')}
+                  </button>
+                </div>
+                {prospectCustomFields.map((field, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '15px', marginBottom: '10px', alignItems: 'center' }}>
+                    <input 
+                      placeholder={isID ? "Nama Kolom (misal: NPWP)" : "Field Name (e.g. NPWP)"}
+                      type="text" 
+                      value={field.key} 
+                      onChange={e => {
+                        const updated = [...prospectCustomFields];
+                        updated[index].key = e.target.value;
+                        setProspectCustomFields(updated);
+                      }}
+                      style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px' }}
+                    />
+                    <input 
+                      placeholder={isID ? "Nilai Kolom" : "Field Value"}
+                      type="text" 
+                      value={field.value} 
+                      onChange={e => {
+                        const updated = [...prospectCustomFields];
+                        updated[index].value = e.target.value;
+                        setProspectCustomFields(updated);
+                      }}
+                      style={{ flex: 2, background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px' }}
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const updated = prospectCustomFields.filter((_, i) => i !== index);
+                        setProspectCustomFields(updated.length ? updated : [{ key: '', value: '' }]);
+                      }}
+                      style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '12px', borderRadius: '12px', cursor: 'pointer' }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
               <ButtonWithLoading className="btn btn-gold" style={{ gridColumn: 'span 3' }} onClick={handleProspectSubmit}>
                 {t('addProspect')}
+              </ButtonWithLoading>
+            </form>
+          </motion.div>
+        )}
+
+        {showCustomerForm && activeTab === 'savedCustomers' && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            className="glass-card" style={{ padding: '30px', overflow: 'hidden' , overflowX: 'auto', marginBottom: '25px' }}
+          >
+            <form onSubmit={handleCustomerSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+              <div className="input-group">
+                <label>{t('customerName')}</label>
+                <input required type="text" value={newCustomerData.name} onChange={e => setNewCustomerData({ ...newCustomerData, name: e.target.value })} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width: '100%' }} />
+              </div>
+              <div className="input-group">
+                <label>{t('phoneNumber')}</label>
+                <input type="text" value={newCustomerData.phone} onChange={e => setNewCustomerData({ ...newCustomerData, phone: e.target.value })} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width: '100%' }} />
+              </div>
+              <div className="input-group">
+                <label>{t('emailAddress')}</label>
+                <input type="email" value={newCustomerData.email} onChange={e => setNewCustomerData({ ...newCustomerData, email: e.target.value })} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width: '100%' }} />
+              </div>
+              <div className="input-group" style={{ gridColumn: 'span 3' }}>
+                <label>{t('address')}</label>
+                <input type="text" value={newCustomerData.address} onChange={e => setNewCustomerData({ ...newCustomerData, address: e.target.value })} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width: '100%' }} />
+              </div>
+              
+              <div style={{ gridColumn: 'span 3', borderTop: '1px solid var(--border)', paddingTop: '20px', marginTop: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                  <h5 style={{ color: 'var(--secondary)', margin: 0, fontWeight: '600' }}>{t('customFields')}</h5>
+                  <button 
+                    type="button" 
+                    onClick={() => setNewCustomerCustomFields([...newCustomerCustomFields, { key: '', value: '' }])}
+                    className="btn btn-gold" 
+                    style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Plus size={14} /> {t('addCustomField')}
+                  </button>
+                </div>
+                {newCustomerCustomFields.map((field, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '15px', marginBottom: '10px', alignItems: 'center' }}>
+                    <input 
+                      placeholder={isID ? "Nama Kolom (misal: NPWP)" : "Field Name (e.g. NPWP)"}
+                      type="text" 
+                      value={field.key} 
+                      onChange={e => {
+                        const updated = [...newCustomerCustomFields];
+                        updated[index].key = e.target.value;
+                        setNewCustomerCustomFields(updated);
+                      }}
+                      style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px' }}
+                    />
+                    <input 
+                      placeholder={isID ? "Nilai Kolom" : "Field Value"}
+                      type="text" 
+                      value={field.value} 
+                      onChange={e => {
+                        const updated = [...newCustomerCustomFields];
+                        updated[index].value = e.target.value;
+                        setNewCustomerCustomFields(updated);
+                      }}
+                      style={{ flex: 2, background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px' }}
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const updated = newCustomerCustomFields.filter((_, i) => i !== index);
+                        setNewCustomerCustomFields(updated.length ? updated : [{ key: '', value: '' }]);
+                      }}
+                      style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '12px', borderRadius: '12px', cursor: 'pointer' }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <ButtonWithLoading className="btn btn-gold" style={{ gridColumn: 'span 3' }} onClick={handleCustomerSubmit}>
+                {t('addCustomer')}
               </ButtonWithLoading>
             </form>
           </motion.div>
@@ -1136,10 +1632,10 @@ const Marketing = () => {
                   })
                   .sort((a, b) => {
                     if (jobOrderSortBy === 'created_desc') {
-                      return getQuotationTime(b) - getQuotationTime(a) || b.id.localeCompare(a.id);
+                      return getQuotationTime(b) - getQuotationTime(a) || (b.id || '').localeCompare(a.id || '');
                     }
                     if (jobOrderSortBy === 'created_asc') {
-                      return getQuotationTime(a) - getQuotationTime(b) || a.id.localeCompare(b.id);
+                      return getQuotationTime(a) - getQuotationTime(b) || (a.id || '').localeCompare(b.id || '');
                     }
                     if (jobOrderSortBy === 'company_asc') {
                       return (a.customerName || '').localeCompare(b.customerName || '');
@@ -1148,10 +1644,10 @@ const Marketing = () => {
                       return (b.customerName || '').localeCompare(a.customerName || '');
                     }
                     if (jobOrderSortBy === 'id_asc') {
-                      return a.id.localeCompare(b.id);
+                      return (a.id || '').localeCompare(b.id || '');
                     }
                     if (jobOrderSortBy === 'id_desc') {
-                      return b.id.localeCompare(a.id);
+                      return (b.id || '').localeCompare(a.id || '');
                     }
                     if (jobOrderSortBy === 'amount_desc') {
                       return (b.total || b.rate || 0) - (a.total || a.rate || 0);
@@ -1282,10 +1778,10 @@ const Marketing = () => {
                   })
                   .sort((a, b) => {
                     if (quotationSortBy === 'created_desc') {
-                      return getQuotationTime(b) - getQuotationTime(a) || b.id.localeCompare(a.id);
+                      return getQuotationTime(b) - getQuotationTime(a) || (b.id || '').localeCompare(a.id || '');
                     }
                     if (quotationSortBy === 'created_asc') {
-                      return getQuotationTime(a) - getQuotationTime(b) || a.id.localeCompare(b.id);
+                      return getQuotationTime(a) - getQuotationTime(b) || (a.id || '').localeCompare(b.id || '');
                     }
                     if (quotationSortBy === 'company_asc') {
                       return (a.customerName || '').localeCompare(b.customerName || '');
@@ -1294,10 +1790,10 @@ const Marketing = () => {
                       return (b.customerName || '').localeCompare(a.customerName || '');
                     }
                     if (quotationSortBy === 'id_asc') {
-                      return a.id.localeCompare(b.id);
+                      return (a.id || '').localeCompare(b.id || '');
                     }
                     if (quotationSortBy === 'id_desc') {
-                      return b.id.localeCompare(a.id);
+                      return (b.id || '').localeCompare(a.id || '');
                     }
                     if (quotationSortBy === 'amount_desc') {
                       return (b.total || b.rate || 0) - (a.total || a.rate || 0);
@@ -1380,6 +1876,114 @@ const Marketing = () => {
               </tbody>
             </table>
 </div></div>
+          </div>
+        ) : activeTab === 'savedCustomers' ? (
+          <div className="glass-card" style={{ padding: '25px', overflowX: 'auto' }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px", flexWrap: "wrap", gap: "15px" }}>
+              <h4 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+                <Users size={20} style={{ color: 'var(--secondary)' }} />
+                {t('savedCustomers') || 'Saved Customers'}
+              </h4>
+              <div style={{ position: 'relative', width: '300px' }}>
+                <input 
+                  type="text" 
+                  placeholder={isID ? "Cari pelanggan..." : "Search customers..."} 
+                  value={customerSearchTerm} 
+                  onChange={(e) => setCustomerSearchTerm(e.target.value)} 
+                  style={{ padding: '10px 15px 10px 45px', borderRadius: '100px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', width: '100%' }} 
+                />
+                <Search size={18} style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              </div>
+            </div>
+            <div className="table-container">
+              <div className="table-responsive-wrapper" style={{ overflowX: 'auto', width: '100%' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--glass-border)' }}>
+                      <th style={{ padding: '15px' }}>ID</th>
+                      <th style={{ padding: '15px' }}>{t('customerName')}</th>
+                      <th style={{ padding: '15px' }}>{t('address')}</th>
+                      <th style={{ padding: '15px' }}>{t('customFields')}</th>
+                      <th style={{ padding: '15px' }}>{t('actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCustomers.map(cust => {
+                      let customFieldsList = [];
+                      try {
+                        const customObj = typeof cust.customData === 'string' ? JSON.parse(cust.customData || '{}') : (cust.customData || {});
+                        customFieldsList = Object.entries(customObj);
+                      } catch (e) {
+                        // ignore
+                      }
+
+                      return (
+                        <tr key={cust.id} style={{ borderBottom: '1px solid var(--glass-border)' }} className="table-row-hover">
+                          <td style={{ padding: '15px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{cust.id}</td>
+                          <td style={{ padding: '15px' }}>
+                            <div style={{ fontWeight: '600', fontSize: '0.95rem' }}>{cust.name}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{cust.email || '-'} | {cust.phone || '-'}</div>
+                          </td>
+                          <td style={{ padding: '15px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>{cust.address || '-'}</td>
+                          <td style={{ padding: '15px' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                              {customFieldsList.length > 0 ? (
+                                customFieldsList.map(([k, v]) => (
+                                  <span key={k} style={{ 
+                                    padding: '4px 8px', 
+                                    background: 'rgba(212, 175, 55, 0.1)', 
+                                    border: '1px solid rgba(212, 175, 55, 0.2)', 
+                                    color: 'var(--secondary)', 
+                                    borderRadius: '6px', 
+                                    fontSize: '0.75rem', 
+                                    fontWeight: '500' 
+                                  }}>
+                                    <strong>{k}</strong>: {String(v)}
+                                  </span>
+                                ))
+                              ) : (
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>-</span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ padding: '15px' }}>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              {canWrite && (
+                                <button
+                                  className="btn-icon"
+                                  style={{ color: 'var(--secondary)', background: 'rgba(212, 175, 55, 0.1)', height: '28px', width: '28px' }}
+                                  onClick={() => handleOpenEditCustomerModal(cust)}
+                                  title="Edit Customer"
+                                >
+                                  <Edit size={14} />
+                                </button>
+                              )}
+                              {user?.role === 'owner' && (
+                                <button
+                                  className="btn-icon"
+                                  style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', height: '28px', width: '28px' }}
+                                  onClick={() => setDeleteConfirm({ id: cust.id, name: cust.name, type: 'customer' })}
+                                  title="Delete Customer"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {filteredCustomers.length === 0 && (
+                      <tr>
+                        <td colSpan="5" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                          {t('noData') || 'No customers found.'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="glass-card" style={{ padding: '25px', overflowX: 'auto' }}>

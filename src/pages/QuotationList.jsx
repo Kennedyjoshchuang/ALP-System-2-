@@ -36,16 +36,16 @@ const QuotationList = () => {
 
   const filteredQuotations = quotations
     .filter(q => 
-      q.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (q.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (q.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (q.pic && q.pic.toLowerCase().includes(searchTerm.toLowerCase()))
     )
     .sort((a, b) => {
       if (sortBy === 'created_desc') {
-        return getQuotationTime(b) - getQuotationTime(a) || b.id.localeCompare(a.id);
+        return getQuotationTime(b) - getQuotationTime(a) || (b.id || '').localeCompare(a.id || '');
       }
       if (sortBy === 'created_asc') {
-        return getQuotationTime(a) - getQuotationTime(b) || a.id.localeCompare(b.id);
+        return getQuotationTime(a) - getQuotationTime(b) || (a.id || '').localeCompare(b.id || '');
       }
       if (sortBy === 'company_asc') {
         return (a.customerName || '').localeCompare(b.customerName || '');
@@ -54,10 +54,10 @@ const QuotationList = () => {
         return (b.customerName || '').localeCompare(a.customerName || '');
       }
       if (sortBy === 'id_asc') {
-        return a.id.localeCompare(b.id);
+        return (a.id || '').localeCompare(b.id || '');
       }
       if (sortBy === 'id_desc') {
-        return b.id.localeCompare(a.id);
+        return (b.id || '').localeCompare(a.id || '');
       }
       if (sortBy === 'amount_desc') {
         return (b.total || b.rate || 0) - (a.total || a.rate || 0);

@@ -120,10 +120,10 @@ const Executor = () => {
     })
     .sort((a, b) => {
       if (sortBy === 'created_desc') {
-        return getJoTimestamp(b) - getJoTimestamp(a) || b.id.localeCompare(a.id);
+        return getJoTimestamp(b) - getJoTimestamp(a) || (b.id || '').localeCompare(a.id || '');
       }
       if (sortBy === 'created_asc') {
-        return getJoTimestamp(a) - getJoTimestamp(b) || a.id.localeCompare(b.id);
+        return getJoTimestamp(a) - getJoTimestamp(b) || (a.id || '').localeCompare(b.id || '');
       }
       if (sortBy === 'company_asc') {
         return (a.customerName || '').localeCompare(b.customerName || '');
@@ -132,10 +132,10 @@ const Executor = () => {
         return (b.customerName || '').localeCompare(a.customerName || '');
       }
       if (sortBy === 'id_asc') {
-        return a.id.localeCompare(b.id);
+        return (a.id || '').localeCompare(b.id || '');
       }
       if (sortBy === 'id_desc') {
-        return b.id.localeCompare(a.id);
+        return (b.id || '').localeCompare(a.id || '');
       }
       return 0;
     });

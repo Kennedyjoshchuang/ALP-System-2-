@@ -304,10 +304,17 @@ app.get('/api/customers', async (req, res) => {
 });
 
 app.post('/api/customers', async (req, res) => {
-  const { id, name, phone, email, address } = req.body;
-  const { error } = await supabase.from('customers').insert({ id, name, phone, email, address });
+  const { id, name, phone, email, address, customData } = req.body;
+  const { error } = await supabase.from('customers').insert({ id, name, phone, email, address, customData: customData || {} });
   if (error) return handleError(res, error, 'POST customers');
   res.status(201).json({ id });
+});
+
+app.put('/api/customers/:id', async (req, res) => {
+  const { name, phone, email, address, customData } = req.body;
+  const { error } = await supabase.from('customers').update({ name, phone, email, address, customData: customData || {} }).eq('id', req.params.id);
+  if (error) return handleError(res, error, 'PUT customers');
+  res.sendStatus(204);
 });
 
 app.delete('/api/customers/:id', async (req, res) => {
@@ -324,10 +331,11 @@ app.get('/api/prospects', async (req, res) => {
 });
 
 app.post('/api/prospects', async (req, res) => {
-  const { id, name, phone, email, address, pic, notes, description, marketingName, marketingPhone, marketingEmail, companyAddress, date, status } = req.body;
+  const { id, name, phone, email, address, pic, notes, description, marketingName, marketingPhone, marketingEmail, companyAddress, date, status, customData } = req.body;
   const prospect = cleanPayload({
     id, name, phone, email, address, pic, notes, description,
-    marketingName, marketingPhone, marketingEmail, companyAddress, date, status
+    marketingName, marketingPhone, marketingEmail, companyAddress, date, status,
+    customData: customData || {}
   });
   const { error } = await supabase.from('prospects').insert(prospect);
   if (error) return handleError(res, error, 'POST prospects');

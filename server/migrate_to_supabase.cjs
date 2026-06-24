@@ -15,8 +15,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 const sqliteDb = new Database(path.join(__dirname, 'alp_system.db'));
 
 const tablesToMigrate = [
-  { name: 'customers' },
-  { name: 'prospects' },
+  { name: 'customers', jsonCols: ['customData'] },
+  { name: 'prospects', jsonCols: ['customData'] },
   { name: 'prospect_drafts' },
   { name: 'quotations', jsonCols: ['items'] },
   { name: 'job_orders', jsonCols: ['photos', 'costs'] },

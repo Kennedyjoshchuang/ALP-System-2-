@@ -10,7 +10,8 @@ db.exec(`
     name TEXT NOT NULL,
     phone TEXT,
     email TEXT,
-    address TEXT
+    address TEXT,
+    customData TEXT DEFAULT '{}'
   );
 
   CREATE TABLE IF NOT EXISTS prospects (
@@ -26,7 +27,8 @@ db.exec(`
     marketingPhone TEXT,
     marketingEmail TEXT,
     date TEXT,
-    status TEXT
+    status TEXT,
+    customData TEXT DEFAULT '{}'
   );
 
   CREATE TABLE IF NOT EXISTS prospect_drafts (
@@ -193,6 +195,16 @@ try {
 try {
   db.prepare('ALTER TABLE job_orders ADD COLUMN completedAt TEXT').run();
   console.log('Added completedAt to job_orders');
+} catch (e) { /* column likely exists */ }
+
+try {
+  db.prepare("ALTER TABLE customers ADD COLUMN customData TEXT DEFAULT '{}'").run();
+  console.log('Added customData to customers');
+} catch (e) { /* column likely exists */ }
+
+try {
+  db.prepare("ALTER TABLE prospects ADD COLUMN customData TEXT DEFAULT '{}'").run();
+  console.log('Added customData to prospects');
 } catch (e) { /* column likely exists */ }
 
 module.exports = db;

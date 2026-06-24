@@ -30,10 +30,10 @@ export function useCustomers() {
   // Mutation to add a new customer
   const addCustomerMutation = useMutation({
     mutationFn: (newCustomer) => {
-      // Ensure the payload follows the expected shape; generate an ID client‑side for now
+      // Ensure the payload follows the expected shape; generate an ID client‑side if not provided
       const payload = {
         ...newCustomer,
-        id: `CUST-${Date.now().toString().slice(-4)}`,
+        id: newCustomer.id || `CUST-${Date.now().toString().slice(-4)}`,
       };
       return apiRequest("customers", {
         method: "POST",
@@ -44,7 +44,8 @@ export function useCustomers() {
     onMutate: async (newCustomer) => {
       await queryClient.cancelQueries({ queryKey: CUSTOMERS_QUERY_KEY });
       const previous = queryClient.getQueryData(CUSTOMERS_QUERY_KEY) || [];
-      queryClient.setQueryData(CUSTOMERS_QUERY_KEY, [...previous, newCustomer]);
+      const tempId = newCustomer.id || `CUST-${Date.now().toString().slice(-4)}`;
+      queryClient.setQueryData(CUSTOMERS_QUERY_KEY, [...previous, { ...newCustomer, id: tempId }]);
       return { previous };
     },
     // If the mutation fails, roll back to previous data
@@ -60,6 +61,35 @@ export function useCustomers() {
     },
   });
 
+  // Mutation to update an existing customer
+  const updateCustomerMutation = useMutation({
+    mutationFn: (updatedCustomer) => {
+      return apiRequest(`customers/${updatedCustomer.id}`, {
+        method: "PUT",
+        body: JSON.stringify(updatedCustomer),
+      });
+    },
+    // Optimistically update the cache
+    onMutate: async (updatedCustomer) => {
+      await queryClient.cancelQueries({ queryKey: CUSTOMERS_QUERY_KEY });
+      const previous = queryClient.getQueryData(CUSTOMERS_QUERY_KEY) || [];
+      queryClient.setQueryData(
+        CUSTOMERS_QUERY_KEY,
+        previous.map((c) => (c.id === updatedCustomer.id ? { ...c, ...updatedCustomer } : c))
+      );
+      return { previous };
+    },
+    onError: (err, updatedCustomer, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(CUSTOMERS_QUERY_KEY, context.previous);
+      }
+      console.error("Failed to update customer:", err);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: CUSTOMERS_QUERY_KEY });
+    },
+  });
+
   return {
     customers,
     isLoading,
@@ -68,6 +98,8 @@ export function useCustomers() {
     refetch,
     addCustomer: addCustomerMutation.mutateAsync,
     addCustomerStatus: addCustomerMutation.status,
+    updateCustomer: updateCustomerMutation.mutateAsync,
+    updateCustomerStatus: updateCustomerMutation.status,
   };
 }
 

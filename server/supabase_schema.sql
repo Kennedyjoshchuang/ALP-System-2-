@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS customers (
     name TEXT NOT NULL,
     phone TEXT,
     email TEXT,
-    address TEXT
+    address TEXT,
+    customData JSONB DEFAULT '{}'::jsonb
 );
 
 -- 2. Prospects
@@ -27,7 +28,8 @@ CREATE TABLE IF NOT EXISTS prospects (
     marketingEmail TEXT,
     companyAddress TEXT,
     date TEXT,
-    status TEXT
+    status TEXT,
+    customData JSONB DEFAULT '{}'::jsonb
 );
 
 -- 3. Prospect Drafts
@@ -225,3 +227,7 @@ CREATE TABLE IF NOT EXISTS company_bank_accounts (
     accountName TEXT NOT NULL,
     isDefault BOOLEAN DEFAULT false
 );
+
+-- Migration query to add customData to existing customers & prospects tables:
+-- ALTER TABLE customers ADD COLUMN IF NOT EXISTS "customData" JSONB DEFAULT '{}'::jsonb;
+-- ALTER TABLE prospects ADD COLUMN IF NOT EXISTS "customData" JSONB DEFAULT '{}'::jsonb;
