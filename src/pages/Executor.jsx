@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { Truck, Camera, CheckCircle2, Package, History, PlayCircle, X, Search, FileSpreadsheet, Plus, FileText, Printer, Trash2 } from 'lucide-react';
+import { Truck, Camera, CheckCircle2, Package, History, PlayCircle, X, Search, FileSpreadsheet, Plus, FileText, Printer, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
@@ -69,6 +69,7 @@ const Executor = () => {
   const [verifyError, setVerifyError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [localData, setLocalData] = useState({}); // { [joId]: { containerNo: [], vehicleNo: [], driverName: [], activityStatus: '' } }
+  const [expandedGroups, setExpandedGroups] = useState({});
 
   const [tick, setTick] = useState(0);
   React.useEffect(() => {
@@ -500,284 +501,328 @@ const Executor = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredJOs.map(jo => (
-              <React.Fragment key={jo.id}>
-                <tr style={{ borderBottom: '1px solid var(--glass-border)', cursor: 'pointer' }} className="table-row-hover" onClick={() => toggleRow(jo)}>
-                  <td style={{ padding: '15px', fontWeight: '800', color: 'var(--secondary)' }}>{jo.id}</td>
-                  <td style={{ padding: '15px' }}>
-                    <div style={{ fontWeight: '600' }}>{jo.customerName}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}</div>
-                  </td>
-                  <td style={{ padding: '15px', fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {jo.jobDescription}
-                  </td>
-                  <td style={{ padding: '15px' }}>
-                    <div style={{ fontSize: '0.85rem' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>{isID ? 'K:' : 'C:'}</span> {Array.isArray(jo.containerNo) ? jo.containerNo.join(', ') : jo.containerNo || '-'}
-                    </div>
-                    <div style={{ fontSize: '0.85rem' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>{isID ? 'Knd:' : 'V:'}</span> {Array.isArray(jo.vehicleNo) ? jo.vehicleNo.join(', ') : jo.vehicleNo || '-'}
-                    </div>
-                  </td>
-                  <td style={{ padding: '15px', fontSize: '0.9rem', fontWeight: '500' }}>
-                    {formatDuration(jo.dispatchedAt, jo.completedAt, t, language)}
-                  </td>
-                  <td style={{ padding: '15px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: activeTab === 'active' ? '#f59e0b' : '#10b981' }} />
-                      <span style={{ fontWeight: '600', color: activeTab === 'active' ? '#f59e0b' : '#10b981', fontSize: '0.9rem' }}>
-                        {jo.activityStatus || (activeTab === 'active' ? (isID ? 'Menunggu Pembaruan...' : 'Pending Update...') : (isID ? 'Selesai' : 'Done'))}
-                      </span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '15px', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px', color: 'var(--text-muted)' }}>
-                      <Camera size={16} />
-                      <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>{jo.photos?.length || 0}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '15px', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                      {activeTab === 'active' ? (
-                        canWrite ? (
-                          <ButtonWithLoading 
-                            className="btn btn-gold" 
-                            style={{ padding: '6px 12px', fontSize: '0.75rem' }}
-                            onClick={(e) => { e.stopPropagation(); return handleDone(jo); }}
-                          >
-                            {isID ? 'Selesai' : 'Done'}
-                          </ButtonWithLoading>
-                        ) : (
-                          <span className="badge badge-pending" style={{ fontSize: '0.7rem' }}>{isID ? 'Aktif' : 'Active'}</span>
-                        )
-                      ) : (
-                        <span className="badge badge-done" style={{ fontSize: '0.7rem' }}>{isID ? 'Diarsipkan' : 'Archived'}</span>
-                      )}
-                      <button 
-                        className="btn-icon" 
-                        style={{ width: '38px', height: '38px', color: 'var(--secondary)', background: 'rgba(212, 175, 55, 0.1)', border: '1px solid rgba(212, 175, 55, 0.3)' }}
-                        onClick={(e) => { e.stopPropagation(); navigate(`/executor/surat-jalan/${jo.id}`); }}
-                        title={isID ? "Lihat Surat Jalan" : "View Delivery Order"}
-                      >
-                        <FileText size={20} />
-                      </button>
-                      <button 
-                        className="btn-icon" 
-                        style={{ width: '38px', height: '38px', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)' }}
-                        onClick={(e) => { e.stopPropagation(); navigate(`/executor/surat-jalan/${jo.id}?print=true`); }}
-                        title={isID ? "Cetak Surat Jalan" : "Print Delivery Order"}
-                      >
-                        <Printer size={20} />
-                      </button>
-                      {activeTab === 'records' && canWrite && (
-                        <button 
-                          className="btn-icon" 
-                          style={{ width: '38px', height: '38px', color: 'var(--gold-metallic)', background: 'rgba(212, 175, 55, 0.1)', border: '1px solid rgba(212, 175, 55, 0.3)' }}
-                          onClick={(e) => { e.stopPropagation(); toggleRow(jo); }}
-                          title={isID ? "Ubah Catatan Data" : "Edit Records Data"}
-                        >
-                          <FileText size={20} />
-                        </button>
-                      )}
-                      {activeTab === 'records' && canWrite && (
-                        <button
-                          className="btn-icon"
-                          style={{ width: '38px', height: '38px', color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
-                          onClick={(e) => { e.stopPropagation(); setJoToDelete(jo); setVerifyCode(''); setVerifyError(''); }}
-                          title={isID ? "Hapus Catatan JO" : "Delete JO Record"}
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+            {(() => {
+              // Grouping by quotationId
+              const groups = {};
+              filteredJOs.forEach(jo => {
+                const qId = jo.quotationId || 'direct';
+                if (!groups[qId]) {
+                  groups[qId] = {
+                    quotationId: qId,
+                    customerName: jo.customerName || 'Direct Customer',
+                    jobOrders: []
+                  };
+                }
+                groups[qId].jobOrders.push(jo);
+              });
+
+              const groupedJOs = Object.values(groups);
+
+              return groupedJOs.map(group => {
+                const isGroupExpanded = expandedGroups[group.quotationId] !== false;
+                const totalJOs = group.jobOrders.length;
+                const doneJOs = group.jobOrders.filter(j => j.status === 'done').length;
                 
-                {/* Expandable Row for Editing (only for active or when clicked) */}
-                <AnimatePresence>
-                  {uploadingForId === jo.id && (
-                    <tr>
-                      <td colSpan="8" style={{ padding: 0 }}>
-                        <motion.div 
-                          initial={{ height: 0, opacity: 0 }} 
-                          animate={{ height: 'auto', opacity: 1 }} 
-                          exit={{ height: 0, opacity: 0 }} 
-                          style={{ overflow: 'hidden', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--secondary)' }}
-                        >
-                          <div className="grid-responsive-2" style={{ padding: '25px' }}>
-                            <div style={{ display: 'grid', gap: '20px' }}>
-                              <div className="grid-responsive-3">
-                                {/* Multi Container */}
-                                <div className="input-group">
-                                  <label>{isID ? 'Nomor Kontainer' : 'Container Number'} <span style={{ color: '#ef4444' }}>*</span></label>
-                                  {(localData[jo.id]?.containerNo || []).map((c, i, arr) => (
-                                    <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
-                                      <input disabled={!canWrite} type="text" value={c} onChange={e => handleLocalListItemUpdate(jo.id, 'containerNo', i, e.target.value)} placeholder="CONT-123456" />
-                                      {arr.length > 1 && canWrite && (
-                                        <button className="btn-icon" onClick={() => removeLocalListItem(jo.id, 'containerNo', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
-                                          <X size={12} />
-                                        </button>
-                                      )}
-                                      {canWrite && (
-                                        <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'containerNo')} style={{ padding: '5px', height: 'auto', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} title={isID ? "Tambah Kontainer" : "Add Container"}>
-                                          <Plus size={12} />
-                                        </button>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                                
-                                {/* Multi Vehicle */}
-                                <div className="input-group">
-                                  <label>{isID ? 'Nomor Kendaraan' : 'Vehicle Number'} <span style={{ color: '#ef4444' }}>*</span></label>
-                                  {(localData[jo.id]?.vehicleNo || []).map((v, i, arr) => (
-                                    <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
-                                      <input disabled={!canWrite} type="text" value={v} onChange={e => handleLocalListItemUpdate(jo.id, 'vehicleNo', i, e.target.value)} placeholder="B 1234 ABC" />
-                                      {arr.length > 1 && canWrite && (
-                                        <button className="btn-icon" onClick={() => removeLocalListItem(jo.id, 'vehicleNo', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
-                                          <X size={12} />
-                                        </button>
-                                      )}
-                                      {canWrite && (
-                                        <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'vehicleNo')} style={{ padding: '5px', height: 'auto', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} title={isID ? "Tambah Kendaraan" : "Add Vehicle"}>
-                                          <Plus size={12} />
-                                        </button>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
- 
-                                {/* Multi Driver */}
-                                <div className="input-group">
-                                  <label>{isID ? 'Nama Sopir' : 'Driver Name'} <span style={{ color: '#ef4444' }}>*</span></label>
-                                  {(localData[jo.id]?.driverName || []).map((d, i, arr) => (
-                                    <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
-                                      <input disabled={!canWrite} type="text" value={d} onChange={e => handleLocalListItemUpdate(jo.id, 'driverName', i, e.target.value)} placeholder={isID ? "Nama Sopir" : "Driver Name"} />
-                                      {arr.length > 1 && canWrite && (
-                                        <button className="btn-icon" onClick={() => removeLocalListItem(jo.id, 'driverName', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
-                                          <X size={12} />
-                                        </button>
-                                      )}
-                                      {canWrite && (
-                                        <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'driverName')} style={{ padding: '5px', height: 'auto', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} title={isID ? "Tambah Sopir" : "Add Driver"}>
-                                          <Plus size={12} />
-                                        </button>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="input-group">
-                                <label>{isID ? 'Status Aktivitas' : 'Activity Status'} <span style={{ color: '#ef4444' }}>*</span></label>
-                                <input 
-                                  disabled={!canWrite}
-                                  type="text" 
-                                  value={localData[jo.id]?.activityStatus || ''} 
-                                  onChange={e => handleLocalUpdate(jo.id, 'activityStatus', e.target.value)} 
-                                  placeholder={isID ? "Perbarui status operasional terakhir..." : "Update last operational status..."} 
-                                />
-                              </div>
- 
-                              {/* Date Pickers Grid */}
-                              <div className="grid-responsive-2">
-                                <div className="input-group">
-                                  <label>{isID ? 'Waktu Pengiriman (Dispatched)' : 'Dispatched Date & Time'}</label>
-                                  <input 
-                                    disabled={!canWrite}
-                                    type="datetime-local" 
-                                    value={localData[jo.id]?.dispatchedAtLocal || ''} 
-                                    onChange={e => handleLocalUpdate(jo.id, 'dispatchedAtLocal', e.target.value)}
-                                    style={{
-                                      background: 'var(--input-bg)',
-                                      border: '1px solid var(--border)',
-                                      borderRadius: '10px',
-                                      color: 'var(--text)',
-                                      padding: '12px',
-                                      width: '100%'
-                                    }}
-                                  />
-                                </div>
-                                {activeTab === 'records' && (
-                                  <div className="input-group">
-                                    <label>{isID ? 'Waktu Selesai (Completed)' : 'Completed Date & Time'}</label>
-                                    <input 
-                                      disabled={!canWrite}
-                                      type="datetime-local" 
-                                      value={localData[jo.id]?.completedAtLocal || ''} 
-                                      onChange={e => handleLocalUpdate(jo.id, 'completedAtLocal', e.target.value)}
-                                      style={{
-                                        background: 'var(--input-bg)',
-                                        border: '1px solid var(--border)',
-                                        borderRadius: '10px',
-                                        color: 'var(--text)',
-                                        padding: '12px',
-                                        width: '100%'
-                                      }}
-                                    />
-                                  </div>
-                                )}
-                              </div>
- 
-                              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
-                                <strong style={{ color: 'var(--text)' }}>{isID ? 'Instruksi Lengkap:' : 'Full Instruction:'}</strong> {jo.jobDescription}
-                              </div>
- 
-                              {canWrite && (
-                                <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
-                                  <ButtonWithLoading
-                                    className="btn btn-gold"
-                                    style={{ padding: '10px 20px', fontSize: '0.85rem' }}
-                                    onClick={() => handleSaveChanges(jo)}
-                                  >
-                                    {isID ? 'Simpan Perubahan' : 'Save Changes'}
-                                  </ButtonWithLoading>
-                                  {activeTab === 'active' && (
-                                    <ButtonWithLoading
-                                      className="btn btn-done"
-                                      style={{ padding: '10px 20px', fontSize: '0.85rem', background: '#10b981', color: 'white', border: 'none' }}
-                                      onClick={() => handleDone(jo)}
-                                    >
-                                      {isID ? 'Selesaikan Pekerjaan' : 'Complete Job'}
-                                    </ButtonWithLoading>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            
-                            <div>
-                              <label style={{ display: 'block', marginBottom: '10px', fontSize: '0.85rem', fontWeight: '600' }}>{isID ? 'Dokumentasi Lapangan' : 'Field Documentation'}</label>
-                              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '15px' }}>
-                                {jo.photos?.map((photo, idx) => (
-                                  <div key={idx} style={{ position: 'relative', width: '70px', height: '70px' }}>
-                                    <img src={photo} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} />
-                                    {activeTab === 'active' && canWrite && (
-                                      <button onClick={() => removePhoto(jo.id, idx)} style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>×</button>
-                                    )}
-                                  </div>
-                                ))}
-                                {activeTab === 'active' && canWrite && (
-                                  <div 
-                                    onClick={() => fileInputRef.current.click()}
-                                    style={{ width: '70px', height: '70px', border: '2px dashed var(--glass-border)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}
-                                  >
-                                    <Plus size={20} />
-                                  </div>
-                                )}
-                              </div>
-                              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{isID ? 'Klik tombol "+" untuk mengunggah foto bukti operasional.' : 'Click the "+" button to upload operational proof photo.'}</p>
-                            </div>
+                return (
+                  <React.Fragment key={group.quotationId}>
+                    {/* Quotation Group Header Row */}
+                    <tr 
+                      style={{ 
+                        background: 'rgba(212, 175, 55, 0.05)', 
+                        borderBottom: '2px solid var(--secondary)',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => setExpandedGroups({ ...expandedGroups, [group.quotationId]: !isGroupExpanded })}
+                    >
+                      <td colSpan="8" style={{ padding: '12px 15px', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '1.2rem' }}>📁</span>
+                            <span style={{ fontWeight: '800', color: 'var(--secondary)' }}>
+                              {group.quotationId === 'direct' ? (isID ? 'Pekerjaan Langsung' : 'Direct Jobs') : group.quotationId}
+                            </span>
+                            <span style={{ color: 'var(--text)', fontWeight: '700', marginLeft: '5px' }}>
+                              — {group.customerName}
+                            </span>
                           </div>
-                        </motion.div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+                              {isID ? `Progress: ${doneJOs} dari ${totalJOs} Selesai` : `Progress: ${doneJOs} of ${totalJOs} Done`}
+                            </span>
+                            {isGroupExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </div>
+                        </div>
                       </td>
                     </tr>
-                  )}
-                </AnimatePresence>
-              </React.Fragment>
-            ))}
+
+                    {/* Child Job Orders inside this group */}
+                    {isGroupExpanded && group.jobOrders.map(jo => (
+                      <React.Fragment key={jo.id}>
+                        <tr style={{ borderBottom: '1px solid var(--glass-border)', cursor: 'pointer', background: 'rgba(255,255,255,0.01)' }} className="table-row-hover" onClick={() => toggleRow(jo)}>
+                          <td style={{ padding: '15px', fontWeight: '800', color: 'var(--secondary)', paddingLeft: '30px' }}>
+                            <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>└</span> {jo.id}
+                          </td>
+                          <td style={{ padding: '15px' }}>
+                            <div style={{ fontWeight: '600' }}>{jo.customerName}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}</div>
+                          </td>
+                          <td style={{ padding: '15px', fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {jo.jobDescription}
+                          </td>
+                          <td style={{ padding: '15px' }}>
+                            <div style={{ fontSize: '0.85rem' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>{isID ? 'K:' : 'C:'}</span> {Array.isArray(jo.containerNo) ? jo.containerNo.join(', ') : jo.containerNo || '-'}
+                            </div>
+                            <div style={{ fontSize: '0.85rem' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>{isID ? 'Knd:' : 'V:'}</span> {Array.isArray(jo.vehicleNo) ? jo.vehicleNo.join(', ') : jo.vehicleNo || '-'}
+                            </div>
+                          </td>
+                          <td style={{ padding: '15px', fontSize: '0.9rem', fontWeight: '500' }}>
+                            {formatDuration(jo.dispatchedAt, jo.completedAt, t, language)}
+                          </td>
+                          <td style={{ padding: '15px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: activeTab === 'active' ? '#f59e0b' : '#10b981' }} />
+                              <span style={{ fontWeight: '600', color: activeTab === 'active' ? '#f59e0b' : '#10b981', fontSize: '0.9rem' }}>
+                                {jo.activityStatus || (activeTab === 'active' ? (isID ? 'Menunggu Pembaruan...' : 'Pending Update...') : (isID ? 'Selesai' : 'Done'))}
+                              </span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '15px', textAlign: 'center' }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px', color: 'var(--text-muted)' }}>
+                              <Camera size={16} />
+                              <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>{jo.photos?.length || 0}</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '15px', textAlign: 'center' }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                              {activeTab === 'active' ? (
+                                canWrite ? (
+                                  <ButtonWithLoading 
+                                    className="btn btn-gold" 
+                                    style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                                    onClick={(e) => { e.stopPropagation(); return handleDone(jo); }}
+                                  >
+                                    {isID ? 'Selesai' : 'Done'}
+                                  </ButtonWithLoading>
+                                ) : (
+                                  <span className="badge badge-pending" style={{ fontSize: '0.7rem' }}>{isID ? 'Aktif' : 'Active'}</span>
+                                )
+                              ) : (
+                                <span className="badge badge-done" style={{ fontSize: '0.7rem' }}>{isID ? 'Diarsipkan' : 'Archived'}</span>
+                              )}
+                              <button 
+                                className="btn-icon" 
+                                style={{ width: '38px', height: '38px', color: 'var(--secondary)', background: 'rgba(212, 175, 55, 0.1)', border: '1px solid rgba(212, 175, 55, 0.3)' }}
+                                onClick={(e) => { e.stopPropagation(); navigate(`/executor/surat-jalan/${jo.id}`); }}
+                                title={isID ? "Lihat Surat Jalan" : "View Delivery Order"}
+                              >
+                                <FileText size={20} />
+                              </button>
+                              <button 
+                                className="btn-icon" 
+                                style={{ width: '38px', height: '38px', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)' }}
+                                onClick={(e) => { e.stopPropagation(); navigate(`/executor/surat-jalan/${jo.id}?print=true`); }}
+                                title={isID ? "Cetak Surat Jalan" : "Print Delivery Order"}
+                              >
+                                <Printer size={20} />
+                              </button>
+                              {activeTab === 'records' && canWrite && (
+                                <button 
+                                  className="btn-icon" 
+                                  style={{ width: '38px', height: '38px', color: 'var(--gold-metallic)', background: 'rgba(212, 175, 55, 0.1)', border: '1px solid rgba(212, 175, 55, 0.3)' }}
+                                  onClick={(e) => { e.stopPropagation(); toggleRow(jo); }}
+                                  title={isID ? "Ubah Catatan Data" : "Edit Records Data"}
+                                >
+                                  <FileText size={20} />
+                                </button>
+                              )}
+                              {activeTab === 'records' && canWrite && (
+                                <button
+                                  className="btn-icon"
+                                  style={{ width: '38px', height: '38px', color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
+                                  onClick={(e) => { e.stopPropagation(); setJoToDelete(jo); setVerifyCode(''); setVerifyError(''); }}
+                                  title={isID ? "Hapus Catatan JO" : "Delete JO Record"}
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+
+                        <AnimatePresence>
+                          {uploadingForId === jo.id && (
+                            <tr>
+                              <td colSpan="8" style={{ padding: 0 }}>
+                                <motion.div 
+                                  initial={{ height: 0, opacity: 0 }} 
+                                  animate={{ height: 'auto', opacity: 1 }} 
+                                  exit={{ height: 0, opacity: 0 }} 
+                                  style={{ overflow: 'hidden', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--secondary)' }}
+                                >
+                                  <div className="grid-responsive-2" style={{ padding: '25px' }}>
+                                    <div style={{ display: 'grid', gap: '20px' }}>
+                                      <div className="grid-responsive-3">
+                                        <div className="input-group">
+                                          <label>{isID ? 'Nomor Kontainer' : 'Container Number'} <span style={{ color: '#ef4444' }}>*</span></label>
+                                          {(localData[jo.id]?.containerNo || []).map((c, i, arr) => (
+                                            <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
+                                              <input disabled={!canWrite} type="text" value={c} onChange={e => handleLocalListItemUpdate(jo.id, 'containerNo', i, e.target.value)} placeholder={`${isID ? 'Kontainer' : 'Container'} ${i+1}`} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)', padding: '12px', flex: 1 }} />
+                                              {canWrite && arr.length > 1 && (
+                                                <button onClick={() => removeLocalListItem(jo.id, 'containerNo', i)} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', width: '42px', cursor: 'pointer' }}>×</button>
+                                              )}
+                                            </div>
+                                          ))}
+                                          {canWrite && (
+                                            <button onClick={() => addLocalListItem(jo.id, 'containerNo')} style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '10px', padding: '8px', cursor: 'pointer', fontSize: '0.8rem', marginTop: '5px' }}>
+                                              + {isID ? 'Tambah Kontainer' : 'Add Container'}
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        <div className="input-group">
+                                          <label>{isID ? 'Nomor Kendaraan / Nopol' : 'Vehicle Number'} <span style={{ color: '#ef4444' }}>*</span></label>
+                                          {(localData[jo.id]?.vehicleNo || []).map((v, i, arr) => (
+                                            <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
+                                              <input disabled={!canWrite} type="text" value={v} onChange={e => handleLocalListItemUpdate(jo.id, 'vehicleNo', i, e.target.value)} placeholder={`${isID ? 'Kendaraan' : 'Vehicle'} ${i+1}`} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)', padding: '12px', flex: 1 }} />
+                                              {canWrite && arr.length > 1 && (
+                                                <button onClick={() => removeLocalListItem(jo.id, 'vehicleNo', i)} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', width: '42px', cursor: 'pointer' }}>×</button>
+                                              )}
+                                            </div>
+                                          ))}
+                                          {canWrite && (
+                                            <button onClick={() => addLocalListItem(jo.id, 'vehicleNo')} style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '10px', padding: '8px', cursor: 'pointer', fontSize: '0.8rem', marginTop: '5px' }}>
+                                              + {isID ? 'Tambah Kendaraan' : 'Add Vehicle'}
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        <div className="input-group">
+                                          <label>{isID ? 'Nama Pengemudi' : 'Driver Name'} <span style={{ color: '#ef4444' }}>*</span></label>
+                                          {(localData[jo.id]?.driverName || []).map((d, i, arr) => (
+                                            <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
+                                              <input disabled={!canWrite} type="text" value={d} onChange={e => handleLocalListItemUpdate(jo.id, 'driverName', i, e.target.value)} placeholder={`${isID ? 'Supir' : 'Driver'} ${i+1}`} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)', padding: '12px', flex: 1 }} />
+                                              {canWrite && arr.length > 1 && (
+                                                <button onClick={() => removeLocalListItem(jo.id, 'driverName', i)} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', width: '42px', cursor: 'pointer' }}>×</button>
+                                              )}
+                                            </div>
+                                          ))}
+                                          {canWrite && (
+                                            <button onClick={() => addLocalListItem(jo.id, 'driverName')} style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '10px', padding: '8px', cursor: 'pointer', fontSize: '0.8rem', marginTop: '5px' }}>
+                                              + {isID ? 'Tambah Supir' : 'Add Driver'}
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <div className="grid-responsive-2">
+                                        <div className="input-group">
+                                          <label>{isID ? 'Status Pengiriman Terakhir' : 'Latest Delivery Status'} <span style={{ color: '#ef4444' }}>*</span></label>
+                                          <input disabled={!canWrite} type="text" value={localData[jo.id]?.activityStatus || ''} onChange={e => handleLocalUpdate(jo.id, 'activityStatus', e.target.value)} placeholder={isID ? "Contoh: Bongkar di Gudang, OTW, dll." : "e.g. Discharging, On the way, etc."} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)', padding: '12px' }} />
+                                        </div>
+
+                                        <div className="input-group">
+                                          <label>{isID ? 'Waktu Pengiriman (Dispatched)' : 'Dispatched Date & Time'}</label>
+                                          <input 
+                                            disabled={!canWrite}
+                                            type="datetime-local" 
+                                            value={localData[jo.id]?.dispatchedAtLocal || ''} 
+                                            onChange={e => handleLocalUpdate(jo.id, 'dispatchedAtLocal', e.target.value)}
+                                            style={{
+                                              background: 'var(--input-bg)',
+                                              border: '1px solid var(--border)',
+                                              borderRadius: '10px',
+                                              color: 'var(--text)',
+                                              padding: '12px',
+                                              width: '100%'
+                                            }}
+                                          />
+                                        </div>
+                                        {activeTab === 'records' && (
+                                          <div className="input-group">
+                                            <label>{isID ? 'Waktu Selesai (Completed)' : 'Completed Date & Time'}</label>
+                                            <input 
+                                              disabled={!canWrite}
+                                              type="datetime-local" 
+                                              value={localData[jo.id]?.completedAtLocal || ''} 
+                                              onChange={e => handleLocalUpdate(jo.id, 'completedAtLocal', e.target.value)}
+                                              style={{
+                                                background: 'var(--input-bg)',
+                                                border: '1px solid var(--border)',
+                                                borderRadius: '10px',
+                                                color: 'var(--text)',
+                                                padding: '12px',
+                                                width: '100%'
+                                              }}
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
+                                        <strong style={{ color: 'var(--text)' }}>{isID ? 'Instruksi Lengkap:' : 'Full Instruction:'}</strong> {jo.jobDescription}
+                                      </div>
+
+                                      {canWrite && (
+                                        <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                                          <ButtonWithLoading
+                                            className="btn btn-gold"
+                                            style={{ padding: '10px 20px', fontSize: '0.85rem' }}
+                                            onClick={() => handleSaveChanges(jo)}
+                                          >
+                                            {isID ? 'Simpan Perubahan' : 'Save Changes'}
+                                          </ButtonWithLoading>
+                                          {activeTab === 'active' && (
+                                            <ButtonWithLoading
+                                              className="btn btn-done"
+                                              style={{ padding: '10px 20px', fontSize: '0.85rem', background: '#10b981', color: 'white', border: 'none' }}
+                                              onClick={() => handleDone(jo)}
+                                            >
+                                              {isID ? 'Selesaikan Pekerjaan' : 'Complete Job'}
+                                            </ButtonWithLoading>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    <div>
+                                      <label style={{ display: 'block', marginBottom: '10px', fontSize: '0.85rem', fontWeight: '600' }}>{isID ? 'Dokumentasi Lapangan' : 'Field Documentation'}</label>
+                                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '15px' }}>
+                                        {jo.photos?.map((photo, idx) => (
+                                          <div key={idx} style={{ position: 'relative', width: '70px', height: '70px' }}>
+                                            <img src={photo} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} />
+                                            {activeTab === 'active' && canWrite && (
+                                              <button onClick={() => removePhoto(jo.id, idx)} style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>×</button>
+                                            )}
+                                          </div>
+                                        ))}
+                                        {activeTab === 'active' && canWrite && (
+                                          <div 
+                                            onClick={() => fileInputRef.current.click()}
+                                            style={{ width: '70px', height: '70px', border: '2px dashed var(--glass-border)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}
+                                          >
+                                            <Plus size={20} />
+                                          </div>
+                                        )}
+                                      </div>
+                                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{isID ? 'Klik tombol "+" untuk mengunggah foto bukti operasional.' : 'Click the "+" button to upload operational proof photo.'}</p>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              </td>
+                            </tr>
+                          )}
+                        </AnimatePresence>
+                      </React.Fragment>
+                    ))}
+                  </React.Fragment>
+                );
+              });
+            })()}
           </tbody>
         </table></div>
 
-        {/* Surat Jalan Modal */}
         {filteredJOs.length === 0 && (
           <div style={{ textAlign: 'center', padding: '100px 20px' }}>
             <Package size={64} color="rgba(255,255,255,0.05)" style={{ marginBottom: '20px' }} />

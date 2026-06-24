@@ -323,6 +323,15 @@ export const AppProvider = ({ children }) => {
     return finalJO;
   };
 
+  const createBulkJOs = async (joDataArray) => {
+    const createdJOs = await apiRequest('job-orders/bulk', {
+      method: 'POST',
+      body: JSON.stringify(joDataArray)
+    });
+    setJobOrders(prev => [...prev, ...createdJOs]);
+    return createdJOs;
+  };
+
   const dispatchJO = async (joId, quantity) => {
     const dispatchedAt = new Date().toISOString();
     await updateJOStatus(joId, { status: 'dispatched', issueQuantity: quantity, dispatchedAt });
@@ -818,7 +827,7 @@ export const AppProvider = ({ children }) => {
       prospects, addProspect, updateProspectStatus, convertProspectToCustomer, deleteProspect, updateProspect,
       prospectDrafts,
       quotations, createQuotation, updateQuotation, approveQuotation, unapproveQuotation, deleteQuotation,
-      jobOrders, createJO, dispatchJO, updateJOStatus, completeJO, deleteJO,
+      jobOrders, createJO, createBulkJOs, dispatchJO, updateJOStatus, completeJO, deleteJO,
       invoices, createInvoice, settleInvoice, deleteInvoice, updateInvoice,
       receivables, settleReceivable,
       salaries, addSalary, deleteSalary, updateSalary,

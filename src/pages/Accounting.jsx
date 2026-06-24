@@ -147,6 +147,7 @@ const Accounting = () => {
   // Invoice Bank Selection
   const [issuingInvoiceJoId, setIssuingInvoiceJoId] = useState(null);
   const [selectedBankId, setSelectedBankId] = useState('');
+  const [expandedCompletedGroups, setExpandedCompletedGroups] = useState({});
   const [receivableProofModal, setReceivableProofModal] = useState(null); // invoice to upload proof for
   const [settleModal, setSettleModal] = useState(null); // { id, amount, ... }
   const [settleForm, setSettleForm] = useState({ paymentProof: [], taxes: [{ name: '', amount: 0 }], taxProof: [] });
@@ -2583,85 +2584,164 @@ const Accounting = () => {
                 </tr>
               </thead>
               <tbody>
-                {completedJOs.map(jo => {
-                  const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id));
-                  return (
-                    <tr key={jo.id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                      <td style={{ padding: '15px' }}>{jo.id}</td>
-                      <td style={{ padding: '15px' }}>{jo.customerName}</td>
-                      <td style={{ padding: '15px' }}>
-                        <span className="badge badge-done">{isID ? 'Selesai' : 'Completed'}</span>
-                      </td>
-                      <td style={{ padding: '15px', textAlign: 'center' }}>
-                        {jo.photos && jo.photos.length > 0 ? (
-                          <button 
-                            onClick={() => setPhotoViewer({ joId: jo.id, photos: jo.photos })}
-                            style={{ background: 'rgba(212, 175, 55, 0.1)', border: '1px solid var(--secondary)', borderRadius: '6px', padding: '5px 10px', color: 'var(--secondary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem' }}
-                          >
-                            <Image size={14} /> {jo.photos.length} {isID ? 'Foto' : 'Photos'}
-                          </button>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{isID ? 'Tidak Ada Foto' : 'No Photos'}</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '15px' }}>
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                          {!hasInvoice && canWrite ? (
-                            <ButtonWithLoading className="btn btn-gold" style={{ padding: '8px 16px', fontSize: '0.85rem' }} onClick={() => handleIssueInvoice(jo.id)}>
-                              {isID ? 'Terbitkan Invoice' : 'Issue Invoice'}
-                            </ButtonWithLoading>
-                          ) : (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                              {undoConfirmJoId === jo.id ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '4px 10px' }}>
-                                  <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: '600' }}>{isID ? 'Batalkan invoice ini?' : 'Cancel this invoice?'}</span>
-                                  <button
-                                    disabled={!canWrite}
-                                    onClick={() => handleUndoInvoice(jo.id)}
-                                    style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '5px', padding: '3px 10px', fontSize: '0.72rem', fontWeight: '700', cursor: canWrite ? 'pointer' : 'not-allowed', opacity: canWrite ? 1 : 0.5 }}
+                {(() => {
+                  // Group completed JOs by quotationId
+                  const groups = {};
+                  completedJOs.forEach(jo => {
+                    const qId = jo.quotationId || 'direct';
+                    if (!groups[qId]) {
+                      groups[qId] = {
+                        quotationId: qId,
+                        customerName: jo.customerName || 'Direct Customer',
+                        jobOrders: []
+                      };
+                    }
+                    groups[qId].jobOrders.push(jo);
+                  });
+
+                  return Object.values(groups).map(group => {
+                    const isGroupExpanded = expandedCompletedGroups[group.quotationId] !== false;
+                    const uninvoicedJOs = group.jobOrders.filter(jo => !invoices.some(inv => String(inv.joId) === String(jo.id)));
+                    const allInvoiced = uninvoicedJOs.length === 0;
+
+                    return (
+                      <React.Fragment key={group.quotationId}>
+                        {/* Quotation Group Folder Row */}
+                        <tr 
+                          style={{ 
+                            background: 'rgba(212, 175, 55, 0.05)', 
+                            borderBottom: '2px solid var(--secondary)',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => setExpandedCompletedGroups({ ...expandedCompletedGroups, [group.quotationId]: !isGroupExpanded })}
+                        >
+                          <td colSpan="5" style={{ padding: '12px 15px', verticalAlign: 'middle' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ fontSize: '1.2rem' }}>📁</span>
+                                <span style={{ fontWeight: '800', color: 'var(--secondary)' }}>
+                                  {group.quotationId === 'direct' ? (isID ? 'Pekerjaan Langsung' : 'Direct Jobs') : group.quotationId}
+                                </span>
+                                <span style={{ color: 'var(--text)', fontWeight: '700', marginLeft: '5px' }}>
+                                  — {group.customerName}
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                {!allInvoiced && canWrite && (
+                                  <ButtonWithLoading 
+                                    className="btn btn-gold" 
+                                    style={{ padding: '6px 14px', fontSize: '0.75rem', gap: '6px' }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleIssueInvoice(uninvoicedJOs[0].id);
+                                    }}
                                   >
-                                    {isID ? 'Ya, Batalkan' : 'Yes, Cancel'}
+                                    {isID ? 'Terbitkan Invoice Gabungan' : 'Issue Combined Invoice'}
+                                  </ButtonWithLoading>
+                                )}
+                                <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                                  {group.jobOrders.length} {isID ? 'Pekerjaan' : 'Jobs'}
+                                </span>
+                                {isGroupExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Child Completed Job Orders */}
+                        {isGroupExpanded && group.jobOrders.map(jo => {
+                          const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id));
+                          return (
+                            <tr key={jo.id} style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.01)' }}>
+                              <td style={{ padding: '15px', paddingLeft: '30px', fontWeight: 'bold', color: 'var(--secondary)' }}>
+                                <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>└</span> {jo.id}
+                              </td>
+                              <td style={{ padding: '15px' }}>
+                                <div style={{ fontWeight: '600' }}>{jo.customerName}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                  {jo.instruction || jo.jobDescription}
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                  {isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}
+                                </div>
+                              </td>
+                              <td style={{ padding: '15px' }}>
+                                <span className="badge badge-done">{isID ? 'Selesai' : 'Completed'}</span>
+                              </td>
+                              <td style={{ padding: '15px', textAlign: 'center' }}>
+                                {jo.photos && jo.photos.length > 0 ? (
+                                  <button 
+                                    onClick={() => setPhotoViewer({ joId: jo.id, photos: jo.photos })}
+                                    style={{ background: 'rgba(212, 175, 55, 0.1)', border: '1px solid var(--secondary)', borderRadius: '6px', padding: '5px 10px', color: 'var(--secondary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem' }}
+                                  >
+                                    <Image size={14} /> {jo.photos.length} {isID ? 'Foto' : 'Photos'}
                                   </button>
-                                  <button
-                                    onClick={() => setUndoConfirmJoId(null)}
-                                    style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-muted)', border: '1px solid var(--glass-border)', borderRadius: '5px', padding: '3px 8px', fontSize: '0.72rem', cursor: 'pointer' }}
+                                ) : (
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{isID ? 'Tidak Ada Foto' : 'No Photos'}</span>
+                                )}
+                              </td>
+                              <td style={{ padding: '15px' }}>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                  {!hasInvoice && canWrite ? (
+                                    <ButtonWithLoading className="btn btn-gold" style={{ padding: '8px 16px', fontSize: '0.85rem' }} onClick={() => handleIssueInvoice(jo.id)}>
+                                      {isID ? 'Terbitkan Invoice' : 'Issue Invoice'}
+                                    </ButtonWithLoading>
+                                  ) : (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                      {undoConfirmJoId === jo.id ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '4px 10px' }}>
+                                          <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: '600' }}>{isID ? 'Batalkan invoice ini?' : 'Cancel this invoice?'}</span>
+                                          <button
+                                            disabled={!canWrite}
+                                            onClick={() => handleUndoInvoice(jo.id)}
+                                            style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '5px', padding: '3px 10px', fontSize: '0.72rem', fontWeight: '700', cursor: canWrite ? 'pointer' : 'not-allowed', opacity: canWrite ? 1 : 0.5 }}
+                                          >
+                                            {isID ? 'Ya, Batalkan' : 'Yes, Cancel'}
+                                          </button>
+                                          <button
+                                            onClick={() => setUndoConfirmJoId(null)}
+                                            style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-muted)', border: '1px solid var(--glass-border)', borderRadius: '5px', padding: '3px 8px', fontSize: '0.72rem', cursor: 'pointer' }}
+                                          >
+                                            {isID ? 'Batal' : 'Cancel'}
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', fontWeight: '600' }}>
+                                            <CheckCircle size={16} /> {isID ? 'Sudah Di-invoice' : 'Invoiced'}
+                                          </span>
+                                          <button
+                                            onClick={() => setUndoConfirmJoId(jo.id)}
+                                            style={{
+                                              background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444',
+                                              border: '1px solid rgba(239, 68, 68, 0.2)', padding: '4px 10px',
+                                              borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer',
+                                              display: 'flex', alignItems: 'center', gap: '5px'
+                                            }}
+                                            title={isID ? 'Batalkan / Tarik Invoice' : 'Undo / Revoke Invoice'}
+                                          >
+                                            <RotateCcw size={12} /> {isID ? 'Batalkan' : 'Undo'}
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                  <button 
+                                    className="btn" 
+                                    style={{ padding: '8px 16px', fontSize: '0.85rem', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px solid var(--secondary)' }} 
+                                    onClick={() => handleCreatePOFromAccounting(jo.id)}
                                   >
-                                    {isID ? 'Batal' : 'Cancel'}
+                                    + Purchase Order
                                   </button>
                                 </div>
-                              ) : (
-                                <>
-                                  <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', fontWeight: '600' }}>
-                                    <CheckCircle size={16} /> {isID ? 'Sudah Di-invoice' : 'Invoiced'}
-                                  </span>
-                                  <button
-                                    onClick={() => setUndoConfirmJoId(jo.id)}
-                                    style={{
-                                      background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444',
-                                      border: '1px solid rgba(239, 68, 68, 0.2)', padding: '4px 10px',
-                                      borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer',
-                                      display: 'flex', alignItems: 'center', gap: '5px'
-                                    }}
-                                    title={isID ? 'Batalkan / Tarik Invoice' : 'Undo / Revoke Invoice'}
-                                  >
-                                    <RotateCcw size={12} /> {isID ? 'Batalkan' : 'Undo'}
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          )}
-                          <button 
-                            className="btn" 
-                            style={{ padding: '8px 16px', fontSize: '0.85rem', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px solid var(--secondary)' }} 
-                            onClick={() => handleCreatePOFromAccounting(jo.id)}
-                          >
-                            + Purchase Order
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  });
+                })()}
               </tbody>
             </table></div></div>
             )}
