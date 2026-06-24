@@ -208,8 +208,31 @@ const PrintInvoice = () => {
               }
             })}
 
-            {/* Extra Charges */}
-            {extraCharges.map((ec, i) => (
+            {/* Render custom items from extra_charges as main items if no JOs exist */}
+            {targetJOs.length === 0 && extraCharges.map((ec, i) => {
+              const qty = ec.qty || 1;
+              const rate = ec.rate || ec.amount || 0;
+              const total = ec.amount || (qty * rate);
+              return (
+                <tr key={`custom-item-${i}`} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '18px 14px' }}>
+                    <div style={{ fontWeight: '800', fontSize: '1rem' }}>{ec.description}</div>
+                  </td>
+                  <td style={{ padding: '18px 14px', textAlign: 'center', fontWeight: '800', fontSize: '1.05rem' }}>
+                    {qty}
+                  </td>
+                  <td style={{ padding: '18px 14px', textAlign: 'right', color: '#475569', fontWeight: '700' }}>
+                    Rp {parseFloat(rate).toLocaleString('id-ID')}
+                  </td>
+                  <td style={{ padding: '18px 14px', textAlign: 'right', fontWeight: '900', fontSize: '1.1rem' }}>
+                    Rp {parseFloat(total).toLocaleString('id-ID')}
+                  </td>
+                </tr>
+              );
+            })}
+
+            {/* Extra Charges (Only if JOs exist, to avoid duplicate rendering) */}
+            {targetJOs.length > 0 && extraCharges.map((ec, i) => (
               <tr key={`ec-${i}`} style={{ borderBottom: '1px solid #f1f5f9', background: '#fafafa' }}>
                 <td style={{ padding: '10px 14px', fontSize: '0.88rem', color: '#475569' }}>{ec.description}</td>
                 <td style={{ padding: '10px 14px', textAlign: 'center' }}>1</td>

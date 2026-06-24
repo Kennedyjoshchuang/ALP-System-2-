@@ -503,6 +503,25 @@ export const AppProvider = ({ children }) => {
       throw error;
     }
   };
+  
+  const createCustomInvoice = async (customInvoice) => {
+    try {
+      const data = await apiRequest('invoices', {
+        method: 'POST',
+        body: JSON.stringify(customInvoice)
+      });
+      
+      const finalInvoice = { ...customInvoice, id: data.id || customInvoice.id };
+      
+      setInvoices(prev => [...prev, finalInvoice]);
+      setReceivables(prev => [...prev, { ...finalInvoice, balance: finalInvoice.amount }]);
+      
+      return finalInvoice;
+    } catch (error) {
+      console.error("Failed to create custom invoice:", error);
+      throw error;
+    }
+  };
 
   const settleInvoice = async (invoiceId, paymentProofPhoto, taxesDeducted, taxDeductionProof) => {
     const totalTax = Array.isArray(taxesDeducted) ? taxesDeducted.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0) : 0;
@@ -828,7 +847,7 @@ export const AppProvider = ({ children }) => {
       prospectDrafts,
       quotations, createQuotation, updateQuotation, approveQuotation, unapproveQuotation, deleteQuotation,
       jobOrders, createJO, createBulkJOs, dispatchJO, updateJOStatus, completeJO, deleteJO,
-      invoices, createInvoice, settleInvoice, deleteInvoice, updateInvoice,
+      invoices, createInvoice, createCustomInvoice, settleInvoice, deleteInvoice, updateInvoice,
       receivables, settleReceivable,
       salaries, addSalary, deleteSalary, updateSalary,
       otherExpenses, addOtherExpense, deleteOtherExpense, updateOtherExpense,

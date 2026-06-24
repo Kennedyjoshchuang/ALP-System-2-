@@ -593,9 +593,11 @@ app.post('/api/invoices', async (req, res) => {
     }
 
     // 3. Update Job Order status to 'invoiced'
-    const { error: joErr } = await supabase.from('job_orders').update({ status: 'invoiced' }).eq('id', joId);
-    if (joErr) {
-      console.error(`[POST /invoices] JO Update error for ${joId}:`, joErr.message);
+    if (joId) {
+      const { error: joErr } = await supabase.from('job_orders').update({ status: 'invoiced' }).eq('id', joId);
+      if (joErr) {
+        console.error(`[POST /invoices] JO Update error for ${joId}:`, joErr.message);
+      }
     }
 
     console.log(`[POST /invoices] Everything complete for ${id}`);

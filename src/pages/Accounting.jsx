@@ -81,6 +81,19 @@ const Accounting = () => {
     name: '', position: '', bankAccount: '', bankName: '', baseSalary: '', period: '', nik: '', npwp: '', taxes: [], proofPhoto: '', expenseDate: ''
   });
 
+  // Custom Invoice States
+  const [showCustomInvoiceModal, setShowCustomInvoiceModal] = useState(false);
+  const [customInvoiceForm, setCustomInvoiceForm] = useState({
+    id: '',
+    customerName: '',
+    date: new Date().toISOString().substring(0, 10),
+    dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10),
+    bankAccountId: '',
+    items: [{ description: '', qty: 1, rate: 0 }],
+    taxRate: 0, // 0 for none, 11 for 11% PPN, custom...
+    taxAmount: 0
+  });
+
   // Other Expense States
   const [otherExpenseModal, setOtherExpenseModal] = useState(false);
   const [transactionTypeFilter, setTransactionTypeFilter] = useState('all');
@@ -162,13 +175,14 @@ const Accounting = () => {
   const fileInputRef = useRef(null);
 
   const { 
-    jobOrders = [], invoices = [], createInvoice, settleInvoice, deleteInvoice, updateInvoice, 
+    jobOrders = [], invoices = [], createInvoice, createCustomInvoice, settleInvoice, deleteInvoice, updateInvoice, 
     receivables = [], vendors = [], purchaseOrders = [], updateJOStatus, updatePurchaseOrder, patchPurchaseOrderLocal,
     quotations = [],
     salaries = [], addSalary, deleteSalary, updateSalary,
     otherExpenses = [], addOtherExpense, deleteOtherExpense, updateOtherExpense,
     employees = [], companyBankAccounts = [], updateCompanyBank, deleteCompanyBank,
     getSystemConfig,
+    customers = [],
     loading,
     t,
     language,
@@ -378,6 +392,91 @@ const Accounting = () => {
       setOtherExpenseModal(false);
     } catch (err) {
       alert('Gagal menyimpan transaksi: ' + err.message);
+    }
+  };
+
+  const handleOpenCustomInvoiceModal = () => {
+    const today = new Date();
+    const dateStr = today.toISOString().substring(0, 10);
+    const dateCompact = dateStr.replace(/-/g, '');
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const defaultInvoiceId = `INV-${dateCompact}-${randomSuffix}`;
+    const defaultBank = companyBankAccounts && companyBankAccounts.length > 0
+      ? (companyBankAccounts.find(b => b.isDefault) || companyBankAccounts[0])
+      : null;
+
+    setCustomInvoiceForm({
+      id: defaultInvoiceId,
+      customerName: '',
+      date: dateStr,
+      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10),
+      bankAccountId: defaultBank ? defaultBank.id : '',
+      items: [{ description: '', qty: 1, rate: 0 }],
+      taxRate: 0,
+      taxAmount: 0
+    });
+    setShowCustomInvoiceModal(true);
+  };
+
+  const handleSaveCustomInvoice = async () => {
+    if (!canWrite) return;
+    if (!customInvoiceForm.id.trim()) {
+      alert(isID ? 'Nomor Invoice wajib diisi.' : 'Invoice ID is required.');
+      return;
+    }
+    if (!customInvoiceForm.customerName.trim()) {
+      alert(isID ? 'Nama Pelanggan wajib diisi.' : 'Customer Name is required.');
+      return;
+    }
+
+    // Filter out empty items
+    const validItems = customInvoiceForm.items.filter(item => item.description.trim());
+    if (validItems.length === 0) {
+      alert(isID ? 'Minimal harus ada 1 item deskripsi.' : 'At least 1 item with description is required.');
+      return;
+    }
+
+    // Calculate totals
+    const subtotal = validItems.reduce((acc, curr) => acc + (parseFloat(curr.qty || 0) * parseFloat(curr.rate || 0)), 0);
+    let tax = 0;
+    if (customInvoiceForm.taxRate === 11) {
+      tax = subtotal * 0.11;
+    } else if (customInvoiceForm.taxRate === 'custom') {
+      tax = parseFloat(customInvoiceForm.taxAmount) || 0;
+    }
+    const amount = subtotal + tax;
+
+    // We store the line items inside extra_charges array so they serialize and print perfectly!
+    const extra_charges = validItems.map(item => ({
+      description: item.description,
+      qty: parseFloat(item.qty) || 1,
+      rate: parseFloat(item.rate) || 0,
+      amount: (parseFloat(item.qty) || 1) * (parseFloat(item.rate) || 0)
+    }));
+
+    const invoicePayload = {
+      id: customInvoiceForm.id,
+      joId: null,
+      consolidatedJOs: [],
+      customerName: customInvoiceForm.customerName,
+      amount: amount,
+      subtotal: subtotal,
+      tax: tax,
+      date: new Date(customInvoiceForm.date).toISOString(),
+      status: 'unpaid',
+      extra_charges: extra_charges,
+      signedReceiptPhoto: null,
+      signedInvoicePhoto: null,
+      deliveryStatus: 'not_sent',
+      bankAccountId: customInvoiceForm.bankAccountId
+    };
+
+    try {
+      await createCustomInvoice(invoicePayload);
+      setShowCustomInvoiceModal(false);
+      alert(isID ? 'Invoice kustom berhasil dibuat!' : 'Custom invoice created successfully!');
+    } catch (err) {
+      alert(isID ? 'Gagal membuat invoice kustom: ' + err.message : 'Failed to create custom invoice: ' + err.message);
     }
   };
 
@@ -2564,6 +2663,17 @@ const Accounting = () => {
         </div>
       ) : activeTab === 'billing' ? (
         <div className="billing-section">
+          {canWrite && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+              <button 
+                className="btn btn-gold" 
+                onClick={handleOpenCustomInvoiceModal}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '10px', fontWeight: '700' }}
+              >
+                <Plus size={18} /> {isID ? 'Buat Invoice Kustom' : 'Create Custom Invoice'}
+              </button>
+            </div>
+          )}
           <div className="glass-card" style={{ padding: '25px', marginBottom: '40px' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: isPendingCollapsed ? '0' : '20px', cursor:'pointer' }} onClick={() => setIsPendingCollapsed(!isPendingCollapsed)}>
               <h4 style={{ margin:0 }}>{isID ? 'Invoice Tertunda (dari Operasional)' : 'Pending Invoices (from Operations)'}</h4>
@@ -4252,6 +4362,223 @@ const Accounting = () => {
             </div>
             <div style={{ padding:'15px', borderTop:'1px solid var(--glass-border)', textAlign:'right' }}>
               <button onClick={() => setPhotoViewer(null)} className="btn btn-gold" style={{ padding:'10px 25px' }}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Custom Invoice Modal */}
+      {showCustomInvoiceModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '800px', padding: '35px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+            <button onClick={() => setShowCustomInvoiceModal(false)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={20}/></button>
+            <h3 style={{ color: 'var(--secondary)', marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '10px' }}><Receipt size={24}/> {isID ? 'Buat Invoice Kustom' : 'Create Custom Invoice'}</h3>
+
+            <div className="grid-responsive-2" style={{ gap: '20px', marginBottom: '20px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '700' }}>{isID ? 'Nomor Invoice' : 'Invoice Number'}</label>
+                <input 
+                  type="text" 
+                  value={customInvoiceForm.id} 
+                  onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, id: e.target.value })} 
+                  style={{ width: '100%', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)' }} 
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '700' }}>{isID ? 'Pelanggan' : 'Customer'}</label>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input 
+                    type="text" 
+                    placeholder={isID ? "Ketik nama pelanggan..." : "Type customer name..."}
+                    value={customInvoiceForm.customerName} 
+                    onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, customerName: e.target.value })} 
+                    style={{ flex: 1, padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)' }} 
+                    list="custom-invoice-customers"
+                    required
+                  />
+                  <datalist id="custom-invoice-customers">
+                    {customers.map(c => <option key={c.id} value={c.name} />)}
+                  </datalist>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid-responsive-3" style={{ gap: '20px', marginBottom: '20px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '700' }}>{isID ? 'Tanggal Invoice' : 'Invoice Date'}</label>
+                <input 
+                  type="date" 
+                  value={customInvoiceForm.date} 
+                  onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, date: e.target.value })} 
+                  style={{ width: '100%', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)' }} 
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '700' }}>{isID ? 'Tanggal Jatuh Tempo' : 'Due Date'}</label>
+                <input 
+                  type="date" 
+                  value={customInvoiceForm.dueDate} 
+                  onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, dueDate: e.target.value })} 
+                  style={{ width: '100%', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)' }} 
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '700' }}>{isID ? 'Rekening Pembayaran' : 'Payment Account'}</label>
+                <select 
+                  value={customInvoiceForm.bankAccountId} 
+                  onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, bankAccountId: e.target.value })} 
+                  style={{ width: '100%', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)' }}
+                  required
+                >
+                  <option value="">-- {isID ? 'Pilih Rekening Bank' : 'Select Bank Account'} --</option>
+                  {companyBankAccounts.map(b => (
+                    <option key={b.id} value={b.id}>{b.bankName} - {b.accountNumber} ({b.accountName})</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '20px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h5 style={{ margin: 0, color: 'var(--text)', fontSize: '1rem', fontWeight: '700' }}>{isID ? 'Item Layanan / Tagihan' : 'Billing / Service Items'}</h5>
+                <button 
+                  type="button"
+                  onClick={() => setCustomInvoiceForm({
+                    ...customInvoiceForm,
+                    items: [...customInvoiceForm.items, { description: '', qty: 1, rate: 0 }]
+                  })}
+                  className="btn btn-gold"
+                  style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Plus size={14} /> {isID ? 'Tambah Baris' : 'Add Row'}
+                </button>
+              </div>
+
+              {customInvoiceForm.items.map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '15px', marginBottom: '10px', alignItems: 'center' }}>
+                  <input 
+                    type="text" 
+                    placeholder={isID ? "Deskripsi item layanan..." : "Service item description..."}
+                    value={item.description} 
+                    onChange={e => {
+                      const newItems = [...customInvoiceForm.items];
+                      newItems[idx].description = e.target.value;
+                      setCustomInvoiceForm({ ...customInvoiceForm, items: newItems });
+                    }} 
+                    style={{ flex: 3, padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)' }} 
+                    required
+                  />
+                  <input 
+                    type="number" 
+                    placeholder="Qty"
+                    min="1"
+                    value={item.qty} 
+                    onChange={e => {
+                      const newItems = [...customInvoiceForm.items];
+                      newItems[idx].qty = parseFloat(e.target.value) || 1;
+                      setCustomInvoiceForm({ ...customInvoiceForm, items: newItems });
+                    }} 
+                    style={{ flex: 0.8, padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', textAlign: 'center' }} 
+                    required
+                  />
+                  <input 
+                    type="number" 
+                    placeholder={isID ? "Harga Satuan" : "Unit Rate"}
+                    value={item.rate} 
+                    onChange={e => {
+                      const newItems = [...customInvoiceForm.items];
+                      newItems[idx].rate = parseFloat(e.target.value) || 0;
+                      setCustomInvoiceForm({ ...customInvoiceForm, items: newItems });
+                    }} 
+                    style={{ flex: 1.5, padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)' }} 
+                    required
+                  />
+                  <div style={{ flex: 1.5, padding: '10px', fontWeight: '700', color: 'var(--text)', textAlign: 'right' }}>
+                    Rp {((parseFloat(item.qty) || 1) * (parseFloat(item.rate) || 0)).toLocaleString('id-ID')}
+                  </div>
+                  {customInvoiceForm.items.length > 1 && (
+                    <button 
+                      type="button" 
+                      onClick={() => setCustomInvoiceForm({
+                        ...customInvoiceForm,
+                        items: customInvoiceForm.items.filter((_, i) => i !== idx)
+                      })} 
+                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)', marginBottom: '25px' }}>
+              <div className="grid-responsive-2" style={{ gap: '20px', alignItems: 'center' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '700' }}>{isID ? 'Pajak (PPN)' : 'Tax (PPN)'}</label>
+                  <select 
+                    value={customInvoiceForm.taxRate} 
+                    onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, taxRate: e.target.value === 'custom' ? 'custom' : parseInt(e.target.value, 10) })} 
+                    style={{ width: '100%', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)' }}
+                  >
+                    <option value="0">{isID ? 'Tanpa Pajak (0%)' : 'No Tax (0%)'}</option>
+                    <option value="11">PPN 11%</option>
+                    <option value="custom">{isID ? 'Pajak Kustom (Nominal)' : 'Custom Tax (Amount)'}</option>
+                  </select>
+                </div>
+                {customInvoiceForm.taxRate === 'custom' && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '700' }}>{isID ? 'Nominal Pajak' : 'Tax Amount'}</label>
+                    <input 
+                      type="number" 
+                      value={customInvoiceForm.taxAmount} 
+                      onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, taxAmount: parseFloat(e.target.value) || 0 })} 
+                      style={{ width: '100%', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)' }} 
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: '20px', borderTop: '1px dashed var(--glass-border)', paddingTop: '15px', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'right' }}>
+                {(() => {
+                  const subtotal = customInvoiceForm.items.reduce((acc, curr) => acc + (parseFloat(curr.qty || 0) * parseFloat(curr.rate || 0)), 0);
+                  let tax = 0;
+                  if (customInvoiceForm.taxRate === 11) {
+                    tax = subtotal * 0.11;
+                  } else if (customInvoiceForm.taxRate === 'custom') {
+                    tax = customInvoiceForm.taxAmount || 0;
+                  }
+                  const total = subtotal + tax;
+
+                  return (
+                    <>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Subtotal: <strong>Rp {subtotal.toLocaleString('id-ID')}</strong></div>
+                      {tax > 0 && <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{isID ? 'Pajak' : 'Tax'}: <strong>Rp {tax.toLocaleString('id-ID')}</strong></div>}
+                      <div style={{ color: 'var(--secondary)', fontSize: '1.2rem', fontWeight: '800', marginTop: '5px' }}>Total Tagihan: Rp {total.toLocaleString('id-ID')}</div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '15px' }}>
+              <button 
+                type="button" 
+                onClick={() => setShowCustomInvoiceModal(false)} 
+                className="btn" 
+                style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)' }}
+              >
+                {isID ? 'Batal' : 'Cancel'}
+              </button>
+              <ButtonWithLoading 
+                onClick={handleSaveCustomInvoice} 
+                className="btn btn-gold" 
+                style={{ flex: 2 }}
+              >
+                <CheckCircle size={16}/> {isID ? 'Buat Invoice' : 'Create Invoice'}
+              </ButtonWithLoading>
             </div>
           </div>
         </div>
