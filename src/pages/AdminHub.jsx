@@ -924,7 +924,7 @@ const AdminHub = () => {
                   <button type="button" onClick={() => setShowModal(false)} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)' }}>
                     {isID ? 'Batal' : 'Cancel'}
                   </button>
-                  <ButtonWithLoading type="submit" className="btn btn-gold" style={{ flex: 1 }} disabled={!selectedQuoteId} onClick={handleModalSubmit}>
+                  <ButtonWithLoading type="button" className="btn btn-gold" style={{ flex: 1 }} disabled={!selectedQuoteId} onClick={handleModalSubmit}>
                     {isID ? 'Buat Form JO' : 'Generate JO Form'}
                   </ButtonWithLoading>
                 </div>
