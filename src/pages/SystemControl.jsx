@@ -14,6 +14,22 @@ import {
   Power
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
+
+const alert = (message) => {
+  if (!message) return;
+  const msgLower = String(message).toLowerCase();
+  const successKeywords = ['berhasil', 'success', 'lunas', 'dispatched', 'sent', 'selesai', 'done', 'saved', 'updated', 'uploaded', 'terbitkan', 'issued', 'settled'];
+  const errorKeywords = ['gagal', 'failed', 'error', 'salah', 'incorrect', 'tidak ditemukan', 'not found', 'incomplete', 'tidak lengkap', 'invalid', 'masalah', 'kurang'];
+  
+  if (errorKeywords.some(keyword => msgLower.includes(keyword))) {
+    toast.error(message);
+  } else if (successKeywords.some(keyword => msgLower.includes(keyword))) {
+    toast.success(message);
+  } else {
+    toast(message);
+  }
+};
 
 import OTPKeys from '../components/OTPKeys';
 

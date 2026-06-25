@@ -1,22 +1,37 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Send, CheckCircle, Plus, X, FileText, ShoppingCart, Trash2, FileCheck, Search, FileSpreadsheet, ChevronDown, ChevronUp, Edit } from 'lucide-react';
+import { useConfirm } from '../context/ConfirmContext';
+import { Send, CheckCircle, Plus, X, FileText, ShoppingCart, Trash2, FileCheck, Search, FileSpreadsheet, ChevronDown, ChevronUp, Edit, ChevronRight, Folder, FolderOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
+import toast from 'react-hot-toast';
+
+const alert = (message) => {
+  if (!message) return;
+  const msgLower = String(message).toLowerCase();
+  const successKeywords = ['berhasil', 'success', 'lunas', 'dispatched', 'sent', 'selesai', 'done', 'saved', 'updated', 'uploaded', 'terbitkan', 'issued', 'settled'];
+  const errorKeywords = ['gagal', 'failed', 'error', 'salah', 'incorrect', 'tidak ditemukan', 'not found', 'incomplete', 'tidak lengkap', 'invalid', 'masalah', 'kurang'];
+  
+  if (errorKeywords.some(keyword => msgLower.includes(keyword))) {
+    toast.error(message);
+  } else if (successKeywords.some(keyword => msgLower.includes(keyword))) {
+    toast.success(message);
+  } else {
+    toast(message);
+  }
+};
 
 const AdminHub = () => {
   const context = useApp();
-  const isCreatingRef = useRef(false);
+  const confirm = useConfirm();
   
   const [quantities, setQuantities] = useState({});
   const [showModal, setShowModal] = useState(false);
   const [selectedQuoteId, setSelectedQuoteId] = useState('');
   const [selectedActivityIndex, setSelectedActivityIndex] = useState(0);
-  const [issueQuantity, setIssueQuantity] = useState(1);
   const [selectedActivities, setSelectedActivities] = useState({});
-  const [activityQuantities, setActivityQuantities] = useState({});
-  const [expandedFolders, setExpandedFolders] = useState({});
+  const [issueQuantity, setIssueQuantity] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('created_desc');
   const [poSearchTerm, setPoSearchTerm] = useState('');
@@ -38,7 +53,7 @@ const AdminHub = () => {
   const [poNotes, setPoNotes] = useState('');
 
   if (!context) return null;
-  const { quotations = [], jobOrders = [], createJO, createBulkJOs, dispatchJO, vendors = [], purchaseOrders = [], createPurchaseOrder, updatePurchaseOrder, issuePurchaseOrder, deletePurchaseOrder, user, t, loading, language, hasAccess } = context;
+  const { quotations = [], jobOrders = [], createJO, dispatchJO, vendors = [], purchaseOrders = [], createPurchaseOrder, updatePurchaseOrder, issuePurchaseOrder, deletePurchaseOrder, user, t, loading, language, hasAccess } = context;
   const isID = language === 'id';
   const canWrite = hasAccess ? hasAccess('admin', true) : false;
   
@@ -248,86 +263,54 @@ const AdminHub = () => {
   const approvedQuotes = quotations.filter(q => q.status === 'approved');
 
   const handleCreateJO = async (quote) => {
-    console.log('handleCreateJO triggered for quote:', quote.id);
-    if (!canWrite) {
-      console.error('Permission denied: canWrite is false');
-      alert(isID ? 'Gagal: Anda tidak memiliki akses untuk menulis!' : 'Failed: You do not have write access!');
-      return;
-    }
+    if (!canWrite) return;
     const hasItems = quote.items && quote.items.length > 0;
-    try {
-      if (hasItems) {
-        // Find checked items
-        const checkedIndices = Object.keys(selectedActivities).filter(idx => selectedActivities[idx]);
-        console.log('checkedIndices:', checkedIndices);
-        if (checkedIndices.length === 0) {
-          alert(isID ? 'Pilih minimal satu aktivitas!' : 'Select at least one activity!');
-          return;
-        }
-        const payloads = checkedIndices.map(idxStr => {
-          const idx = parseInt(idxStr);
-          const item = quote.items[idx];
-          const qty = parseInt(activityQuantities[idx]) || 1;
-          return {
-            quotationId: quote.id,
-            customerName: quote.customerName,
-            jobDescription: item.description,
-            phone: quote.phone || 'N/A',
-            email: quote.email || 'N/A',
-            rate: parseFloat(item.rate || 0),
-            quantity: qty,
-            quoteValidity: quote.validTo || 'N/A'
-          };
-        });
-        console.log('Sending payloads to createBulkJOs:', payloads);
-        await createBulkJOs(payloads);
-      } else {
-        const payload = {
+
+    if (hasItems) {
+      const selectedIndexes = Object.keys(selectedActivities).filter(idx => selectedActivities[idx]?.selected);
+      if (selectedIndexes.length === 0) {
+        alert(isID ? 'Pilih setidaknya satu aktivitas!' : 'Select at least one activity!');
+        return;
+      }
+
+      for (const idxStr of selectedIndexes) {
+        const idx = parseInt(idxStr, 10);
+        const item = quote.items[idx];
+        const qty = selectedActivities[idx]?.quantity || item.quantity || 1;
+        await createJO({
           quotationId: quote.id,
           customerName: quote.customerName,
-          jobDescription: quote.jobDescription || 'N/A',
+          jobDescription: item.description,
           phone: quote.phone || 'N/A',
           email: quote.email || 'N/A',
-          rate: parseFloat(quote.rate || 0),
-          quantity: parseInt(issueQuantity) || 1,
-          quoteValidity: quote.validTo || 'N/A'
-        };
-        console.log('Sending payload to createJO:', payload);
-        await createJO(payload);
-      }
-      console.log('JO creation successful. Resetting state...');
-      setShowModal(false);
-      setSelectedQuoteId('');
-      setSelectedActivities({});
-      setActivityQuantities({});
-      setIssueQuantity(1);
-    } catch (err) {
-      console.error('Error in handleCreateJO:', err);
-      alert((isID ? 'Gagal membuat Job Order: ' : 'Failed to create Job Orders: ') + err.message);
-    }
-  };
-
-  const handleModalSubmit = async (e) => {
-    console.log('handleModalSubmit triggered');
-    if (e && typeof e.preventDefault === 'function') {
-      e.preventDefault();
-    }
-    if (isCreatingRef.current) {
-      console.log('Double submission blocked by useRef lock.');
-      return;
-    }
-    
-    const quote = approvedQuotes.find(q => q.id === selectedQuoteId);
-    console.log('selectedQuoteId:', selectedQuoteId, 'found quote:', quote);
-    if (quote) {
-      isCreatingRef.current = true;
-      try {
-        await handleCreateJO(quote);
-      } finally {
-        isCreatingRef.current = false;
+          rate: parseFloat(item.rate || 0),
+          quantity: parseInt(qty, 10)
+        });
       }
     } else {
-      console.warn('No approved quote found for selectedQuoteId:', selectedQuoteId);
+      await createJO({
+        quotationId: quote.id,
+        customerName: quote.customerName,
+        jobDescription: quote.jobDescription || 'No description',
+        phone: quote.phone || 'N/A',
+        email: quote.email || 'N/A',
+        rate: parseFloat(quote.rate || 0),
+        quantity: parseInt(issueQuantity, 10)
+      });
+    }
+
+    setShowModal(false);
+    setSelectedQuoteId('');
+    setSelectedActivities({});
+    setSelectedActivityIndex(0);
+    setIssueQuantity(1);
+  };
+
+  const handleModalSubmit = (e) => {
+    e.preventDefault();
+    const quote = approvedQuotes.find(q => q.id === selectedQuoteId);
+    if (quote) {
+      handleCreateJO(quote);
     }
   };
 
@@ -337,6 +320,27 @@ const AdminHub = () => {
     const qty = quantities[joId] || jo.quantity || 1;
     await dispatchJO(joId, parseInt(qty));
     alert(isID ? 'Job Order berhasil dikirim ke Pelaksana!' : 'Job Order dispatched to Executor!');
+  };
+
+  const handleDispatchAll = async (group) => {
+    if (!canWrite) return;
+    const confirmed = await confirm(
+      isID 
+        ? `Kirim semua ${group.jobOrders.length} JO untuk ${group.customerName}?` 
+        : `Dispatch all ${group.jobOrders.length} JOs for ${group.customerName}?`,
+      {
+        title: isID ? "Kirim Semua JO" : "Dispatch All JOs",
+        confirmText: isID ? "Kirim" : "Dispatch",
+        cancelText: isID ? "Batal" : "Cancel"
+      }
+    );
+    if (confirmed) {
+      for (const jo of group.jobOrders) {
+        const qty = quantities[jo.id] || jo.quantity || 1;
+        await dispatchJO(jo.id, parseInt(qty));
+      }
+      alert(isID ? 'Semua Job Order berhasil dikirim ke Pelaksana!' : 'All Job Orders dispatched to Executor!');
+    }
   };
 
   return (
@@ -729,20 +733,23 @@ const AdminHub = () => {
                     onChange={e => {
                       const qId = e.target.value;
                       setSelectedQuoteId(qId);
+                      setSelectedActivityIndex(0);
+
                       const quote = approvedQuotes.find(q => q.id === qId);
                       if (quote) {
+                        const defaultQty = quote.items && quote.items.length > 0 ? quote.items[0].quantity : (quote.quantity || 1);
+                        setIssueQuantity(parseInt(defaultQty));
+                        
+                        // Initialize selected activities
+                        const initialSelected = {};
                         if (quote.items && quote.items.length > 0) {
-                          const initialSelected = {};
-                          const initialQuantities = {};
                           quote.items.forEach((item, idx) => {
-                            initialSelected[idx] = true;
-                            initialQuantities[idx] = parseInt(item.quantity) || 1;
+                            initialSelected[idx] = { selected: true, quantity: parseInt(item.quantity || 1) };
                           });
-                          setSelectedActivities(initialSelected);
-                          setActivityQuantities(initialQuantities);
-                        } else {
-                          setIssueQuantity(parseInt(quote.quantity || 1));
                         }
+                        setSelectedActivities(initialSelected);
+                      } else {
+                        setSelectedActivities({});
                       }
                     }}
                     style={{
@@ -778,84 +785,67 @@ const AdminHub = () => {
 
                 {selectedQuoteId && (() => {
                   const q = approvedQuotes.find(quote => quote.id === selectedQuoteId);
-                  if (!q) return null;
-                  const hasMultipleItems = q.items && q.items.length > 1;
+                  const hasItems = q.items && q.items.length > 0;
 
                   return (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                     >
-                      {hasMultipleItems ? (
+                      {hasItems ? (
                         <div style={{ marginBottom: '25px' }}>
-                          <label style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: '10px', fontWeight: 'bold' }}>
-                            <span>{isID ? 'Pilih Item Aktivitas & Jumlah' : 'Select Activities & Quantities'}</span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const allSelected = Object.values(selectedActivities).every(v => v);
-                                const nextSelected = {};
-                                q.items.forEach((_, idx) => {
-                                  nextSelected[idx] = !allSelected;
-                                });
-                                setSelectedActivities(nextSelected);
-                              }}
-                              style={{ background: 'none', border: 'none', color: 'var(--secondary)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}
-                            >
-                              {Object.values(selectedActivities).every(v => v) ? (isID ? 'Sembunyikan Semua' : 'Deselect All') : (isID ? 'Pilih Semua' : 'Select All')}
-                            </button>
+                          <label style={{ marginBottom: '12px', display: 'block', fontWeight: '600' }}>
+                            {isID ? 'Pilih Aktivitas untuk Di-issue' : 'Select Activities to Issue'}
                           </label>
-                          
-                          <div style={{ display: 'grid', gap: '15px' }}>
-                            {q.items.map((item, idx) => (
-                              <div 
-                                key={idx} 
-                                style={{ 
-                                  display: 'flex', 
-                                  flexWrap: 'wrap',
-                                  alignItems: 'center', 
-                                  gap: '15px', 
-                                  padding: '12px 15px', 
-                                  background: selectedActivities[idx] ? 'rgba(6, 95, 70, 0.08)' : 'rgba(255,255,255,0.01)', 
-                                  border: selectedActivities[idx] ? '1px solid rgba(6, 95, 70, 0.3)' : '1px solid var(--border)', 
-                                  borderRadius: '12px',
-                                  transition: 'all 0.2s'
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={!!selectedActivities[idx]}
-                                  onChange={e => setSelectedActivities({ ...selectedActivities, [idx]: e.target.checked })}
-                                  style={{ cursor: 'pointer', width: '18px', height: '18px' }}
-                                />
-                                <div style={{ flex: 1, minWidth: '150px' }}>
-                                  <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>{item.description}</div>
-                                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                    {isID ? 'Kontrak: ' : 'Contract: '}{item.quantity} {item.unit || 'Unit'} @ Rp {parseFloat(item.rate || 0).toLocaleString()}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                            {q.items.map((item, idx) => {
+                              const isChecked = !!selectedActivities[idx]?.selected;
+                              const currentQty = selectedActivities[idx]?.quantity || item.quantity || 1;
+                              return (
+                                <div key={idx} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '15px', padding: '15px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '12px' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      setSelectedActivities(prev => ({
+                                        ...prev,
+                                        [idx]: {
+                                          ...prev[idx],
+                                          selected: e.target.checked
+                                        }
+                                      }));
+                                    }}
+                                    style={{ width: '20px', height: '20px', accentColor: 'var(--secondary)', cursor: 'pointer' }}
+                                  />
+                                  <div style={{ flex: 1, minWidth: '150px' }}>
+                                    <div style={{ fontWeight: '600', fontSize: '0.95rem' }}>{item.description}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                      {isID ? 'Kontrak:' : 'Contract:'} {item.quantity} {item.unit || 'unit'} | Rp {parseFloat(item.rate || 0).toLocaleString()}
+                                    </div>
+                                  </div>
+                                  <div style={{ width: '120px' }}>
+                                    <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                                      {isID ? 'Jumlah Issue:' : 'Issue Qty:'}
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={currentQty}
+                                      disabled={!isChecked}
+                                      onChange={(e) => {
+                                        setSelectedActivities(prev => ({
+                                          ...prev,
+                                          [idx]: {
+                                            ...prev[idx],
+                                            quantity: parseInt(e.target.value) || 1
+                                          }
+                                        }));
+                                      }}
+                                      style={{ width: '100%', padding: '6px 10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.9rem', fontWeight: '700' }}
+                                    />
                                   </div>
                                 </div>
-                                <div style={{ width: '100px' }}>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    required={!!selectedActivities[idx]}
-                                    disabled={!selectedActivities[idx]}
-                                    value={activityQuantities[idx] !== undefined ? activityQuantities[idx] : ''}
-                                    onChange={e => setActivityQuantities({ ...activityQuantities, [idx]: e.target.value })}
-                                    style={{
-                                      width: '100%',
-                                      padding: '6px 10px',
-                                      background: 'var(--input-bg)',
-                                      border: '1px solid var(--border)',
-                                      borderRadius: '8px',
-                                      color: 'var(--text)',
-                                      fontSize: '0.9rem',
-                                      fontWeight: '700',
-                                      textAlign: 'center'
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       ) : (
@@ -863,7 +853,7 @@ const AdminHub = () => {
                           <label style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between' }}>
                             <span>{isID ? 'Jumlah yang Dikeluarkan' : 'Quantity to Issue'}</span>
                             <span style={{ color: 'var(--secondary)', fontSize: '0.75rem' }}>
-                              {isID ? 'Maks Kontrak: ' : 'Contract Max: '}{(q.items?.[0]?.quantity || q.quantity || 1)}
+                              {isID ? 'Maks Kontrak: ' : 'Contract Max: '}{q.quantity || 1}
                             </span>
                           </label>
                           <input
@@ -891,28 +881,16 @@ const AdminHub = () => {
                           <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{isID ? 'Pelanggan:' : 'Customer:'}</span>
                           <div style={{ fontWeight: '600' }}>{q.customerName}</div>
                         </div>
-                        {!hasMultipleItems && (
-                          <>
-                            <div style={{ marginBottom: '10px' }}>
-                              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{isID ? 'Detail Aktivitas Terpilih:' : 'Selected Activity Detail:'}</span>
-                              <div style={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>
-                                {(q.items?.[0]?.description || q.jobDescription || '-')}
-                              </div>
-                            </div>
-                            <div>
-                              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{isID ? 'Harga Kontrak:' : 'Contract Rate:'}</span>
-                              <div style={{ fontWeight: '700', color: 'var(--secondary)' }}>
-                                Rp {parseFloat(q.items?.[0]?.rate || q.rate || 0).toLocaleString()}
-                              </div>
-                            </div>
-                          </>
+                        {q.companyAddress && (
+                          <div style={{ marginBottom: '10px' }}>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{isID ? 'Alamat Perusahaan:' : 'Company Address:'}</span>
+                            <div style={{ fontSize: '0.9rem' }}>{q.companyAddress}</div>
+                          </div>
                         )}
-                        {hasMultipleItems && (
-                          <div>
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{isID ? 'Total Nilai Kontrak:' : 'Total Contract Value:'}</span>
-                            <div style={{ fontWeight: '700', color: 'var(--secondary)' }}>
-                              Rp {parseFloat(q.total || 0).toLocaleString()}
-                            </div>
+                        {!hasItems && (
+                          <div style={{ marginBottom: '10px' }}>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{isID ? 'Deskripsi:' : 'Description:'}</span>
+                            <div style={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>{q.jobDescription}</div>
                           </div>
                         )}
                       </div>
@@ -924,7 +902,7 @@ const AdminHub = () => {
                   <button type="button" onClick={() => setShowModal(false)} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)' }}>
                     {isID ? 'Batal' : 'Cancel'}
                   </button>
-                  <ButtonWithLoading type="button" className="btn btn-gold" style={{ flex: 1 }} disabled={!selectedQuoteId} onClick={handleModalSubmit}>
+                  <ButtonWithLoading type="submit" className="btn btn-gold" style={{ flex: 1 }} disabled={!selectedQuoteId} onClick={handleModalSubmit}>
                     {isID ? 'Buat Form JO' : 'Generate JO Form'}
                   </ButtonWithLoading>
                 </div>
@@ -1050,11 +1028,14 @@ const AdminHub = () => {
         </AnimatePresence>
       </div>
 
-      <div className="glass-card" style={{ padding: '25px', marginTop: '30px' }}>
-        <h4 style={{ marginBottom: '25px' }}>{isID ? 'Job Order untuk Dikirim' : 'Job Orders for Dispatch'}</h4>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div className="glass-card" style={{ padding: '25px', marginTop: '30px', overflowX: 'auto' }}>
+        <h4 style={{ marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Folder size={20} style={{ color: 'var(--secondary)' }} />
+          {isID ? 'Job Order Draft (Grup Penawaran)' : 'Job Order Drafts (Grouped by Quotation)'}
+        </h4>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px' }}>
           {(() => {
-            const pendingJOs = jobOrders
+            const filteredPendingJOs = jobOrders
               .filter(jo => jo.status === 'pending')
               .filter(jo => filterByDate(jo.date))
               .filter(jo => {
@@ -1064,223 +1045,113 @@ const AdminHub = () => {
                 return id.toLowerCase().includes(term) || name.toLowerCase().includes(term);
               });
 
-            // Grouping by quotationId
-            const groups = {};
-            pendingJOs.forEach(jo => {
-              const qId = jo.quotationId || 'direct';
-              if (!groups[qId]) {
+            const joGroups = {};
+            filteredPendingJOs.forEach(jo => {
+              const qId = jo.quotationId || 'no-quotation';
+              if (!joGroups[qId]) {
                 const quote = quotations.find(q => q.id === qId);
-                groups[qId] = {
+                joGroups[qId] = {
                   quotationId: qId,
-                  customerName: jo.customerName || (quote ? quote.customerName : 'Direct Customer'),
+                  customerName: quote ? quote.customerName : jo.customerName,
                   date: quote ? quote.date : jo.date,
                   jobOrders: []
                 };
               }
-              groups[qId].jobOrders.push(jo);
+              joGroups[qId].jobOrders.push(jo);
             });
 
-            const sortedGroups = Object.values(groups).sort((a, b) => {
-              if (sortBy === 'created_desc') {
-                return (b.date || '').localeCompare(a.date || '') || b.quotationId.localeCompare(a.quotationId);
-              }
-              if (sortBy === 'created_asc') {
-                return (a.date || '').localeCompare(a.date || '') || a.quotationId.localeCompare(b.quotationId);
-              }
-              if (sortBy === 'company_asc') {
-                return a.customerName.localeCompare(b.customerName);
-              }
-              if (sortBy === 'company_desc') {
-                return b.customerName.localeCompare(a.customerName);
-              }
-              if (sortBy === 'id_asc') {
-                return a.quotationId.localeCompare(b.quotationId);
-              }
-              if (sortBy === 'id_desc') {
-                return b.quotationId.localeCompare(a.quotationId);
-              }
-              return 0;
+            const joGroupsArray = Object.values(joGroups).sort((a, b) => {
+              const timeA = a.date ? new Date(a.date).getTime() : 0;
+              const timeB = b.date ? new Date(b.date).getTime() : 0;
+              return timeB - timeA;
             });
 
-            const handleDispatchAll = async (group) => {
-              if (!canWrite) return;
-              try {
-                for (const jo of group.jobOrders) {
-                  const qty = quantities[jo.id] || jo.quantity || 1;
-                  await dispatchJO(jo.id, parseInt(qty));
-                }
-                alert(isID ? 'Semua Job Order berhasil dikirim!' : 'All Job Orders dispatched successfully!');
-              } catch (err) {
-                console.error(err);
-                alert(isID ? 'Gagal mengirim beberapa Job Order.' : 'Failed to dispatch some Job Orders.');
-              }
-            };
-
-            const handleDeleteFolder = async (group) => {
-              if (user?.role !== 'owner') return;
-              const confirmMsg = isID 
-                ? `Hapus folder ${group.quotationId} dan semua JO draft di dalamnya?`
-                : `Delete folder ${group.quotationId} and all draft JOs inside it?`;
-              if (window.confirm(confirmMsg)) {
-                try {
-                  for (const jo of group.jobOrders) {
-                    await deleteJO(jo.id);
-                  }
-                } catch (err) {
-                  console.error(err);
-                }
-              }
-            };
-
-            return sortedGroups.map(group => {
-              const isExpanded = expandedFolders[group.quotationId] !== false;
+            if (joGroupsArray.length === 0) {
               return (
-                <div 
-                  key={group.quotationId} 
-                  className="glass-card" 
-                  style={{ 
-                    padding: '20px', 
-                    background: 'rgba(255,255,255,0.02)', 
-                    border: '1px solid var(--glass-border)',
-                    borderRadius: '12px'
-                  }}
-                >
-                  {/* Folder Header */}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '15px', borderBottom: isExpanded ? '1px solid var(--glass-border)' : 'none', paddingBottom: isExpanded ? '15px' : '0', marginBottom: isExpanded ? '15px' : '0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => setExpandedFolders({ ...expandedFolders, [group.quotationId]: !isExpanded })}>
-                      <div style={{ fontSize: '1.5rem' }}>📁</div>
-                      <div>
-                        <div style={{ fontWeight: '800', color: 'var(--secondary)', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {group.quotationId === 'direct' ? (isID ? 'JO Langsung' : 'Direct JOs') : group.quotationId}
-                          <span style={{ fontSize: '0.75rem', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', padding: '2px 8px', borderRadius: '10px' }}>
-                            {group.jobOrders.length} {isID ? 'Pekerjaan' : 'Jobs'}
-                          </span>
-                        </div>
-                        <div style={{ fontWeight: '700', fontSize: '1.1rem', marginTop: '2px' }}>{group.customerName}</div>
-                      </div>
-                    </div>
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      {canWrite && (
-                        <ButtonWithLoading 
-                          className="btn btn-gold" 
-                          style={{ padding: '8px 15px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }} 
-                          onClick={() => handleDispatchAll(group)}
-                        >
-                          <Send size={14} />
-                          {isID ? 'Kirim Semua' : 'Dispatch All'}
-                        </ButtonWithLoading>
-                      )}
-                      {user?.role === 'owner' && (
-                        <button 
-                          className="btn-icon" 
-                          style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', width: '32px', height: '32px' }} 
-                          onClick={() => handleDeleteFolder(group)}
-                          title={isID ? "Hapus Folder" : "Delete Folder"}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => setExpandedFolders({ ...expandedFolders, [group.quotationId]: !isExpanded })}
-                        style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '5px' }}
-                      >
-                        {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Folder Items */}
-                  {isExpanded && (
-                    <div style={{ display: 'grid', gap: '15px' }}>
-                      {group.jobOrders.map(jo => (
-                        <div 
-                          key={jo.id} 
-                          style={{ 
-                            display: 'flex', 
-                            flexWrap: 'wrap', 
-                            justifyContent: 'space-between', 
-                            alignItems: 'center', 
-                            gap: '15px', 
-                            padding: '15px', 
-                            background: 'rgba(255,255,255,0.01)', 
-                            border: '1px solid rgba(255,255,255,0.03)', 
-                            borderRadius: '10px' 
-                          }}
-                        >
-                          <div style={{ flex: 1, minWidth: '200px' }}>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ color: 'var(--secondary)', fontWeight: 'bold' }}>{jo.id}</span>
-                              <span>•</span>
-                              <span>{jo.date}</span>
-                            </div>
-                            <div style={{ fontSize: '0.95rem', fontWeight: '600', marginTop: '4px' }}>{jo.jobDescription}</div>
-                            {jo.rate && (
-                              <div style={{ fontSize: '0.8rem', color: 'var(--secondary)', marginTop: '2px', fontWeight: 'bold' }}>
-                                Rp {parseFloat(jo.rate).toLocaleString()}
-                              </div>
-                            )}
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{isID ? 'Jumlah:' : 'Qty:'}</span>
-                              <input
-                                type="number"
-                                min="1"
-                                disabled={!canWrite}
-                                value={quantities[jo.id] !== undefined ? quantities[jo.id] : (jo.quantity || '')}
-                                onChange={e => setQuantities({ ...quantities, [jo.id]: e.target.value })}
-                                style={{
-                                  width: '70px',
-                                  padding: '5px 10px',
-                                  background: 'var(--input-bg)',
-                                  border: '1px solid var(--border)',
-                                  borderRadius: '8px',
-                                  color: 'var(--text)',
-                                  fontSize: '0.85rem',
-                                  fontWeight: '700',
-                                  textAlign: 'center'
-                                }}
-                              />
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                              {canWrite && (
-                                <ButtonWithLoading 
-                                  className="btn btn-gold" 
-                                  style={{ padding: '6px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }} 
-                                  onClick={() => handleDispatch(jo.id)}
-                                >
-                                  <Send size={12} />
-                                  {isID ? 'Kirim' : 'Dispatch'}
-                                </ButtonWithLoading>
-                              )}
-                              {canWrite && (
-                                <button 
-                                  className="btn-icon" 
-                                  style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', width: '30px', height: '30px' }} 
-                                  onClick={() => setDeleteJOConfirm(jo)}
-                                  title={isID ? "Hapus" : "Delete"}
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
+                  {isID ? 'Belum ada form JO draft.' : 'No JO forms drafted yet.'}
                 </div>
               );
-            });
+            }
+
+            return joGroupsArray.map(group => (
+              <div key={group.quotationId} className="glass-card" style={{ padding: '25px', border: '1px solid var(--secondary)', background: 'rgba(6, 95, 70, 0.03)' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--glass-border)', paddingBottom: '15px', marginBottom: '20px', gap: '15px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <FolderOpen size={24} style={{ color: 'var(--secondary)' }} />
+                    <div>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>
+                        {isID ? 'RUJUKAN PENAWARAN' : 'QUOTATION REFERENCE'}
+                      </span>
+                      <strong style={{ color: 'var(--secondary)', fontSize: '1rem' }}>{group.quotationId}</strong>
+                      <span style={{ margin: '0 8px', color: 'var(--text-muted)' }}>|</span>
+                      <strong style={{ fontSize: '1rem' }}>{group.customerName}</strong>
+                    </div>
+                  </div>
+                  {canWrite && (
+                    <ButtonWithLoading 
+                      className="btn btn-gold" 
+                      style={{ padding: '8px 16px', fontSize: '0.8rem' }}
+                      onClick={() => handleDispatchAll(group)}
+                    >
+                      <Send size={15} />
+                      {isID ? 'Kirim Semua JO' : 'Dispatch All JOs'} ({group.jobOrders.length})
+                    </ButtonWithLoading>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: '20px' }}>
+                  {group.jobOrders.map(jo => (
+                    <div key={jo.id} style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                          <span style={{ fontWeight: '700', color: 'var(--secondary)', fontSize: '0.85rem' }}>{jo.id}</span>
+                          {canWrite && (
+                            <button 
+                              className="btn-icon" 
+                              style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', width: '28px', height: '28px' }} 
+                              onClick={() => setDeleteJOConfirm(jo)}
+                              title={isID ? "Hapus Draft JO" : "Delete Draft JO"}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                        <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '15px', minHeight: '35px', fontWeight: '500' }}>
+                          {jo.jobDescription}
+                        </p>
+                      </div>
+
+                      <div>
+                        <div className="input-group" style={{ marginBottom: '15px' }}>
+                          <label style={{ fontSize: '0.75rem', marginBottom: '4px', display: 'block' }}>{isID ? 'Jumlah Pekerjaan (Unit)' : 'Work Quantity (Units)'}</label>
+                          <input
+                            type="number"
+                            min="1"
+                            disabled={!canWrite}
+                            value={quantities[jo.id] || jo.quantity || ''}
+                            onChange={e => setQuantities({ ...quantities, [jo.id]: e.target.value })}
+                            placeholder={isID ? "Masukkan jumlah..." : "Enter quantity..."}
+                            style={{ borderRadius: '8px', padding: '6px 12px', fontSize: '0.9rem' }}
+                          />
+                        </div>
+                        {canWrite && (
+                          <ButtonWithLoading 
+                            className="btn btn-gold" 
+                            style={{ width: '100%', padding: '8px 12px', fontSize: '0.8rem' }} 
+                            onClick={() => handleDispatch(jo.id)}
+                          >
+                            <Send size={14} />
+                            {isID ? 'Kirim ke Pelaksana' : 'Dispatch'}
+                          </ButtonWithLoading>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ));
           })()}
-          {jobOrders.filter(jo => jo.status === 'pending').length === 0 && (
-            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
-              {isID ? 'Belum ada form JO draft.' : 'No JO forms drafted yet.'}
-            </div>
-          )}
         </div>
       </div>
     </div>

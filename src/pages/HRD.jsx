@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useConfirm } from '../context/ConfirmContext';
 import toast from 'react-hot-toast';
 import { 
   Users, 
@@ -22,6 +23,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 const HRD = () => {
+  const confirm = useConfirm();
   const { 
     employees = [], addEmployee, updateEmployee, deleteEmployee,
     employeeAccounts = [], addEmployeeAccount, updateEmployeeAccount, deleteEmployeeAccount,
@@ -248,8 +250,17 @@ const HRD = () => {
                               </button>
                               <button 
                                 title={isID ? "Hapus Akses" : "Remove Access"}
-                                onClick={() => {
-                                  if (confirm(isID ? `Hapus akses sistem untuk ${emp.name}?` : `Remove system access for ${emp.name}?`)) {
+                                onClick={async () => {
+                                  const confirmed = await confirm(
+                                    isID ? `Hapus akses sistem untuk ${emp.name}?` : `Remove system access for ${emp.name}?`,
+                                    {
+                                      title: isID ? "Hapus Akses" : "Remove Access",
+                                      confirmText: isID ? "Hapus" : "Remove",
+                                      cancelText: isID ? "Batal" : "Cancel",
+                                      isDanger: true
+                                    }
+                                  );
+                                  if (confirmed) {
                                     deleteEmployeeAccount(emp.id);
                                   }
                                 }}
@@ -300,8 +311,17 @@ const HRD = () => {
                           <button 
                             className="btn-icon" 
                             style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }}
-                            onClick={() => {
-                              if (confirm(isID ? `Hapus karyawan ${emp.name}?` : `Delete employee ${emp.name}?`)) {
+                            onClick={async () => {
+                              const confirmed = await confirm(
+                                isID ? `Hapus karyawan ${emp.name}?` : `Delete employee ${emp.name}?`,
+                                {
+                                  title: isID ? "Hapus Karyawan" : "Delete Employee",
+                                  confirmText: isID ? "Hapus" : "Delete",
+                                  cancelText: isID ? "Batal" : "Cancel",
+                                  isDanger: true
+                                }
+                              );
+                              if (confirmed) {
                                 deleteEmployee(emp.id);
                               }
                             }}

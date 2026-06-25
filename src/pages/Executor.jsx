@@ -1,10 +1,26 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { Truck, Camera, CheckCircle2, Package, History, PlayCircle, X, Search, FileSpreadsheet, Plus, FileText, Printer, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Truck, Camera, CheckCircle2, Package, History, PlayCircle, X, Search, FileSpreadsheet, Plus, FileText, Printer, Trash2, Folder, FolderOpen, ChevronDown, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
+import toast from 'react-hot-toast';
+
+const alert = (message) => {
+  if (!message) return;
+  const msgLower = String(message).toLowerCase();
+  const successKeywords = ['berhasil', 'success', 'lunas', 'dispatched', 'sent', 'selesai', 'done', 'saved', 'updated', 'uploaded', 'terbitkan', 'issued', 'settled'];
+  const errorKeywords = ['gagal', 'failed', 'error', 'salah', 'incorrect', 'tidak ditemukan', 'not found', 'incomplete', 'tidak lengkap', 'invalid', 'masalah', 'kurang'];
+  
+  if (errorKeywords.some(keyword => msgLower.includes(keyword))) {
+    toast.error(message);
+  } else if (successKeywords.some(keyword => msgLower.includes(keyword))) {
+    toast.success(message);
+  } else {
+    toast(message);
+  }
+};
 
 const toDatetimeLocal = (isoString) => {
   if (!isoString) return '';
@@ -502,66 +518,62 @@ const Executor = () => {
           </thead>
           <tbody>
             {(() => {
-              // Grouping by quotationId
+              // Group filteredJOs by quotationId
               const groups = {};
               filteredJOs.forEach(jo => {
-                const qId = jo.quotationId || 'direct';
+                const qId = jo.quotationId || 'no-quotation';
                 if (!groups[qId]) {
                   groups[qId] = {
                     quotationId: qId,
-                    customerName: jo.customerName || 'Direct Customer',
+                    customerName: jo.customerName,
+                    date: jo.date,
                     jobOrders: []
                   };
                 }
                 groups[qId].jobOrders.push(jo);
               });
 
-              const groupedJOs = Object.values(groups);
+              const groupedArray = Object.values(groups).sort((a, b) => {
+                const timeA = a.date ? new Date(a.date).getTime() : 0;
+                const timeB = b.date ? new Date(b.date).getTime() : 0;
+                return timeB - timeA;
+              });
 
-              return groupedJOs.map(group => {
-                const isGroupExpanded = expandedGroups[group.quotationId] !== false;
-                const totalJOs = group.jobOrders.length;
-                const doneJOs = group.jobOrders.filter(j => j.status === 'done').length;
-                
+              if (groupedArray.length === 0) {
+                return null;
+              }
+
+              return groupedArray.map(group => {
+                const isGroupExpanded = !!expandedGroups[group.quotationId];
                 return (
                   <React.Fragment key={group.quotationId}>
-                    {/* Quotation Group Header Row */}
+                    {/* Folder Header Row */}
                     <tr 
-                      style={{ 
-                        background: 'rgba(212, 175, 55, 0.05)', 
-                        borderBottom: '2px solid var(--secondary)',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => setExpandedGroups({ ...expandedGroups, [group.quotationId]: !isGroupExpanded })}
+                      style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(212, 175, 55, 0.05)', cursor: 'pointer' }} 
+                      className="table-row-hover" 
+                      onClick={() => setExpandedGroups(prev => ({ ...prev, [group.quotationId]: !prev[group.quotationId] }))}
                     >
-                      <td colSpan="8" style={{ padding: '12px 15px', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <td colSpan="8" style={{ padding: '15px', fontWeight: '800' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontSize: '1.2rem' }}>📁</span>
-                            <span style={{ fontWeight: '800', color: 'var(--secondary)' }}>
-                              {group.quotationId === 'direct' ? (isID ? 'Pekerjaan Langsung' : 'Direct Jobs') : group.quotationId}
-                            </span>
-                            <span style={{ color: 'var(--text)', fontWeight: '700', marginLeft: '5px' }}>
-                              — {group.customerName}
-                            </span>
+                            {isGroupExpanded ? <ChevronDown size={16} style={{ color: 'var(--secondary)' }} /> : <ChevronRight size={16} style={{ color: 'var(--secondary)' }} />}
+                            {isGroupExpanded ? <FolderOpen size={20} style={{ color: 'var(--secondary)' }} /> : <Folder size={20} style={{ color: 'var(--secondary)' }} />}
+                            <span style={{ color: 'var(--secondary)' }}>{group.quotationId}</span>
+                            <span style={{ color: 'var(--text-muted)' }}>|</span>
+                            <span>{group.customerName}</span>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>
-                              {isID ? `Progress: ${doneJOs} dari ${totalJOs} Selesai` : `Progress: ${doneJOs} of ${totalJOs} Done`}
-                            </span>
-                            {isGroupExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                          </div>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', background: 'rgba(255,255,255,0.05)', padding: '2px 10px', borderRadius: '20px' }}>
+                            {group.jobOrders.length} {isID ? 'Aktivitas' : 'Activities'}
+                          </span>
                         </div>
                       </td>
                     </tr>
 
-                    {/* Child Job Orders inside this group */}
+                    {/* Child Job Order Rows */}
                     {isGroupExpanded && group.jobOrders.map(jo => (
                       <React.Fragment key={jo.id}>
                         <tr style={{ borderBottom: '1px solid var(--glass-border)', cursor: 'pointer', background: 'rgba(255,255,255,0.01)' }} className="table-row-hover" onClick={() => toggleRow(jo)}>
-                          <td style={{ padding: '15px', fontWeight: '800', color: 'var(--secondary)', paddingLeft: '30px' }}>
-                            <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>└</span> {jo.id}
-                          </td>
+                          <td style={{ padding: '15px 15px 15px 35px', fontWeight: '800', color: 'var(--secondary)', borderLeft: '3px solid var(--secondary)' }}>{jo.id}</td>
                           <td style={{ padding: '15px' }}>
                             <div style={{ fontWeight: '600' }}>{jo.customerName}</div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}</div>
@@ -638,8 +650,8 @@ const Executor = () => {
                                 </button>
                               )}
                               {activeTab === 'records' && canWrite && (
-                                <button
-                                  className="btn-icon"
+                                <button 
+                                  className="btn-icon" 
                                   style={{ width: '38px', height: '38px', color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
                                   onClick={(e) => { e.stopPropagation(); setJoToDelete(jo); setVerifyCode(''); setVerifyError(''); }}
                                   title={isID ? "Hapus Catatan JO" : "Delete JO Record"}
@@ -650,10 +662,11 @@ const Executor = () => {
                             </div>
                           </td>
                         </tr>
-
+                        
+                        {/* Expandable Row for Editing (only for active or when clicked) */}
                         <AnimatePresence>
                           {uploadingForId === jo.id && (
-                            <tr>
+                            <tr key={`${jo.id}-edit`}>
                               <td colSpan="8" style={{ padding: 0 }}>
                                 <motion.div 
                                   initial={{ height: 0, opacity: 0 }} 
@@ -664,64 +677,79 @@ const Executor = () => {
                                   <div className="grid-responsive-2" style={{ padding: '25px' }}>
                                     <div style={{ display: 'grid', gap: '20px' }}>
                                       <div className="grid-responsive-3">
+                                        {/* Multi Container */}
                                         <div className="input-group">
                                           <label>{isID ? 'Nomor Kontainer' : 'Container Number'} <span style={{ color: '#ef4444' }}>*</span></label>
                                           {(localData[jo.id]?.containerNo || []).map((c, i, arr) => (
                                             <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
-                                              <input disabled={!canWrite} type="text" value={c} onChange={e => handleLocalListItemUpdate(jo.id, 'containerNo', i, e.target.value)} placeholder={`${isID ? 'Kontainer' : 'Container'} ${i+1}`} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)', padding: '12px', flex: 1 }} />
-                                              {canWrite && arr.length > 1 && (
-                                                <button onClick={() => removeLocalListItem(jo.id, 'containerNo', i)} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', width: '42px', cursor: 'pointer' }}>×</button>
+                                              <input disabled={!canWrite} type="text" value={c} onChange={e => handleLocalListItemUpdate(jo.id, 'containerNo', i, e.target.value)} placeholder="CONT-123456" />
+                                              {arr.length > 1 && canWrite && (
+                                                <button className="btn-icon" onClick={() => removeLocalListItem(jo.id, 'containerNo', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
+                                                  <X size={12} />
+                                                </button>
+                                              )}
+                                              {canWrite && (
+                                                <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'containerNo')} style={{ padding: '5px', height: 'auto', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} title={isID ? "Tambah Kontainer" : "Add Container"}>
+                                                  <Plus size={12} />
+                                                </button>
                                               )}
                                             </div>
                                           ))}
-                                          {canWrite && (
-                                            <button onClick={() => addLocalListItem(jo.id, 'containerNo')} style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '10px', padding: '8px', cursor: 'pointer', fontSize: '0.8rem', marginTop: '5px' }}>
-                                              + {isID ? 'Tambah Kontainer' : 'Add Container'}
-                                            </button>
-                                          )}
                                         </div>
-
+                                        
+                                        {/* Multi Vehicle */}
                                         <div className="input-group">
-                                          <label>{isID ? 'Nomor Kendaraan / Nopol' : 'Vehicle Number'} <span style={{ color: '#ef4444' }}>*</span></label>
+                                          <label>{isID ? 'Nomor Kendaraan' : 'Vehicle Number'} <span style={{ color: '#ef4444' }}>*</span></label>
                                           {(localData[jo.id]?.vehicleNo || []).map((v, i, arr) => (
                                             <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
-                                              <input disabled={!canWrite} type="text" value={v} onChange={e => handleLocalListItemUpdate(jo.id, 'vehicleNo', i, e.target.value)} placeholder={`${isID ? 'Kendaraan' : 'Vehicle'} ${i+1}`} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)', padding: '12px', flex: 1 }} />
-                                              {canWrite && arr.length > 1 && (
-                                                <button onClick={() => removeLocalListItem(jo.id, 'vehicleNo', i)} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', width: '42px', cursor: 'pointer' }}>×</button>
+                                              <input disabled={!canWrite} type="text" value={v} onChange={e => handleLocalListItemUpdate(jo.id, 'vehicleNo', i, e.target.value)} placeholder="B 1234 ABC" />
+                                              {arr.length > 1 && canWrite && (
+                                                <button className="btn-icon" onClick={() => removeLocalListItem(jo.id, 'vehicleNo', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
+                                                  <X size={12} />
+                                                </button>
+                                              )}
+                                              {canWrite && (
+                                                <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'vehicleNo')} style={{ padding: '5px', height: 'auto', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} title={isID ? "Tambah Kendaraan" : "Add Vehicle"}>
+                                                  <Plus size={12} />
+                                                </button>
                                               )}
                                             </div>
                                           ))}
-                                          {canWrite && (
-                                            <button onClick={() => addLocalListItem(jo.id, 'vehicleNo')} style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '10px', padding: '8px', cursor: 'pointer', fontSize: '0.8rem', marginTop: '5px' }}>
-                                              + {isID ? 'Tambah Kendaraan' : 'Add Vehicle'}
-                                            </button>
-                                          )}
                                         </div>
-
+                                        
+                                        {/* Multi Driver */}
                                         <div className="input-group">
-                                          <label>{isID ? 'Nama Pengemudi' : 'Driver Name'} <span style={{ color: '#ef4444' }}>*</span></label>
+                                          <label>{isID ? 'Nama Sopir' : 'Driver Name'} <span style={{ color: '#ef4444' }}>*</span></label>
                                           {(localData[jo.id]?.driverName || []).map((d, i, arr) => (
                                             <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
-                                              <input disabled={!canWrite} type="text" value={d} onChange={e => handleLocalListItemUpdate(jo.id, 'driverName', i, e.target.value)} placeholder={`${isID ? 'Supir' : 'Driver'} ${i+1}`} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)', padding: '12px', flex: 1 }} />
-                                              {canWrite && arr.length > 1 && (
-                                                <button onClick={() => removeLocalListItem(jo.id, 'driverName', i)} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', width: '42px', cursor: 'pointer' }}>×</button>
+                                              <input disabled={!canWrite} type="text" value={d} onChange={e => handleLocalListItemUpdate(jo.id, 'driverName', i, e.target.value)} placeholder={isID ? "Nama Sopir" : "Driver Name"} />
+                                              {arr.length > 1 && canWrite && (
+                                                <button className="btn-icon" onClick={() => removeLocalListItem(jo.id, 'driverName', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
+                                                  <X size={12} />
+                                                </button>
+                                              )}
+                                              {canWrite && (
+                                                <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'driverName')} style={{ padding: '5px', height: 'auto', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} title={isID ? "Tambah Sopir" : "Add Driver"}>
+                                                  <Plus size={12} />
+                                                </button>
                                               )}
                                             </div>
                                           ))}
-                                          {canWrite && (
-                                            <button onClick={() => addLocalListItem(jo.id, 'driverName')} style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '10px', padding: '8px', cursor: 'pointer', fontSize: '0.8rem', marginTop: '5px' }}>
-                                              + {isID ? 'Tambah Supir' : 'Add Driver'}
-                                            </button>
-                                          )}
                                         </div>
                                       </div>
-
+                                      <div className="input-group">
+                                        <label>{isID ? 'Status Aktivitas' : 'Activity Status'} <span style={{ color: '#ef4444' }}>*</span></label>
+                                        <input 
+                                          disabled={!canWrite}
+                                          type="text" 
+                                          value={localData[jo.id]?.activityStatus || ''} 
+                                          onChange={e => handleLocalUpdate(jo.id, 'activityStatus', e.target.value)} 
+                                          placeholder={isID ? "Perbarui status operasional terakhir..." : "Update last operational status..."} 
+                                        />
+                                      </div>
+                                      
+                                      {/* Date Pickers Grid */}
                                       <div className="grid-responsive-2">
-                                        <div className="input-group">
-                                          <label>{isID ? 'Status Pengiriman Terakhir' : 'Latest Delivery Status'} <span style={{ color: '#ef4444' }}>*</span></label>
-                                          <input disabled={!canWrite} type="text" value={localData[jo.id]?.activityStatus || ''} onChange={e => handleLocalUpdate(jo.id, 'activityStatus', e.target.value)} placeholder={isID ? "Contoh: Bongkar di Gudang, OTW, dll." : "e.g. Discharging, On the way, etc."} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)', padding: '12px' }} />
-                                        </div>
-
                                         <div className="input-group">
                                           <label>{isID ? 'Waktu Pengiriman (Dispatched)' : 'Dispatched Date & Time'}</label>
                                           <input 
@@ -759,11 +787,11 @@ const Executor = () => {
                                           </div>
                                         )}
                                       </div>
-
+                                      
                                       <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
                                         <strong style={{ color: 'var(--text)' }}>{isID ? 'Instruksi Lengkap:' : 'Full Instruction:'}</strong> {jo.jobDescription}
                                       </div>
-
+                                      
                                       {canWrite && (
                                         <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
                                           <ButtonWithLoading
@@ -823,6 +851,7 @@ const Executor = () => {
           </tbody>
         </table></div>
 
+        {/* Surat Jalan Modal */}
         {filteredJOs.length === 0 && (
           <div style={{ textAlign: 'center', padding: '100px 20px' }}>
             <Package size={64} color="rgba(255,255,255,0.05)" style={{ marginBottom: '20px' }} />

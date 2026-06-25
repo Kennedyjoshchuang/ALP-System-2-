@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileText, 
@@ -13,6 +14,7 @@ import {
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
 
 const QuotationList = () => {
+  const confirm = useConfirm();
   const { 
     quotations, 
     approveQuotation, 
@@ -22,6 +24,7 @@ const QuotationList = () => {
     hasAccess,
     language
   } = useApp();
+  const isID = language === 'id';
   const canWrite = hasAccess ? hasAccess('marketing', true) : false;
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -330,7 +333,18 @@ const QuotationList = () => {
                         className="btn-icon" 
                         style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }} 
                         onClick={async () => { 
-                          if(window.confirm(`Hapus penawaran ${quote.id} untuk ${quote.customerName} secara permanen? Semua data Job Order dan Invoice terkait juga akan dihapus.`)) {
+                          const confirmed = await confirm(
+                            isID
+                              ? `Hapus penawaran ${quote.id} untuk ${quote.customerName} secara permanen? Semua data Job Order dan Invoice terkait juga akan dihapus.`
+                              : `Permanently delete quotation ${quote.id} for ${quote.customerName}? All related Job Order and Invoice data will also be deleted.`,
+                            {
+                              title: isID ? "Hapus Penawaran" : "Delete Quotation",
+                              confirmText: isID ? "Hapus Permanen" : "Delete Permanently",
+                              cancelText: isID ? "Batal" : "Cancel",
+                              isDanger: true
+                            }
+                          );
+                          if (confirmed) {
                             await deleteQuotation(quote.id);
                           }
                         }}

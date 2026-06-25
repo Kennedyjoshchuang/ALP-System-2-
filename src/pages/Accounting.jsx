@@ -1,8 +1,25 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { CreditCard, Download, Receipt, Wallet, CheckCircle, Plus, X, XCircle, DollarSign, Search, FileSpreadsheet, RotateCcw, Edit3, Save, Image, ChevronDown, ChevronUp, User, Briefcase, Banknote, Calendar, FileText, Trash2, Settings, ExternalLink, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { useConfirm } from '../context/ConfirmContext';
+import { CreditCard, Download, Receipt, Wallet, CheckCircle, Plus, X, XCircle, DollarSign, Search, FileSpreadsheet, RotateCcw, Edit3, Save, Image, ChevronDown, ChevronUp, User, Briefcase, Banknote, Calendar, FileText, Trash2, Settings, ExternalLink, ShieldCheck, ShieldAlert, ChevronRight, Folder, FolderOpen } from 'lucide-react';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
+import toast from 'react-hot-toast';
+
+const alert = (message) => {
+  if (!message) return;
+  const msgLower = String(message).toLowerCase();
+  const successKeywords = ['berhasil', 'success', 'lunas', 'dispatched', 'sent', 'selesai', 'done', 'saved', 'updated', 'uploaded', 'terbitkan', 'issued', 'settled'];
+  const errorKeywords = ['gagal', 'failed', 'error', 'salah', 'incorrect', 'tidak ditemukan', 'not found', 'incomplete', 'tidak lengkap', 'invalid', 'masalah', 'kurang'];
+  
+  if (errorKeywords.some(keyword => msgLower.includes(keyword))) {
+    toast.error(message);
+  } else if (successKeywords.some(keyword => msgLower.includes(keyword))) {
+    toast.success(message);
+  } else {
+    toast(message);
+  }
+};
 
 const defaultSubcategories = {
   'Gaji': [
@@ -39,6 +56,7 @@ const defaultSubcategories = {
 
 const Accounting = () => {
   const context = useApp();
+  const confirm = useConfirm();
   
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
@@ -79,19 +97,6 @@ const Accounting = () => {
   const [salaryModal, setSalaryModal] = useState(false);
   const [salaryForm, setSalaryForm] = useState({
     name: '', position: '', bankAccount: '', bankName: '', baseSalary: '', period: '', nik: '', npwp: '', taxes: [], proofPhoto: '', expenseDate: ''
-  });
-
-  // Custom Invoice States
-  const [showCustomInvoiceModal, setShowCustomInvoiceModal] = useState(false);
-  const [customInvoiceForm, setCustomInvoiceForm] = useState({
-    id: '',
-    customerName: '',
-    date: new Date().toISOString().substring(0, 10),
-    dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10),
-    bankAccountId: '',
-    items: [{ description: '', qty: 1, rate: 0 }],
-    taxRate: 0, // 0 for none, 11 for 11% PPN, custom...
-    taxAmount: 0
   });
 
   // Other Expense States
@@ -160,7 +165,6 @@ const Accounting = () => {
   // Invoice Bank Selection
   const [issuingInvoiceJoId, setIssuingInvoiceJoId] = useState(null);
   const [selectedBankId, setSelectedBankId] = useState('');
-  const [expandedCompletedGroups, setExpandedCompletedGroups] = useState({});
   const [receivableProofModal, setReceivableProofModal] = useState(null); // invoice to upload proof for
   const [settleModal, setSettleModal] = useState(null); // { id, amount, ... }
   const [settleForm, setSettleForm] = useState({ paymentProof: [], taxes: [{ name: '', amount: 0 }], taxProof: [] });
@@ -172,17 +176,18 @@ const Accounting = () => {
   const [otpInput, setOtpInput] = useState('');
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [expandedBillingQuotes, setExpandedBillingQuotes] = useState({});
+  const [expandedCostingQuotes, setExpandedCostingQuotes] = useState({});
   const fileInputRef = useRef(null);
 
   const { 
-    jobOrders = [], invoices = [], createInvoice, createCustomInvoice, settleInvoice, deleteInvoice, updateInvoice, 
+    jobOrders = [], invoices = [], createInvoice, settleInvoice, deleteInvoice, updateInvoice, 
     receivables = [], vendors = [], purchaseOrders = [], updateJOStatus, updatePurchaseOrder, patchPurchaseOrderLocal,
     quotations = [],
     salaries = [], addSalary, deleteSalary, updateSalary,
     otherExpenses = [], addOtherExpense, deleteOtherExpense, updateOtherExpense,
     employees = [], companyBankAccounts = [], updateCompanyBank, deleteCompanyBank,
     getSystemConfig,
-    customers = [],
     loading,
     t,
     language,
@@ -392,91 +397,6 @@ const Accounting = () => {
       setOtherExpenseModal(false);
     } catch (err) {
       alert('Gagal menyimpan transaksi: ' + err.message);
-    }
-  };
-
-  const handleOpenCustomInvoiceModal = () => {
-    const today = new Date();
-    const dateStr = today.toISOString().substring(0, 10);
-    const dateCompact = dateStr.replace(/-/g, '');
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const defaultInvoiceId = `INV-${dateCompact}-${randomSuffix}`;
-    const defaultBank = companyBankAccounts && companyBankAccounts.length > 0
-      ? (companyBankAccounts.find(b => b.isDefault) || companyBankAccounts[0])
-      : null;
-
-    setCustomInvoiceForm({
-      id: defaultInvoiceId,
-      customerName: '',
-      date: dateStr,
-      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10),
-      bankAccountId: defaultBank ? defaultBank.id : '',
-      items: [{ description: '', qty: 1, rate: 0 }],
-      taxRate: 0,
-      taxAmount: 0
-    });
-    setShowCustomInvoiceModal(true);
-  };
-
-  const handleSaveCustomInvoice = async () => {
-    if (!canWrite) return;
-    if (!customInvoiceForm.id.trim()) {
-      alert(isID ? 'Nomor Invoice wajib diisi.' : 'Invoice ID is required.');
-      return;
-    }
-    if (!customInvoiceForm.customerName.trim()) {
-      alert(isID ? 'Nama Pelanggan wajib diisi.' : 'Customer Name is required.');
-      return;
-    }
-
-    // Filter out empty items
-    const validItems = customInvoiceForm.items.filter(item => item.description.trim());
-    if (validItems.length === 0) {
-      alert(isID ? 'Minimal harus ada 1 item deskripsi.' : 'At least 1 item with description is required.');
-      return;
-    }
-
-    // Calculate totals
-    const subtotal = validItems.reduce((acc, curr) => acc + (parseFloat(curr.qty || 0) * parseFloat(curr.rate || 0)), 0);
-    let tax = 0;
-    if (customInvoiceForm.taxRate === 11) {
-      tax = subtotal * 0.11;
-    } else if (customInvoiceForm.taxRate === 'custom') {
-      tax = parseFloat(customInvoiceForm.taxAmount) || 0;
-    }
-    const amount = subtotal + tax;
-
-    // We store the line items inside extra_charges array so they serialize and print perfectly!
-    const extra_charges = validItems.map(item => ({
-      description: item.description,
-      qty: parseFloat(item.qty) || 1,
-      rate: parseFloat(item.rate) || 0,
-      amount: (parseFloat(item.qty) || 1) * (parseFloat(item.rate) || 0)
-    }));
-
-    const invoicePayload = {
-      id: customInvoiceForm.id,
-      joId: null,
-      consolidatedJOs: [],
-      customerName: customInvoiceForm.customerName,
-      amount: amount,
-      subtotal: subtotal,
-      tax: tax,
-      date: new Date(customInvoiceForm.date).toISOString(),
-      status: 'unpaid',
-      extra_charges: extra_charges,
-      signedReceiptPhoto: null,
-      signedInvoicePhoto: null,
-      deliveryStatus: 'not_sent',
-      bankAccountId: customInvoiceForm.bankAccountId
-    };
-
-    try {
-      await createCustomInvoice(invoicePayload);
-      setShowCustomInvoiceModal(false);
-      alert(isID ? 'Invoice kustom berhasil dibuat!' : 'Custom invoice created successfully!');
-    } catch (err) {
-      alert(isID ? 'Gagal membuat invoice kustom: ' + err.message : 'Failed to create custom invoice: ' + err.message);
     }
   };
 
@@ -775,7 +695,17 @@ const Accounting = () => {
   const handleSettlePayable = async (poId, data) => {
     if (!canWrite) return;
     if (!data.paymentProofPhoto || data.paymentProofPhoto.length === 0) {
-      if (!window.confirm("Anda belum melampirkan Bukti Bayar. Lanjutkan proses pelunasan tanpa bukti?")) return;
+      const confirmed = await confirm(
+        isID 
+          ? "Anda belum melampirkan Bukti Bayar. Lanjutkan proses pelunasan tanpa bukti?" 
+          : "You haven't attached payment proof. Proceed with settlement without proof?",
+        {
+          title: isID ? "Konfirmasi Pelunasan" : "Confirm Settlement",
+          confirmText: isID ? "Lanjutkan" : "Proceed",
+          cancelText: isID ? "Batal" : "Cancel"
+        }
+      );
+      if (!confirmed) return;
     }
     const paidDate = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
     
@@ -1213,7 +1143,18 @@ const Accounting = () => {
 
   const handleUndoPaidInvoice = async (inv) => {
     if (!canWrite) return;
-    if (window.confirm(`Undo payment for Invoice ${inv.id}? It will be moved back to Outstanding Receivables.`)) {
+    const confirmed = await confirm(
+      isID 
+        ? `Batalkan pembayaran untuk Invoice ${inv.id}? Invoice akan dikembalikan ke Piutang Outstanding.`
+        : `Undo payment for Invoice ${inv.id}? It will be moved back to Outstanding Receivables.`,
+      {
+        title: isID ? "Batalkan Pembayaran" : "Undo Payment",
+        confirmText: isID ? "Ya, Batalkan" : "Yes, Undo",
+        cancelText: isID ? "Batal" : "Cancel",
+        isDanger: true
+      }
+    );
+    if (confirmed) {
       try {
         await updateInvoice(inv.id, { status: 'issued' });
       } catch (err) {
@@ -1224,7 +1165,18 @@ const Accounting = () => {
 
   const handleUndoPaidPO = async (po) => {
     if (!canWrite) return;
-    if (window.confirm(`Undo payment for PO ${po.id}? It will be moved back to Outstanding Payables.`)) {
+    const confirmed = await confirm(
+      isID
+        ? `Batalkan pembayaran untuk PO ${po.id}? PO akan dikembalikan ke Hutang Outstanding.`
+        : `Undo payment for PO ${po.id}? It will be moved back to Outstanding Payables.`,
+      {
+        title: isID ? "Batalkan Pembayaran" : "Undo Payment",
+        confirmText: isID ? "Ya, Batalkan" : "Yes, Undo",
+        cancelText: isID ? "Batal" : "Cancel",
+        isDanger: true
+      }
+    );
+    if (confirmed) {
       try {
         await updatePurchaseOrder(po.id, { status: 'issued' });
       } catch (err) {
@@ -2611,69 +2563,138 @@ const Accounting = () => {
                 </tr>
               </thead>
               <tbody>
-                {sortedActiveJOs.map(jo => {
-                  const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s,c)=>s+parseFloat(c.total||0),0) : 0;
-                  const poCost = (poMap[jo.id] || []).reduce((s,p)=>s+parseFloat(p.grandTotal||0),0);
-                  const totalCost = manualCost + poCost;
-                  
-                  const invoice = invoiceMap[String(jo.id)];
-                  const revenue = invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : 0;
-                  const profitLoss = revenue - totalCost;
+                {(() => {
+                  const groups = {};
+                  sortedActiveJOs.forEach(jo => {
+                    const qId = jo.quotationId || 'no-quotation';
+                    if (!groups[qId]) {
+                      groups[qId] = {
+                        quotationId: qId,
+                        customerName: jo.customerName,
+                        date: jo.date,
+                        jobOrders: []
+                      };
+                    }
+                    groups[qId].jobOrders.push(jo);
+                  });
 
-                  return (
-                    <tr key={jo.id} style={{ borderBottom:'1px solid var(--glass-border)' }} className="table-row-hover">
-                       <td style={{padding:'12px',fontWeight:'700',color:'var(--secondary)',fontSize:'0.85rem'}}>{jo.id}</td>
-                       <td style={{padding:'12px',fontWeight:'600'}}>{jo.customerName}</td>
-                       <td style={{padding:'12px',fontSize:'0.8rem',fontWeight:'700',color:'var(--secondary)'}}>
-                         {invoice ? invoice.id : <span style={{color:'var(--text-muted)', fontWeight:'400'}}>{isID ? 'Belum Ada' : 'None Yet'}</span>}
-                       </td>
-                       <td style={{padding:'12px',fontSize:'0.8rem',color:'var(--text-muted)'}}>
-                         {invoice ? new Date(invoice.date).toLocaleDateString() : '—'}
-                       </td>
-                       <td style={{padding:'12px'}}><span className={`badge badge-${jo.status}`} style={{fontSize:'0.7rem'}}>{jo.status}</span></td>
-                      <td style={{padding:'12px', textAlign:'right', fontWeight:'700', color: revenue > 0 ? '#10b981' : 'var(--text-muted)'}}>
-                        {revenue > 0 ? `Rp ${revenue.toLocaleString('id-ID')}` : '—'}
-                      </td>
-                      <td style={{padding:'12px',textAlign:'right',fontWeight:'700',color: totalCost>0 ? '#ef4444' : 'var(--text-muted)'}}>
-                        {totalCost>0 ? `Rp ${totalCost.toLocaleString('id-ID')}` : '—'}
-                      </td>
-                      <td style={{padding:'12px', textAlign:'right', fontWeight:'800', color: profitLoss > 0 ? '#10b981' : profitLoss < 0 ? '#ef4444' : 'var(--text-muted)'}}>
-                        {revenue > 0 || totalCost > 0 ? `Rp ${profitLoss.toLocaleString('id-ID')}` : '—'}
-                      </td>
-                      <td style={{padding:'12px', textAlign:'center'}}>
-                        <div style={{display:'flex', gap:'8px', justifyContent:'center'}}>
-                          {canWrite && (
-                            <button className="btn" style={{padding:'7px 14px',fontSize:'0.8rem',gap:'6px', background:'rgba(212,175,55,0.1)', color:'var(--secondary)', border:'1px solid var(--secondary)'}} onClick={()=>{ setCostModal(jo); setCostLines([{vendorId:'',serviceIdx:'',qty:1,customVendorName:'',customServiceDescription:'',customPrice:''}]); }}>
-                              <Plus size={14}/> {isID ? 'Biaya' : 'Costs'}
-                            </button>
-                          )}
-                          {!invoice && canWrite && (
-                            <ButtonWithLoading className="btn btn-gold" style={{padding:'7px 14px',fontSize:'0.8rem',gap:'6px'}} onClick={() => handleIssueInvoice(jo.id)}>
-                              <Receipt size={14}/> {isID ? 'Invoice' : 'Invoice'}
-                            </ButtonWithLoading>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                  const groupedArray = Object.values(groups).sort((a, b) => {
+                    const timeA = a.date ? new Date(a.date).getTime() : 0;
+                    const timeB = b.date ? new Date(b.date).getTime() : 0;
+                    return timeB - timeA;
+                  });
+
+                  return groupedArray.map(group => {
+                    const isExpanded = !!expandedCostingQuotes[group.quotationId];
+                    
+                    // Aggregate financials
+                    let groupRevenue = 0;
+                    let groupCost = 0;
+                    
+                    group.jobOrders.forEach(jo => {
+                      const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s,c)=>s+parseFloat(c.total||0),0) : 0;
+                      const poCost = (poMap[jo.id] || []).reduce((s,p)=>s+parseFloat(p.grandTotal||0),0);
+                      groupCost += (manualCost + poCost);
+                      
+                      const invoice = invoiceMap[String(jo.id)];
+                      groupRevenue += invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : 0;
+                    });
+                    
+                    const groupPL = groupRevenue - groupCost;
+
+                    return (
+                      <React.Fragment key={group.quotationId}>
+                        {/* Folder Header Row */}
+                        <tr 
+                          style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(212, 175, 55, 0.05)', cursor: 'pointer' }} 
+                          className="table-row-hover" 
+                          onClick={() => setExpandedCostingQuotes(prev => ({ ...prev, [group.quotationId]: !prev[group.quotationId] }))}
+                        >
+                          <td colSpan="5" style={{ padding: '12px', fontWeight: '800' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              {isExpanded ? <ChevronDown size={14} style={{ color: 'var(--secondary)' }} /> : <ChevronRight size={14} style={{ color: 'var(--secondary)' }} />}
+                              {isExpanded ? <FolderOpen size={16} style={{ color: 'var(--secondary)' }} /> : <Folder size={16} style={{ color: 'var(--secondary)' }} />}
+                              <span style={{ color: 'var(--secondary)' }}>{group.quotationId}</span>
+                              <span style={{ color: 'var(--text-muted)' }}>|</span>
+                              <span>{group.customerName}</span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'normal', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '20px', marginLeft: '5px' }}>
+                                {group.jobOrders.length} {isID ? 'JO' : 'JOs'}
+                              </span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: groupRevenue > 0 ? '#10b981' : 'var(--text-muted)' }}>
+                            {groupRevenue > 0 ? `Rp ${groupRevenue.toLocaleString('id-ID')}` : '—'}
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: groupCost > 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                            {groupCost > 0 ? `Rp ${groupCost.toLocaleString('id-ID')}` : '—'}
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800', color: groupPL > 0 ? '#10b981' : groupPL < 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                            {groupRevenue > 0 || groupCost > 0 ? `Rp ${groupPL.toLocaleString('id-ID')}` : '—'}
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                              {isExpanded ? (isID ? 'Tutup' : 'Collapse') : (isID ? 'Buka' : 'Expand')}
+                            </span>
+                          </td>
+                        </tr>
+
+                        {/* Child JO Rows */}
+                        {isExpanded && group.jobOrders.map(jo => {
+                          const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s,c)=>s+parseFloat(c.total||0),0) : 0;
+                          const poCost = (poMap[jo.id] || []).reduce((s,p)=>s+parseFloat(p.grandTotal||0),0);
+                          const totalCost = manualCost + poCost;
+                          
+                          const invoice = invoiceMap[String(jo.id)];
+                          const revenue = invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : 0;
+                          const profitLoss = revenue - totalCost;
+
+                          return (
+                            <tr key={jo.id} style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.01)' }} className="table-row-hover">
+                              <td style={{ padding: '12px 12px 12px 25px', fontWeight: '700', color: 'var(--secondary)', fontSize: '0.85rem', borderLeft: '3px solid var(--secondary)' }}>{jo.id}</td>
+                              <td style={{ padding: '12px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{jo.jobDescription}</td>
+                              <td style={{ padding: '12px', fontSize: '0.8rem', fontWeight: '700', color: 'var(--secondary)' }}>
+                                {invoice ? invoice.id : <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{isID ? 'Belum Ada' : 'None Yet'}</span>}
+                              </td>
+                              <td style={{ padding: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                {invoice ? new Date(invoice.date).toLocaleDateString() : '—'}
+                              </td>
+                              <td style={{ padding: '12px' }}><span className={`badge badge-${jo.status}`} style={{ fontSize: '0.7rem' }}>{jo.status}</span></td>
+                              <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: revenue > 0 ? '#10b981' : 'var(--text-muted)' }}>
+                                {revenue > 0 ? `Rp ${revenue.toLocaleString('id-ID')}` : '—'}
+                              </td>
+                              <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: totalCost > 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                                {totalCost > 0 ? `Rp ${totalCost.toLocaleString('id-ID')}` : '—'}
+                              </td>
+                              <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800', color: profitLoss > 0 ? '#10b981' : profitLoss < 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                                {revenue > 0 || totalCost > 0 ? `Rp ${profitLoss.toLocaleString('id-ID')}` : '—'}
+                              </td>
+                              <td style={{ padding: '12px', textAlign: 'center' }}>
+                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                  {canWrite && (
+                                    <button className="btn" style={{ padding: '6px 12px', fontSize: '0.75rem', gap: '4px', background: 'rgba(212,175,55,0.1)', color: 'var(--secondary)', border: '1px solid var(--secondary)' }} onClick={() => { setCostModal(jo); setCostLines([{ vendorId: '', serviceIdx: '', qty: 1, customVendorName: '', customServiceDescription: '', customPrice: '' }]); }}>
+                                      <Plus size={12} /> {isID ? 'Biaya' : 'Costs'}
+                                    </button>
+                                  )}
+                                  {!invoice && canWrite && (
+                                    <ButtonWithLoading className="btn btn-gold" style={{ padding: '6px 12px', fontSize: '0.75rem', gap: '4px' }} onClick={() => handleIssueInvoice(jo.id)}>
+                                      <Receipt size={12} /> {isID ? 'Invoice' : 'Invoice'}
+                                    </ButtonWithLoading>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  });
+                })()}
               </tbody>
             </table></div></div>
           )}
         </div>
       ) : activeTab === 'billing' ? (
         <div className="billing-section">
-          {canWrite && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
-              <button 
-                className="btn btn-gold" 
-                onClick={handleOpenCustomInvoiceModal}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '10px', fontWeight: '700' }}
-              >
-                <Plus size={18} /> {isID ? 'Buat Invoice Kustom' : 'Create Custom Invoice'}
-              </button>
-            </div>
-          )}
           <div className="glass-card" style={{ padding: '25px', marginBottom: '40px' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: isPendingCollapsed ? '0' : '20px', cursor:'pointer' }} onClick={() => setIsPendingCollapsed(!isPendingCollapsed)}>
               <h4 style={{ margin:0 }}>{isID ? 'Invoice Tertunda (dari Operasional)' : 'Pending Invoices (from Operations)'}</h4>
@@ -2695,86 +2716,89 @@ const Accounting = () => {
               </thead>
               <tbody>
                 {(() => {
-                  // Group completed JOs by quotationId
                   const groups = {};
                   completedJOs.forEach(jo => {
-                    const qId = jo.quotationId || 'direct';
+                    const qId = jo.quotationId || 'no-quotation';
                     if (!groups[qId]) {
                       groups[qId] = {
                         quotationId: qId,
-                        customerName: jo.customerName || 'Direct Customer',
+                        customerName: jo.customerName,
+                        date: jo.date,
                         jobOrders: []
                       };
                     }
                     groups[qId].jobOrders.push(jo);
                   });
 
-                  return Object.values(groups).map(group => {
-                    const isGroupExpanded = expandedCompletedGroups[group.quotationId] !== false;
+                  const groupedArray = Object.values(groups).sort((a, b) => {
+                    const timeA = a.date ? new Date(a.date).getTime() : 0;
+                    const timeB = b.date ? new Date(b.date).getTime() : 0;
+                    return timeB - timeA;
+                  });
+
+                  if (groupedArray.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                          {isID ? 'Tidak ada data operational selesai.' : 'No completed operational data.'}
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return groupedArray.map(group => {
+                    const isExpanded = !!expandedBillingQuotes[group.quotationId];
                     const uninvoicedJOs = group.jobOrders.filter(jo => !invoices.some(inv => String(inv.joId) === String(jo.id)));
-                    const allInvoiced = uninvoicedJOs.length === 0;
+                    const hasUninvoiced = uninvoicedJOs.length > 0;
 
                     return (
                       <React.Fragment key={group.quotationId}>
-                        {/* Quotation Group Folder Row */}
+                        {/* Folder Header Row */}
                         <tr 
-                          style={{ 
-                            background: 'rgba(212, 175, 55, 0.05)', 
-                            borderBottom: '2px solid var(--secondary)',
-                            cursor: 'pointer'
-                          }}
-                          onClick={() => setExpandedCompletedGroups({ ...expandedCompletedGroups, [group.quotationId]: !isGroupExpanded })}
+                          style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(212, 175, 55, 0.05)', cursor: 'pointer' }} 
+                          className="table-row-hover" 
+                          onClick={() => setExpandedBillingQuotes(prev => ({ ...prev, [group.quotationId]: !prev[group.quotationId] }))}
                         >
-                          <td colSpan="5" style={{ padding: '12px 15px', verticalAlign: 'middle' }}>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <span style={{ fontSize: '1.2rem' }}>📁</span>
-                                <span style={{ fontWeight: '800', color: 'var(--secondary)' }}>
-                                  {group.quotationId === 'direct' ? (isID ? 'Pekerjaan Langsung' : 'Direct Jobs') : group.quotationId}
-                                </span>
-                                <span style={{ color: 'var(--text)', fontWeight: '700', marginLeft: '5px' }}>
-                                  — {group.customerName}
-                                </span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                {!allInvoiced && canWrite && (
-                                  <ButtonWithLoading 
-                                    className="btn btn-gold" 
-                                    style={{ padding: '6px 14px', fontSize: '0.75rem', gap: '6px' }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleIssueInvoice(uninvoicedJOs[0].id);
-                                    }}
-                                  >
-                                    {isID ? 'Terbitkan Invoice Gabungan' : 'Issue Combined Invoice'}
-                                  </ButtonWithLoading>
-                                )}
-                                <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                                  {group.jobOrders.length} {isID ? 'Pekerjaan' : 'Jobs'}
-                                </span>
-                                {isGroupExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                              </div>
+                          <td colSpan="4" style={{ padding: '15px', fontWeight: '800' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              {isExpanded ? <ChevronDown size={14} style={{ color: 'var(--secondary)' }} /> : <ChevronRight size={14} style={{ color: 'var(--secondary)' }} />}
+                              {isExpanded ? <FolderOpen size={16} style={{ color: 'var(--secondary)' }} /> : <Folder size={16} style={{ color: 'var(--secondary)' }} />}
+                              <span style={{ color: 'var(--secondary)' }}>{group.quotationId}</span>
+                              <span style={{ color: 'var(--text-muted)' }}>|</span>
+                              <span>{group.customerName}</span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'normal', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '20px', marginLeft: '5px' }}>
+                                {group.jobOrders.length} JO Selesai
+                              </span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '15px', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', alignItems: 'center' }}>
+                              {hasUninvoiced && canWrite && (
+                                <ButtonWithLoading 
+                                  className="btn btn-gold" 
+                                  style={{ padding: '6px 14px', fontSize: '0.75rem' }} 
+                                  onClick={(e) => { e.stopPropagation(); return handleIssueInvoice(uninvoicedJOs[0].id); }}
+                                >
+                                  {isID ? 'Terbitkan Invoice Konsolidasi' : 'Issue Consolidated Invoice'}
+                                </ButtonWithLoading>
+                              )}
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                {isExpanded ? (isID ? 'Tutup' : 'Collapse') : (isID ? 'Buka' : 'Expand')}
+                              </span>
                             </div>
                           </td>
                         </tr>
 
-                        {/* Child Completed Job Orders */}
-                        {isGroupExpanded && group.jobOrders.map(jo => {
+                        {/* Child JO Rows */}
+                        {isExpanded && group.jobOrders.map(jo => {
                           const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id));
                           return (
                             <tr key={jo.id} style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.01)' }}>
-                              <td style={{ padding: '15px', paddingLeft: '30px', fontWeight: 'bold', color: 'var(--secondary)' }}>
-                                <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>└</span> {jo.id}
+                              <td style={{ padding: '15px 15px 15px 25px', fontWeight: '700', color: 'var(--secondary)', borderLeft: '3px solid var(--secondary)' }}>
+                                <div>{jo.id}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>{jo.jobDescription}</div>
                               </td>
-                              <td style={{ padding: '15px' }}>
-                                <div style={{ fontWeight: '600' }}>{jo.customerName}</div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                  {jo.instruction || jo.jobDescription}
-                                </div>
-                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                  {isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}
-                                </div>
-                              </td>
+                              <td style={{ padding: '15px' }}>{jo.customerName}</td>
                               <td style={{ padding: '15px' }}>
                                 <span className="badge badge-done">{isID ? 'Selesai' : 'Completed'}</span>
                               </td>
@@ -3502,7 +3526,18 @@ const Accounting = () => {
                               </button>
                             )}
                             {canWrite && (
-                              <button onClick={() => { if(window.confirm(isID ? 'Yakin hapus data ini?' : 'Delete this record?')) deleteOtherExpense(r.id); }} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title={isID ? 'Hapus Data' : 'Delete Data'}>
+                              <button onClick={async () => { 
+                                const confirmed = await confirm(
+                                  isID ? 'Yakin hapus data ini?' : 'Delete this record?', 
+                                  { 
+                                    title: isID ? 'Hapus Data' : 'Delete Data', 
+                                    confirmText: isID ? 'Hapus' : 'Delete', 
+                                    cancelText: isID ? 'Batal' : 'Cancel', 
+                                    isDanger: true 
+                                  }
+                                );
+                                if (confirmed) deleteOtherExpense(r.id); 
+                              }} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title={isID ? 'Hapus Data' : 'Delete Data'}>
                                 <Trash2 size={16} />
                               </button>
                             )}
@@ -3832,7 +3867,18 @@ const Accounting = () => {
                             {canWrite && (
                               <>
                                 <button onClick={() => { setModalPhotos(po.vendorInvoicePhoto); setVendorInvoiceModal(po); }} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}><Edit3 size={14}/></button>
-                                <button onClick={() => { if(window.confirm(isID ? 'Hapus semua lampiran invoice vendor?' : 'Delete all vendor invoice attachments?')) handleUploadVendorInvoice(po.id, []); }} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer' }}><Trash2 size={14}/></button>
+                                <button onClick={async () => { 
+                                  const confirmed = await confirm(
+                                    isID ? 'Hapus semua lampiran invoice vendor?' : 'Delete all vendor invoice attachments?',
+                                    {
+                                      title: isID ? 'Hapus Lampiran' : 'Delete Attachments',
+                                      confirmText: isID ? 'Hapus' : 'Delete',
+                                      cancelText: isID ? 'Batal' : 'Cancel',
+                                      isDanger: true
+                                    }
+                                  );
+                                  if (confirmed) handleUploadVendorInvoice(po.id, []); 
+                                }} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer' }}><Trash2 size={14}/></button>
                               </>
                             )}
                           </div>
@@ -3884,7 +3930,18 @@ const Accounting = () => {
                                         taxProof: po.tax_proof_photo || []
                                      });
                                   }} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}><Edit3 size={14}/></button>
-                                  <button onClick={() => { if(window.confirm(isID ? 'Hapus bukti potong pajak?' : 'Delete tax deduction proof?')) handleSettlePayable(po.id, { tax_proof_photo: [] }); }} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer' }}><Trash2 size={14}/></button>
+                                  <button onClick={async () => { 
+                                    const confirmed = await confirm(
+                                      isID ? 'Hapus bukti potong pajak?' : 'Delete tax deduction proof?',
+                                      {
+                                        title: isID ? 'Hapus Bukti Potong' : 'Delete Tax Proof',
+                                        confirmText: isID ? 'Hapus' : 'Delete',
+                                        cancelText: isID ? 'Batal' : 'Cancel',
+                                        isDanger: true
+                                      }
+                                    );
+                                    if (confirmed) handleSettlePayable(po.id, { tax_proof_photo: [] }); 
+                                  }} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer' }}><Trash2 size={14}/></button>
                                 </>
                               )}
                            </div>
@@ -4362,223 +4419,6 @@ const Accounting = () => {
             </div>
             <div style={{ padding:'15px', borderTop:'1px solid var(--glass-border)', textAlign:'right' }}>
               <button onClick={() => setPhotoViewer(null)} className="btn btn-gold" style={{ padding:'10px 25px' }}>Done</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Custom Invoice Modal */}
-      {showCustomInvoiceModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '800px', padding: '35px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
-            <button onClick={() => setShowCustomInvoiceModal(false)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={20}/></button>
-            <h3 style={{ color: 'var(--secondary)', marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '10px' }}><Receipt size={24}/> {isID ? 'Buat Invoice Kustom' : 'Create Custom Invoice'}</h3>
-
-            <div className="grid-responsive-2" style={{ gap: '20px', marginBottom: '20px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '700' }}>{isID ? 'Nomor Invoice' : 'Invoice Number'}</label>
-                <input 
-                  type="text" 
-                  value={customInvoiceForm.id} 
-                  onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, id: e.target.value })} 
-                  style={{ width: '100%', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)' }} 
-                  required
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '700' }}>{isID ? 'Pelanggan' : 'Customer'}</label>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <input 
-                    type="text" 
-                    placeholder={isID ? "Ketik nama pelanggan..." : "Type customer name..."}
-                    value={customInvoiceForm.customerName} 
-                    onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, customerName: e.target.value })} 
-                    style={{ flex: 1, padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)' }} 
-                    list="custom-invoice-customers"
-                    required
-                  />
-                  <datalist id="custom-invoice-customers">
-                    {customers.map(c => <option key={c.id} value={c.name} />)}
-                  </datalist>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid-responsive-3" style={{ gap: '20px', marginBottom: '20px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '700' }}>{isID ? 'Tanggal Invoice' : 'Invoice Date'}</label>
-                <input 
-                  type="date" 
-                  value={customInvoiceForm.date} 
-                  onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, date: e.target.value })} 
-                  style={{ width: '100%', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)' }} 
-                  required
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '700' }}>{isID ? 'Tanggal Jatuh Tempo' : 'Due Date'}</label>
-                <input 
-                  type="date" 
-                  value={customInvoiceForm.dueDate} 
-                  onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, dueDate: e.target.value })} 
-                  style={{ width: '100%', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)' }} 
-                  required
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '700' }}>{isID ? 'Rekening Pembayaran' : 'Payment Account'}</label>
-                <select 
-                  value={customInvoiceForm.bankAccountId} 
-                  onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, bankAccountId: e.target.value })} 
-                  style={{ width: '100%', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)' }}
-                  required
-                >
-                  <option value="">-- {isID ? 'Pilih Rekening Bank' : 'Select Bank Account'} --</option>
-                  {companyBankAccounts.map(b => (
-                    <option key={b.id} value={b.id}>{b.bankName} - {b.accountNumber} ({b.accountName})</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '20px', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                <h5 style={{ margin: 0, color: 'var(--text)', fontSize: '1rem', fontWeight: '700' }}>{isID ? 'Item Layanan / Tagihan' : 'Billing / Service Items'}</h5>
-                <button 
-                  type="button"
-                  onClick={() => setCustomInvoiceForm({
-                    ...customInvoiceForm,
-                    items: [...customInvoiceForm.items, { description: '', qty: 1, rate: 0 }]
-                  })}
-                  className="btn btn-gold"
-                  style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                >
-                  <Plus size={14} /> {isID ? 'Tambah Baris' : 'Add Row'}
-                </button>
-              </div>
-
-              {customInvoiceForm.items.map((item, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: '15px', marginBottom: '10px', alignItems: 'center' }}>
-                  <input 
-                    type="text" 
-                    placeholder={isID ? "Deskripsi item layanan..." : "Service item description..."}
-                    value={item.description} 
-                    onChange={e => {
-                      const newItems = [...customInvoiceForm.items];
-                      newItems[idx].description = e.target.value;
-                      setCustomInvoiceForm({ ...customInvoiceForm, items: newItems });
-                    }} 
-                    style={{ flex: 3, padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)' }} 
-                    required
-                  />
-                  <input 
-                    type="number" 
-                    placeholder="Qty"
-                    min="1"
-                    value={item.qty} 
-                    onChange={e => {
-                      const newItems = [...customInvoiceForm.items];
-                      newItems[idx].qty = parseFloat(e.target.value) || 1;
-                      setCustomInvoiceForm({ ...customInvoiceForm, items: newItems });
-                    }} 
-                    style={{ flex: 0.8, padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', textAlign: 'center' }} 
-                    required
-                  />
-                  <input 
-                    type="number" 
-                    placeholder={isID ? "Harga Satuan" : "Unit Rate"}
-                    value={item.rate} 
-                    onChange={e => {
-                      const newItems = [...customInvoiceForm.items];
-                      newItems[idx].rate = parseFloat(e.target.value) || 0;
-                      setCustomInvoiceForm({ ...customInvoiceForm, items: newItems });
-                    }} 
-                    style={{ flex: 1.5, padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)' }} 
-                    required
-                  />
-                  <div style={{ flex: 1.5, padding: '10px', fontWeight: '700', color: 'var(--text)', textAlign: 'right' }}>
-                    Rp {((parseFloat(item.qty) || 1) * (parseFloat(item.rate) || 0)).toLocaleString('id-ID')}
-                  </div>
-                  {customInvoiceForm.items.length > 1 && (
-                    <button 
-                      type="button" 
-                      onClick={() => setCustomInvoiceForm({
-                        ...customInvoiceForm,
-                        items: customInvoiceForm.items.filter((_, i) => i !== idx)
-                      })} 
-                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--glass-border)', marginBottom: '25px' }}>
-              <div className="grid-responsive-2" style={{ gap: '20px', alignItems: 'center' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '700' }}>{isID ? 'Pajak (PPN)' : 'Tax (PPN)'}</label>
-                  <select 
-                    value={customInvoiceForm.taxRate} 
-                    onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, taxRate: e.target.value === 'custom' ? 'custom' : parseInt(e.target.value, 10) })} 
-                    style={{ width: '100%', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)' }}
-                  >
-                    <option value="0">{isID ? 'Tanpa Pajak (0%)' : 'No Tax (0%)'}</option>
-                    <option value="11">PPN 11%</option>
-                    <option value="custom">{isID ? 'Pajak Kustom (Nominal)' : 'Custom Tax (Amount)'}</option>
-                  </select>
-                </div>
-                {customInvoiceForm.taxRate === 'custom' && (
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', fontWeight: '700' }}>{isID ? 'Nominal Pajak' : 'Tax Amount'}</label>
-                    <input 
-                      type="number" 
-                      value={customInvoiceForm.taxAmount} 
-                      onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, taxAmount: parseFloat(e.target.value) || 0 })} 
-                      style={{ width: '100%', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)' }} 
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div style={{ marginTop: '20px', borderTop: '1px dashed var(--glass-border)', paddingTop: '15px', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'right' }}>
-                {(() => {
-                  const subtotal = customInvoiceForm.items.reduce((acc, curr) => acc + (parseFloat(curr.qty || 0) * parseFloat(curr.rate || 0)), 0);
-                  let tax = 0;
-                  if (customInvoiceForm.taxRate === 11) {
-                    tax = subtotal * 0.11;
-                  } else if (customInvoiceForm.taxRate === 'custom') {
-                    tax = customInvoiceForm.taxAmount || 0;
-                  }
-                  const total = subtotal + tax;
-
-                  return (
-                    <>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Subtotal: <strong>Rp {subtotal.toLocaleString('id-ID')}</strong></div>
-                      {tax > 0 && <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{isID ? 'Pajak' : 'Tax'}: <strong>Rp {tax.toLocaleString('id-ID')}</strong></div>}
-                      <div style={{ color: 'var(--secondary)', fontSize: '1.2rem', fontWeight: '800', marginTop: '5px' }}>Total Tagihan: Rp {total.toLocaleString('id-ID')}</div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '15px' }}>
-              <button 
-                type="button" 
-                onClick={() => setShowCustomInvoiceModal(false)} 
-                className="btn" 
-                style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)' }}
-              >
-                {isID ? 'Batal' : 'Cancel'}
-              </button>
-              <ButtonWithLoading 
-                onClick={handleSaveCustomInvoice} 
-                className="btn btn-gold" 
-                style={{ flex: 2 }}
-              >
-                <CheckCircle size={16}/> {isID ? 'Buat Invoice' : 'Create Invoice'}
-              </ButtonWithLoading>
             </div>
           </div>
         </div>

@@ -1,10 +1,25 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Plus, Download, CheckCircle, XCircle, FileText, UserPlus, Search, Trash2, FileSpreadsheet, Edit, Users } from 'lucide-react';
+import { Plus, Download, CheckCircle, XCircle, FileText, UserPlus, Search, Trash2, FileSpreadsheet, Edit, Users, ChevronDown, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
 import toast from 'react-hot-toast';
+
+const alert = (message) => {
+  if (!message) return;
+  const msgLower = String(message).toLowerCase();
+  const successKeywords = ['berhasil', 'success', 'lunas', 'dispatched', 'sent', 'selesai', 'done', 'saved', 'updated', 'uploaded', 'terbitkan', 'issued', 'settled'];
+  const errorKeywords = ['gagal', 'failed', 'error', 'salah', 'incorrect', 'tidak ditemukan', 'not found', 'incomplete', 'tidak lengkap', 'invalid', 'masalah', 'kurang'];
+  
+  if (errorKeywords.some(keyword => msgLower.includes(keyword))) {
+    toast.error(message);
+  } else if (successKeywords.some(keyword => msgLower.includes(keyword))) {
+    toast.success(message);
+  } else {
+    toast(message);
+  }
+};
 
 const Marketing = () => {
   const context = useApp();
@@ -22,6 +37,7 @@ const Marketing = () => {
   const [endDate, setEndDate] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [expandedQuoteJOs, setExpandedQuoteJOs] = useState({});
   const [activeProspectForQuote, setActiveProspectForQuote] = useState(null);
   const [activeProspectForEdit, setActiveProspectForEdit] = useState(null);
   const [editProspectData, setEditProspectData] = useState({
@@ -76,6 +92,7 @@ const Marketing = () => {
     prospects = [], addProspect, updateProspect, updateProspectStatus, deleteProspect,
     prospectDrafts = [], generateProspectDraft,
     quotations = [], createQuotation, updateQuotation, approveQuotation, unapproveQuotation, deleteQuotation,
+    jobOrders = [],
     employees = [],
     user,
     hasAccess,
@@ -1660,44 +1677,113 @@ const Marketing = () => {
                   .map(quote => {
                     const firstItem = Array.isArray(quote.items) && quote.items.length > 0 ? quote.items[0] : null;
                     const activityLabel = firstItem ? firstItem.description : '-';
+                    const quoteJOs = jobOrders.filter(jo => String(jo.quotationId) === String(quote.id));
+                    const isExpanded = !!expandedQuoteJOs[quote.id];
+
                     return (
-                      <tr key={quote.id} style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(16, 185, 129, 0.04)' }} className="table-row-hover">
-                        <td style={{ padding: '15px', fontWeight: '700', color: 'var(--secondary)', fontSize: '0.85rem' }}>{quote.id}</td>
-                        <td style={{ padding: '15px', fontSize: '0.85rem' }}>{quote.date}</td>
-                        <td style={{ padding: '15px', fontSize: '0.95rem', fontWeight: '600' }}>{quote.customerName}</td>
-                        <td style={{ padding: '15px', fontSize: '0.9rem', color: 'var(--secondary)' }}>{quote.pic || '-'}</td>
-                        <td style={{ padding: '15px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                          {activityLabel}{Array.isArray(quote.items) && quote.items.length > 1 ? ` +${quote.items.length - 1} more` : ''}
-                        </td>
-                        <td style={{ padding: '15px', fontSize: '0.9rem', fontWeight: '600' }}>Rp {(quote.total || 0).toLocaleString()}</td>
-                        <td style={{ padding: '15px' }}>
-                          <span className="badge badge-approved" style={{ fontSize: '0.7rem' }}>{t('approved')}</span>
-                        </td>
-                        <td style={{ padding: '15px' }}>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            {canWrite && (
-                              <ButtonWithLoading
-                                className="btn-icon"
-                                style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)' }}
-                                onClick={() => unapproveQuotation(quote.id)}
-                                title="Batalkan Approval (kembalikan ke Pending)"
-                              >
-                                <XCircle size={16} />
-                              </ButtonWithLoading>
-                            )}
-                            {user?.role === 'owner' && (
-                              <button
-                                className="btn-icon"
-                                style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }}
-                                onClick={() => setDeleteConfirm({ id: quote.id, name: quote.customerName, type: 'quotation' })}
-                                title="Hapus"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                      <React.Fragment key={quote.id}>
+                        <tr style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(16, 185, 129, 0.04)' }} className="table-row-hover">
+                          <td style={{ padding: '15px', fontWeight: '700', color: 'var(--secondary)', fontSize: '0.85rem' }}>
+                            <span 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedQuoteJOs(prev => ({ ...prev, [quote.id]: !prev[quote.id] }));
+                              }}
+                              style={{ cursor: 'pointer', marginRight: '8px', display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}
+                            >
+                              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                            </span>
+                            {quote.id}
+                          </td>
+                          <td style={{ padding: '15px', fontSize: '0.85rem' }}>{quote.date}</td>
+                          <td style={{ padding: '15px', fontSize: '0.95rem', fontWeight: '600' }}>{quote.customerName}</td>
+                          <td style={{ padding: '15px', fontSize: '0.9rem', color: 'var(--secondary)' }}>{quote.pic || '-'}</td>
+                          <td style={{ padding: '15px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                            {activityLabel}{Array.isArray(quote.items) && quote.items.length > 1 ? ` +${quote.items.length - 1} more` : ''}
+                          </td>
+                          <td style={{ padding: '15px', fontSize: '0.9rem', fontWeight: '600' }}>Rp {(quote.total || 0).toLocaleString()}</td>
+                          <td style={{ padding: '15px' }}>
+                            <span className="badge badge-approved" style={{ fontSize: '0.7rem' }}>{t('approved')}</span>
+                          </td>
+                          <td style={{ padding: '15px' }}>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              {canWrite && (
+                                <ButtonWithLoading
+                                  className="btn-icon"
+                                  style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)' }}
+                                  onClick={() => unapproveQuotation(quote.id)}
+                                  title="Batalkan Approval (kembalikan ke Pending)"
+                                >
+                                  <XCircle size={16} />
+                                </ButtonWithLoading>
+                              )}
+                              {user?.role === 'owner' && (
+                                <button
+                                  className="btn-icon"
+                                  style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }}
+                                  onClick={() => setDeleteConfirm({ id: quote.id, name: quote.customerName, type: 'quotation' })}
+                                  title="Hapus"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr key={`${quote.id}-details`} style={{ background: 'rgba(255, 255, 255, 0.01)', borderBottom: '1px solid var(--glass-border)' }}>
+                            <td colSpan={8} style={{ padding: '20px 40px', background: 'rgba(0, 0, 0, 0.2)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <h5 style={{ color: 'var(--secondary)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0' }}>
+                                  <FileText size={16} /> {isID ? 'Daftar Job Order (Aktivitas)' : 'Job Orders List (Activities)'} ({quoteJOs.length})
+                                </h5>
+                                {quoteJOs.length === 0 ? (
+                                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                                    {isID ? 'Belum ada Job Order yang dibuat untuk penawaran ini di Admin Office.' : 'No Job Orders created for this quotation yet in Admin Office.'}
+                                  </p>
+                                ) : (
+                                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                    <thead>
+                                      <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                                        <th style={{ padding: '8px 12px' }}>JO ID</th>
+                                        <th style={{ padding: '8px 12px' }}>{isID ? 'Instruksi / Aktivitas' : 'Instruction / Activity'}</th>
+                                        <th style={{ padding: '8px 12px' }}>{isID ? 'Jumlah' : 'Qty'}</th>
+                                        <th style={{ padding: '8px 12px' }}>{isID ? 'Status Operasional' : 'Operational Status'}</th>
+                                        <th style={{ padding: '8px 12px' }}>{isID ? 'Peralatan & Driver' : 'Containers & Drivers'}</th>
+                                        <th style={{ padding: '8px 12px', textAlign: 'center' }}>{isID ? 'Foto' : 'Photos'}</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {quoteJOs.map(jo => {
+                                        const photosCount = Array.isArray(jo.photos) ? jo.photos.length : 0;
+                                        return (
+                                          <tr key={jo.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }} className="table-row-hover">
+                                            <td style={{ padding: '8px 12px', fontWeight: '700', color: 'var(--secondary)' }}>{jo.id}</td>
+                                            <td style={{ padding: '8px 12px' }}>{jo.jobDescription || jo.instruction}</td>
+                                            <td style={{ padding: '8px 12px' }}>{jo.quantity}</td>
+                                            <td style={{ padding: '8px 12px' }}>
+                                              <span className={`badge badge-${jo.status || 'pending'}`} style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
+                                                {jo.status === 'pending' ? (isID ? 'Draft' : 'Draft') : jo.status === 'dispatched' ? (isID ? 'Dikirim' : 'Dispatched') : jo.status === 'done' ? (isID ? 'Selesai' : 'Completed') : jo.status === 'invoiced' ? (isID ? 'Sudah Di-Invoice' : 'Invoiced') : jo.status}
+                                              </span>
+                                            </td>
+                                            <td style={{ padding: '8px 12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                              <div>C: {Array.isArray(jo.containerNo) ? jo.containerNo.join(', ') : jo.containerNo || '-'}</div>
+                                              <div>V: {Array.isArray(jo.vehicleNo) ? jo.vehicleNo.join(', ') : jo.vehicleNo || '-'}</div>
+                                            </td>
+                                            <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                              {photosCount} {isID ? 'Foto' : 'Photos'}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
               </tbody>
