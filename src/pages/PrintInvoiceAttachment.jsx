@@ -98,7 +98,7 @@ const PrintInvoiceAttachment = () => {
           <span style={{ fontWeight: '800', fontSize: '0.95rem', color: '#1e293b' }}>
             Lampiran Dokumentasi — {invoice?.id}
           </span>
-          <span style={{ background: '#eff6ff', color: '#3b82f6', fontSize: '0.7rem', fontWeight: '800', padding: '2px 10px', borderRadius: '20px' }}>
+          <span style={{ background: '#eff6ff', color: 'var(--info)', fontSize: '0.7rem', fontWeight: '800', padding: '2px 10px', borderRadius: '20px' }}>
             {allPhotos.length} FOTO (1 FOTO/HALAMAN)
           </span>
         </div>

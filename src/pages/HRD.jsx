@@ -218,7 +218,7 @@ const HRD = () => {
                     <td style={{ padding: '20px' }}>
                       {account ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontSize: '0.85rem', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '100px', width: 'fit-content' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--success)', fontSize: '0.85rem', background: 'var(--success-bg)', padding: '6px 12px', borderRadius: '100px', width: 'fit-content' }}>
                             <ShieldCheck size={14} />
                             {account.username}
                           </div>
@@ -265,7 +265,7 @@ const HRD = () => {
                                   }
                                 }}
                                 className="btn-icon" 
-                                style={{ padding: '6px', width: '32px', height: '32px', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }}
+                                style={{ padding: '6px', width: '32px', height: '32px', color: 'var(--danger)', background: 'var(--danger-bg)' }}
                               >
                                 <X size={14} />
                               </button>
@@ -310,7 +310,7 @@ const HRD = () => {
                           </button>
                           <button 
                             className="btn-icon" 
-                            style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }}
+                            style={{ color: 'var(--danger)', background: 'var(--danger-bg)' }}
                             onClick={async () => {
                               const confirmed = await confirm(
                                 isID ? `Hapus karyawan ${emp.name}?` : `Delete employee ${emp.name}?`,
@@ -397,7 +397,7 @@ const HRD = () => {
                 </div>
               </div>
               {submitError && (
-                <div style={{ marginTop: '16px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '10px', color: '#ef4444', fontSize: '0.85rem' }}>
+                <div style={{ marginTop: '16px', padding: '12px 16px', background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: '10px', color: 'var(--danger)', fontSize: '0.85rem' }}>
                   ⚠️ {submitError}
                 </div>
               )}
@@ -420,7 +420,7 @@ const HRD = () => {
               <h3>{isEditAccount ? (isID ? 'Edit Akses Sistem' : 'Edit System Access') : (isID ? 'Beri Akses Sistem' : 'Grant System Access')}</h3>
               <button className="close-btn" onClick={() => { setIsAccountModalOpen(false); setIsEditAccount(false); }}><X size={24} /></button>
             </div>
-            <div style={{ padding: '20px 30px', background: 'rgba(212, 175, 55, 0.05)', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ padding: '20px 30px', background: 'var(--secondary-bg)', borderBottom: '1px solid var(--border)' }}>
               <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>Karyawan: <strong style={{ color: 'var(--secondary)' }}>{selectedEmployee?.name}</strong></p>
             </div>
             <form onSubmit={handleCreateAccount} style={{ padding: '30px' }}>
@@ -474,7 +474,7 @@ const HRD = () => {
                             }}
                             style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                           />
-                          <span style={{ fontWeight: '600', color: mod.warning ? '#ef4444' : 'var(--text)' }}>
+                          <span style={{ fontWeight: '600', color: mod.warning ? 'var(--danger)' : 'var(--text)' }}>
                             {mod.label}
                           </span>
                         </div>
@@ -490,7 +490,7 @@ const HRD = () => {
                             <button
                               type="button"
                               onClick={(e) => { e.preventDefault(); const newPerms = { ...accountData.permissions }; newPerms[mod.key] = 'write'; setAccountData({ ...accountData, permissions: newPerms }); }}
-                              style={{ padding: '6px 12px', fontSize: '0.8rem', background: isWrite ? '#10b981' : 'transparent', color: isWrite ? '#fff' : 'var(--text-muted)', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+                              style={{ padding: '6px 12px', fontSize: '0.8rem', background: isWrite ? 'var(--success)' : 'transparent', color: isWrite ? '#fff' : 'var(--text-muted)', border: 'none', cursor: 'pointer', fontWeight: '600' }}
                             >
                               Read & Write
                             </button>
@@ -502,7 +502,7 @@ const HRD = () => {
                 </div>
               </div>
               {createAccountError && (
-                <div style={{ marginTop: '16px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '10px', color: '#ef4444', fontSize: '0.85rem' }}>
+                <div style={{ marginTop: '16px', padding: '12px 16px', background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: '10px', color: 'var(--danger)', fontSize: '0.85rem' }}>
                   ⚠️ {createAccountError}
                 </div>
               )}

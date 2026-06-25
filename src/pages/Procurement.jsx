@@ -103,7 +103,7 @@ const Procurement = () => {
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
             <motion.div initial={{ scale: 0.85 }} animate={{ scale: 1 }} exit={{ scale: 0.85 }} className="glass-card" style={{ padding: '40px', maxWidth: '440px', width: '100%', textAlign: 'center' }}>
               <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🗑️</div>
-              <h3 style={{ color: '#ef4444', marginBottom: '8px' }}>{isID ? 'Hapus Vendor?' : 'Delete Vendor?'}</h3>
+              <h3 style={{ color: 'var(--danger)', marginBottom: '8px' }}>{isID ? 'Hapus Vendor?' : 'Delete Vendor?'}</h3>
               <p style={{ color: 'var(--text-muted)', marginBottom: '28px' }}>
                 {isID ? 'Data vendor ' : 'Vendor data for '}
                 <strong style={{ color: 'var(--text)' }}>{deleteConfirm.name}</strong>
@@ -111,7 +111,7 @@ const Procurement = () => {
               </p>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)' }} onClick={() => setDeleteConfirm(null)}>{isID ? 'Batal' : 'Cancel'}</button>
-                <ButtonWithLoading className="btn" style={{ flex: 1, background: '#ef4444', color: 'white', border: 'none' }} onClick={async () => { await deleteVendor(deleteConfirm.id); setDeleteConfirm(null); }}>{isID ? 'Hapus' : 'Delete'}</ButtonWithLoading>
+                <ButtonWithLoading className="btn" style={{ flex: 1, background: 'var(--danger)', color: 'white', border: 'none' }} onClick={async () => { await deleteVendor(deleteConfirm.id); setDeleteConfirm(null); }}>{isID ? 'Hapus' : 'Delete'}</ButtonWithLoading>
               </div>
             </motion.div>
           </motion.div>
@@ -159,7 +159,7 @@ const Procurement = () => {
               <div style={{ marginBottom: '25px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>{isID ? 'Daftar Layanan & Harga' : 'Services & Rates List'}</label>
-                  <button type="button" className="btn" style={{ padding: '5px 12px', fontSize: '0.8rem', background: 'rgba(212,175,55,0.1)', color: 'var(--secondary)', border: '1px dashed var(--secondary)' }} onClick={addService}>{isID ? '+ Tambah Layanan' : '+ Add Service'}</button>
+                  <button type="button" className="btn" style={{ padding: '5px 12px', fontSize: '0.8rem', background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px dashed var(--secondary)' }} onClick={addService}>{isID ? '+ Tambah Layanan' : '+ Add Service'}</button>
                 </div>
                 <div className="grid-vendor-services desktop-only" style={{ marginBottom: '8px', fontSize: '0.75rem', color: 'var(--text-muted)', paddingLeft: '4px' }}>
                   <div/><div>{isID ? 'Deskripsi Pekerjaan' : 'Job Description'}</div><div>{isID ? 'Harga (IDR)' : 'Rate (IDR)'}</div><div/>
@@ -169,7 +169,7 @@ const Procurement = () => {
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--secondary)' }} />
                     <input required type="text" value={s.description} onChange={e => updateService(i, 'description', e.target.value)} placeholder={isID ? "Contoh: Trucking 20ft Tanjung Priok" : "Example: Trucking 20ft Tanjung Priok"} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '9px 12px' }} />
                     <input required type="number" value={s.price} onChange={e => updateService(i, 'price', e.target.value)} placeholder={isID ? "Harga" : "Price"} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '9px 12px' }} />
-                    <button type="button" onClick={() => removeService(i)} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
+                    <button type="button" onClick={() => removeService(i)} style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
                   </div>
                 ))}
               </div>
@@ -178,12 +178,12 @@ const Procurement = () => {
               <div style={{ marginBottom: '30px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>{isID ? 'Aset Operasional' : 'Operational Assets'}</label>
-                  <button type="button" className="btn" style={{ padding: '5px 12px', fontSize: '0.8rem', background: 'rgba(212,175,55,0.1)', color: 'var(--secondary)', border: '1px dashed var(--secondary)' }} onClick={addAsset}>{isID ? '+ Tambah Aset' : '+ Add Asset'}</button>
+                  <button type="button" className="btn" style={{ padding: '5px 12px', fontSize: '0.8rem', background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px dashed var(--secondary)' }} onClick={addAsset}>{isID ? '+ Tambah Aset' : '+ Add Asset'}</button>
                 </div>
                 {form.assets.map((a, i) => (
                   <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 40px', gap: '8px', marginBottom: '10px' }}>
                     <input type="text" value={a} onChange={e => updateAsset(i, e.target.value)} placeholder={isID ? "Contoh: Truk Fuso B 1234 ABC" : "Example: Fuso Truck B 1234 ABC"} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '9px 12px' }} />
-                    <button type="button" onClick={() => removeAsset(i)} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
+                    <button type="button" onClick={() => removeAsset(i)} style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
                   </div>
                 ))}
               </div>
@@ -200,9 +200,9 @@ const Procurement = () => {
       {/* Stats */}
       <div className="grid-responsive-3">
         {[
-          { label: isID ? 'Total Vendor' : 'Total Vendors', value: vendors.length, color: '#d4af37', icon: '🏢' },
-          { label: isID ? 'Total Layanan' : 'Total Services', value: vendors.reduce((s, v) => s + (v.services?.length || 0), 0), color: '#10b981', icon: '📋' },
-          { label: isID ? 'Total Aset' : 'Total Assets', value: vendors.reduce((s, v) => s + (v.assets?.filter(a=>a).length || 0), 0), color: '#3b82f6', icon: '🚛' },
+          { label: isID ? 'Total Vendor' : 'Total Vendors', value: vendors.length, color: 'var(--secondary)', icon: '🏢' },
+          { label: isID ? 'Total Layanan' : 'Total Services', value: vendors.reduce((s, v) => s + (v.services?.length || 0), 0), color: 'var(--success)', icon: '📋' },
+          { label: isID ? 'Total Aset' : 'Total Assets', value: vendors.reduce((s, v) => s + (v.assets?.filter(a=>a).length || 0), 0), color: 'var(--info)', icon: '🚛' },
         ].map(stat => (
           <div key={stat.label} className="glass-card" style={{ padding: '25px', display: 'flex', alignItems: 'center', gap: '20px' }}>
             <div style={{ fontSize: '2rem' }}>{stat.icon}</div>
@@ -252,7 +252,7 @@ const Procurement = () => {
             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.8rem' }} />
           </div>
           {(startDate || endDate || searchTerm) && (
-            <button onClick={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); }} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>Reset</button>
+            <button onClick={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); }} style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>Reset</button>
           )}
           <div style={{ marginLeft: 'auto' }}>
             <button className="btn btn-gold" onClick={handleExport} style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
@@ -294,7 +294,7 @@ const Procurement = () => {
                         <button className="btn-icon" onClick={() => startEdit(v)} title="Edit"><Edit2 size={15} /></button>
                       )}
                       {user?.role === 'owner' && (
-                        <button className="btn-icon" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }} onClick={() => setDeleteConfirm(v)} title={isID ? 'Hapus' : 'Delete'}><Trash2 size={15} /></button>
+                        <button className="btn-icon" style={{ color: 'var(--danger)', background: 'var(--danger-bg)' }} onClick={() => setDeleteConfirm(v)} title={isID ? 'Hapus' : 'Delete'}><Trash2 size={15} /></button>
                       )}
                     </div>
                 </div>
@@ -328,12 +328,12 @@ const Procurement = () => {
                         </div>
                         {/* Assets */}
                         <div>
-                          <div style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>{isID ? '🚛 Aset Operasional' : '🚛 Operational Assets'}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--info)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>{isID ? '🚛 Aset Operasional' : '🚛 Operational Assets'}</div>
                           {v.assets?.filter(a => a).length > 0 ? (
                             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                               {v.assets.filter(a => a).map((a, i) => (
                                 <li key={i} style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ color: '#3b82f6', fontSize: '0.6rem' }}>●</span> {a}
+                                  <span style={{ color: 'var(--info)', fontSize: '0.6rem' }}>●</span> {a}
                                 </li>
                               ))}
                             </ul>

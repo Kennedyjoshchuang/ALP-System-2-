@@ -324,14 +324,14 @@ const QuotationList = () => {
                       <Download size={16} />
                     </button>
                     {canWrite && quote.status === 'pending' && (
-                      <ButtonWithLoading className="btn-icon" style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.1)' }} onClick={() => approveQuotation(quote.id)}>
+                      <ButtonWithLoading className="btn-icon" style={{ color: 'var(--success)', background: 'var(--success-bg)' }} onClick={() => approveQuotation(quote.id)}>
                         <CheckCircle size={16} />
                       </ButtonWithLoading>
                     )}
                     {user?.role === 'owner' && (
                       <ButtonWithLoading 
                         className="btn-icon" 
-                        style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }} 
+                        style={{ color: 'var(--danger)', background: 'var(--danger-bg)' }} 
                         onClick={async () => { 
                           const confirmed = await confirm(
                             isID

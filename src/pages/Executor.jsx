@@ -362,7 +362,7 @@ const Executor = () => {
               style={{ padding: '40px', maxWidth: '480px', width: '100%', textAlign: 'center' }}
             >
               <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🗑️</div>
-              <h3 style={{ color: '#ef4444', marginBottom: '8px' }}>{isID ? 'Hapus Job Order?' : 'Delete Job Order?'}</h3>
+              <h3 style={{ color: 'var(--danger)', marginBottom: '8px' }}>{isID ? 'Hapus Job Order?' : 'Delete Job Order?'}</h3>
               <p style={{ color: 'var(--text-muted)', marginBottom: '6px' }}>
                 <strong style={{ color: 'var(--text)' }}>{joToDelete.id}</strong> — {joToDelete.customerName}
               </p>
@@ -371,16 +371,16 @@ const Executor = () => {
               </p>
               <div className="input-group" style={{ textAlign: 'left', marginBottom: '8px' }}>
                 <label style={{ color: 'var(--secondary)', fontWeight: '700' }}>
-                  {isID ? 'Ketik ' : 'Type '}<strong style={{ color: '#ef4444' }}>{joToDelete.id}</strong> {isID ? 'untuk konfirmasi:' : 'to confirm:'}
+                  {isID ? 'Ketik ' : 'Type '}<strong style={{ color: 'var(--danger)' }}>{joToDelete.id}</strong> {isID ? 'untuk konfirmasi:' : 'to confirm:'}
                 </label>
                 <input
                   type="text"
                   value={verifyCode}
                   onChange={e => { setVerifyCode(e.target.value); setVerifyError(''); }}
                   placeholder={isID ? `Ketik ${joToDelete.id} di sini...` : `Type ${joToDelete.id} here...`}
-                  style={{ background: 'var(--input-bg)', border: `1px solid ${verifyError ? '#ef4444' : 'var(--border)'}`, borderRadius: '10px', color: 'var(--text)', padding: '12px', width: '100%' }}
+                  style={{ background: 'var(--input-bg)', border: `1px solid ${verifyError ? 'var(--danger)' : 'var(--border)'}`, borderRadius: '10px', color: 'var(--text)', padding: '12px', width: '100%' }}
                 />
-                {verifyError && <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '4px' }}>{verifyError}</p>}
+                {verifyError && <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '4px' }}>{verifyError}</p>}
               </div>
               <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
                 <button
@@ -393,7 +393,7 @@ const Executor = () => {
                 </button>
                 <ButtonWithLoading
                   className="btn"
-                  style={{ flex: 1, background: '#ef4444', color: 'white', border: 'none' }}
+                  style={{ flex: 1, background: 'var(--danger)', color: 'white', border: 'none' }}
                   onClick={async () => {
                     if (verifyCode !== joToDelete.id) {
                       setVerifyError(isID ? 'Kode verifikasi tidak sesuai!' : 'Verification code does not match!');
@@ -479,7 +479,7 @@ const Executor = () => {
           <span style={{ color: 'var(--text-muted)' }}>{isID ? 's/d' : 'to'}</span>
           <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
           {(startDate || endDate || searchTerm) && (
-            <button onClick={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); }} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>{isID ? 'Atur Ulang' : 'Reset'}</button>
+            <button onClick={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); }} style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>{isID ? 'Atur Ulang' : 'Reset'}</button>
           )}
         </div>
         <div style={{ marginLeft: 'auto' }}>
@@ -536,7 +536,7 @@ const Executor = () => {
                   <React.Fragment key={group.quotationId}>
                     {/* Folder Header Row */}
                     <tr 
-                      style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(212, 175, 55, 0.05)', cursor: 'pointer' }} 
+                      style={{ borderBottom: '1px solid var(--glass-border)', background: 'var(--secondary-bg)', cursor: 'pointer' }} 
                       className="table-row-hover" 
                       onClick={() => setExpandedGroups(prev => ({ ...prev, [group.quotationId]: !prev[group.quotationId] }))}
                     >
@@ -581,8 +581,8 @@ const Executor = () => {
                           </td>
                           <td style={{ padding: '15px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: activeTab === 'active' ? '#f59e0b' : '#10b981' }} />
-                              <span style={{ fontWeight: '600', color: activeTab === 'active' ? '#f59e0b' : '#10b981', fontSize: '0.9rem' }}>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: activeTab === 'active' ? 'var(--warning)' : 'var(--success)' }} />
+                              <span style={{ fontWeight: '600', color: activeTab === 'active' ? 'var(--warning)' : 'var(--success)', fontSize: '0.9rem' }}>
                                 {jo.activityStatus || (activeTab === 'active' ? (isID ? 'Menunggu Pembaruan...' : 'Pending Update...') : (isID ? 'Selesai' : 'Done'))}
                               </span>
                             </div>
@@ -612,7 +612,7 @@ const Executor = () => {
                               )}
                               <button 
                                 className="btn-icon" 
-                                style={{ width: '38px', height: '38px', color: 'var(--secondary)', background: 'rgba(212, 175, 55, 0.1)', border: '1px solid rgba(212, 175, 55, 0.3)' }}
+                                style={{ width: '38px', height: '38px', color: 'var(--secondary)', background: 'var(--secondary-bg)', border: '1px solid var(--secondary-border)' }}
                                 onClick={(e) => { e.stopPropagation(); navigate(`/executor/surat-jalan/${jo.id}`); }}
                                 title={isID ? "Lihat Surat Jalan" : "View Delivery Order"}
                               >
@@ -620,7 +620,7 @@ const Executor = () => {
                               </button>
                               <button 
                                 className="btn-icon" 
-                                style={{ width: '38px', height: '38px', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)' }}
+                                style={{ width: '38px', height: '38px', color: 'var(--success)', background: 'var(--success-bg)', border: '1px solid var(--success-border)' }}
                                 onClick={(e) => { e.stopPropagation(); navigate(`/executor/surat-jalan/${jo.id}?print=true`); }}
                                 title={isID ? "Cetak Surat Jalan" : "Print Delivery Order"}
                               >
@@ -629,7 +629,7 @@ const Executor = () => {
                               {activeTab === 'records' && canWrite && (
                                 <button 
                                   className="btn-icon" 
-                                  style={{ width: '38px', height: '38px', color: 'var(--gold-metallic)', background: 'rgba(212, 175, 55, 0.1)', border: '1px solid rgba(212, 175, 55, 0.3)' }}
+                                  style={{ width: '38px', height: '38px', color: 'var(--gold-metallic)', background: 'var(--secondary-bg)', border: '1px solid var(--secondary-border)' }}
                                   onClick={(e) => { e.stopPropagation(); toggleRow(jo); }}
                                   title={isID ? "Ubah Catatan Data" : "Edit Records Data"}
                                 >
@@ -639,7 +639,7 @@ const Executor = () => {
                               {activeTab === 'records' && canWrite && (
                                 <button 
                                   className="btn-icon" 
-                                  style={{ width: '38px', height: '38px', color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
+                                  style={{ width: '38px', height: '38px', color: 'var(--danger)', background: 'var(--danger-bg)', border: '1px solid var(--danger-border)' }}
                                   onClick={(e) => { e.stopPropagation(); setJoToDelete(jo); setVerifyCode(''); setVerifyError(''); }}
                                   title={isID ? "Hapus Catatan JO" : "Delete JO Record"}
                                 >
@@ -666,7 +666,7 @@ const Executor = () => {
                                       <div className="grid-responsive-3">
                                         {/* Multi Container */}
                                         <div className="input-group">
-                                          <label>{isID ? 'Nomor Kontainer' : 'Container Number'} <span style={{ color: '#ef4444' }}>*</span></label>
+                                          <label>{isID ? 'Nomor Kontainer' : 'Container Number'} <span style={{ color: 'var(--danger)' }}>*</span></label>
                                           {(localData[jo.id]?.containerNo || []).map((c, i, arr) => (
                                             <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
                                               <input disabled={!canWrite} type="text" value={c} onChange={e => handleLocalListItemUpdate(jo.id, 'containerNo', i, e.target.value)} placeholder="CONT-123456" />
@@ -676,7 +676,7 @@ const Executor = () => {
                                                 </button>
                                               )}
                                               {canWrite && (
-                                                <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'containerNo')} style={{ padding: '5px', height: 'auto', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} title={isID ? "Tambah Kontainer" : "Add Container"}>
+                                                <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'containerNo')} style={{ padding: '5px', height: 'auto', color: 'var(--success)', background: 'var(--success-bg)' }} title={isID ? "Tambah Kontainer" : "Add Container"}>
                                                   <Plus size={12} />
                                                 </button>
                                               )}
@@ -686,7 +686,7 @@ const Executor = () => {
                                         
                                         {/* Multi Vehicle */}
                                         <div className="input-group">
-                                          <label>{isID ? 'Nomor Kendaraan' : 'Vehicle Number'} <span style={{ color: '#ef4444' }}>*</span></label>
+                                          <label>{isID ? 'Nomor Kendaraan' : 'Vehicle Number'} <span style={{ color: 'var(--danger)' }}>*</span></label>
                                           {(localData[jo.id]?.vehicleNo || []).map((v, i, arr) => (
                                             <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
                                               <input disabled={!canWrite} type="text" value={v} onChange={e => handleLocalListItemUpdate(jo.id, 'vehicleNo', i, e.target.value)} placeholder="B 1234 ABC" />
@@ -696,7 +696,7 @@ const Executor = () => {
                                                 </button>
                                               )}
                                               {canWrite && (
-                                                <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'vehicleNo')} style={{ padding: '5px', height: 'auto', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} title={isID ? "Tambah Kendaraan" : "Add Vehicle"}>
+                                                <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'vehicleNo')} style={{ padding: '5px', height: 'auto', color: 'var(--success)', background: 'var(--success-bg)' }} title={isID ? "Tambah Kendaraan" : "Add Vehicle"}>
                                                   <Plus size={12} />
                                                 </button>
                                               )}
@@ -706,7 +706,7 @@ const Executor = () => {
                                         
                                         {/* Multi Driver */}
                                         <div className="input-group">
-                                          <label>{isID ? 'Nama Sopir' : 'Driver Name'} <span style={{ color: '#ef4444' }}>*</span></label>
+                                          <label>{isID ? 'Nama Sopir' : 'Driver Name'} <span style={{ color: 'var(--danger)' }}>*</span></label>
                                           {(localData[jo.id]?.driverName || []).map((d, i, arr) => (
                                             <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
                                               <input disabled={!canWrite} type="text" value={d} onChange={e => handleLocalListItemUpdate(jo.id, 'driverName', i, e.target.value)} placeholder={isID ? "Nama Sopir" : "Driver Name"} />
@@ -716,7 +716,7 @@ const Executor = () => {
                                                 </button>
                                               )}
                                               {canWrite && (
-                                                <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'driverName')} style={{ padding: '5px', height: 'auto', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} title={isID ? "Tambah Sopir" : "Add Driver"}>
+                                                <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'driverName')} style={{ padding: '5px', height: 'auto', color: 'var(--success)', background: 'var(--success-bg)' }} title={isID ? "Tambah Sopir" : "Add Driver"}>
                                                   <Plus size={12} />
                                                 </button>
                                               )}
@@ -725,7 +725,7 @@ const Executor = () => {
                                         </div>
                                       </div>
                                       <div className="input-group">
-                                        <label>{isID ? 'Status Aktivitas' : 'Activity Status'} <span style={{ color: '#ef4444' }}>*</span></label>
+                                        <label>{isID ? 'Status Aktivitas' : 'Activity Status'} <span style={{ color: 'var(--danger)' }}>*</span></label>
                                         <input 
                                           disabled={!canWrite}
                                           type="text" 
@@ -791,7 +791,7 @@ const Executor = () => {
                                           {activeTab === 'active' && (
                                             <ButtonWithLoading
                                               className="btn btn-done"
-                                              style={{ padding: '10px 20px', fontSize: '0.85rem', background: '#10b981', color: 'white', border: 'none' }}
+                                              style={{ padding: '10px 20px', fontSize: '0.85rem', background: 'var(--success)', color: 'white', border: 'none' }}
                                               onClick={() => handleDone(jo)}
                                             >
                                               {isID ? 'Selesaikan Pekerjaan' : 'Complete Job'}
@@ -808,7 +808,7 @@ const Executor = () => {
                                           <div key={idx} style={{ position: 'relative', width: '70px', height: '70px' }}>
                                             <img src={photo} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} />
                                             {activeTab === 'active' && canWrite && (
-                                              <button onClick={() => removePhoto(jo.id, idx)} style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>×</button>
+                                              <button onClick={() => removePhoto(jo.id, idx)} style={{ position: 'absolute', top: -5, right: -5, background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>×</button>
                                             )}
                                           </div>
                                         ))}

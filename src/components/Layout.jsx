@@ -53,7 +53,7 @@ const Layout = ({ children }) => {
   };
 
   return (
-    <div className={theme === 'light' ? 'light-theme' : ''} style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', overflowX: 'hidden' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', overflowX: 'hidden' }}>
       {/* Sidebar Overlay (Mobile) */}
       <AnimatePresence>
         {isMobileMenuOpen && (
@@ -81,7 +81,6 @@ const Layout = ({ children }) => {
         height: isLaptop ? 'calc(100vh - 24px)' : 'calc(100vh - 40px)',
         zIndex: 200,
         borderRadius: '18px',
-        background: theme === 'light' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(3, 7, 18, 0.4)',
         transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
         transform: isMobile && !isMobileMenuOpen ? `translateX(-${SIDEBAR_WIDTH + 40}px)` : 'translateX(0)'
       }}>
@@ -143,9 +142,9 @@ const Layout = ({ children }) => {
             style={{ 
               width: '100%', 
               justifyContent: 'center', 
-              color: '#ef4444', 
-              background: 'rgba(239, 68, 68, 0.05)',
-              border: '1px solid rgba(239, 68, 68, 0.1)' 
+              color: 'var(--danger)', 
+              background: 'var(--danger-bg)',
+              border: '1px solid var(--danger-border)' 
             }}
             onClick={logout}
           >

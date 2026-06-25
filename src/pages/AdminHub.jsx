@@ -428,11 +428,11 @@ const AdminHub = () => {
             style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display: 'flex', flexWrap: 'wrap',alignItems:'center',justifyContent:'center',padding:'20px'}}>
             <motion.div initial={{scale:0.85}} animate={{scale:1}} exit={{scale:0.85}} className="glass-card" style={{padding:'35px',maxWidth:'420px',width:'100%',textAlign:'center' , overflowX: 'auto' }}>
               <div style={{fontSize:'2.5rem',marginBottom:'12px'}}>🗑️</div>
-              <h3 style={{color:'#ef4444',marginBottom:'8px'}}>{isID ? 'Hapus Purchase Order?' : 'Delete Purchase Order?'}</h3>
+              <h3 style={{color:'var(--danger)',marginBottom:'8px'}}>{isID ? 'Hapus Purchase Order?' : 'Delete Purchase Order?'}</h3>
               <p style={{color:'var(--text-muted)',marginBottom:'25px'}}>{isID ? 'PO ' : 'PO '}<strong style={{color:'var(--text)'}}>{deletePOConfirm.id}</strong>{isID ? ' akan dihapus permanen.' : ' will be permanently deleted.'}</p>
               <div style={{display: 'flex', flexWrap: 'wrap',gap:'12px'}}>
                 <button className="btn" style={{flex:1,background:'rgba(255,255,255,0.05)',border:'1px solid var(--border)',color:'var(--text)'}} onClick={()=>setDeletePOConfirm(null)}>{isID ? 'Batal' : 'Cancel'}</button>
-                <ButtonWithLoading className="btn" style={{flex:1,background:'#ef4444',color:'white',border:'none'}} onClick={async()=>{if (!canWrite) return; await deletePurchaseOrder(deletePOConfirm.id);setDeletePOConfirm(null);}}>{isID ? 'Hapus' : 'Delete'}</ButtonWithLoading>
+                <ButtonWithLoading className="btn" style={{flex:1,background:'var(--danger)',color:'white',border:'none'}} onClick={async()=>{if (!canWrite) return; await deletePurchaseOrder(deletePOConfirm.id);setDeletePOConfirm(null);}}>{isID ? 'Hapus' : 'Delete'}</ButtonWithLoading>
               </div>
             </motion.div>
           </motion.div>
@@ -445,11 +445,11 @@ const AdminHub = () => {
             style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display: 'flex', flexWrap: 'wrap',alignItems:'center',justifyContent:'center',padding:'20px'}}>
             <motion.div initial={{scale:0.85}} animate={{scale:1}} exit={{scale:0.85}} className="glass-card" style={{padding:'35px',maxWidth:'420px',width:'100%',textAlign:'center' , overflowX: 'auto' }}>
               <div style={{fontSize:'2.5rem',marginBottom:'12px'}}>🗑️</div>
-              <h3 style={{color:'#ef4444',marginBottom:'8px'}}>{isID ? 'Batalkan / Hapus Job Order?' : 'Cancel / Delete Job Order?'}</h3>
+              <h3 style={{color:'var(--danger)',marginBottom:'8px'}}>{isID ? 'Batalkan / Hapus Job Order?' : 'Cancel / Delete Job Order?'}</h3>
               <p style={{color:'var(--text-muted)',marginBottom:'25px'}}>{isID ? 'Job Order draft ' : 'Draft Job Order '}<strong style={{color:'var(--text)'}}>{deleteJOConfirm.id}</strong> ({deleteJOConfirm.customerName}){isID ? ' akan dihapus permanen.' : ' will be permanently deleted.'}</p>
               <div style={{display: 'flex', flexWrap: 'wrap',gap:'12px'}}>
                 <button className="btn" style={{flex:1,background:'rgba(255,255,255,0.05)',border:'1px solid var(--border)',color:'var(--text)'}} onClick={()=>setDeleteJOConfirm(null)}>{isID ? 'Batal' : 'Cancel'}</button>
-                <ButtonWithLoading className="btn" style={{flex:1,background:'#ef4444',color:'white',border:'none'}} onClick={async()=>{if (!canWrite) return; await context.deleteJO(deleteJOConfirm.id);setDeleteJOConfirm(null);}}>{isID ? 'Hapus Draft' : 'Delete Draft'}</ButtonWithLoading>
+                <ButtonWithLoading className="btn" style={{flex:1,background:'var(--danger)',color:'white',border:'none'}} onClick={async()=>{if (!canWrite) return; await context.deleteJO(deleteJOConfirm.id);setDeleteJOConfirm(null);}}>{isID ? 'Hapus Draft' : 'Delete Draft'}</ButtonWithLoading>
               </div>
             </motion.div>
           </motion.div>
@@ -507,7 +507,7 @@ const AdminHub = () => {
                 {poJoId && (() => {
                   const jo = jobOrders.find(j=>j.id===poJoId);
                   return jo ? (
-                    <div style={{padding:'15px',background:'rgba(212,175,55,0.06)',border:'1px solid rgba(212,175,55,0.2)',borderRadius:'10px',marginBottom:'20px',fontSize:'0.875rem'}}>
+                    <div style={{padding:'15px',background:'rgba(212,175,55,0.06)',border:'1px solid var(--secondary-border)',borderRadius:'10px',marginBottom:'20px',fontSize:'0.875rem'}}>
                       <div className="grid-responsive-2">
                         <div><span style={{color:'var(--text-muted)'}}>{isID ? 'Pelanggan:' : 'Customer:'}</span><div style={{fontWeight:'700'}}>{jo.customerName}</div></div>
                         <div><span style={{color:'var(--text-muted)'}}>{isID ? 'Instruksi Kerja:' : 'Work Instruction:'}</span><div style={{fontWeight:'700'}}>{jo.jobDescription||jo.instruction||'-'}</div></div>
@@ -562,7 +562,7 @@ const AdminHub = () => {
                           </select>
                           <input type="number" min="1" value={item.qty} onChange={e=>updatePOItem(i,'qty',e.target.value)} style={{padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--text)',fontSize:'0.85rem',textAlign:'center'}}/>
                           <div style={{padding:'9px',background:'rgba(255,255,255,0.03)',border:'1px solid var(--glass-border)',borderRadius:'8px',fontSize:'0.85rem',fontWeight:'700',color:'var(--secondary)',textAlign:'right'}}>{svc?`Rp ${sub.toLocaleString('id-ID')}`:'Rp 0'}</div>
-                          <button type="button" onClick={()=>removePOItem(i)} disabled={poItems.length===1} style={{background:'rgba(239,68,68,0.1)',color:'#ef4444',border:'none',borderRadius:'8px',height:'36px',cursor:'pointer',display: 'flex', flexWrap: 'wrap',alignItems:'center',justifyContent:'center'}}><X size={13}/></button>
+                          <button type="button" onClick={()=>removePOItem(i)} disabled={poItems.length===1} style={{background:'var(--danger-bg)',color:'var(--danger)',border:'none',borderRadius:'8px',height:'36px',cursor:'pointer',display: 'flex', flexWrap: 'wrap',alignItems:'center',justifyContent:'center'}}><X size={13}/></button>
                         </div>
                       );
                     })}
@@ -590,7 +590,7 @@ const AdminHub = () => {
                     type="button"
                     onClick={handleSaveDraft}
                     className="btn"
-                    style={{flex:1.5,background:'rgba(212,175,55,0.1)',color:'var(--secondary)',border:'1px solid var(--secondary)'}}
+                    style={{flex:1.5,background:'var(--secondary-bg)',color:'var(--secondary)',border:'1px solid var(--secondary)'}}
                     disabled={!poJoId||!poVendorId}
                   >
                     💾 {isID ? (editingPOId ? 'Perbarui Draft' : 'Simpan Draft') : (editingPOId ? 'Update Draft' : 'Save Draft')}
@@ -620,7 +620,7 @@ const AdminHub = () => {
           <div style={{display: 'flex', flexWrap: 'wrap',gap:'10px'}}>
             <button 
               className="btn btn-gold" 
-              style={{ padding: '10px 22px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', borderRadius: '12px', fontWeight: '700', boxShadow: '0 4px 15px rgba(212,175,55,0.2)' }} 
+              style={{ padding: '10px 22px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', borderRadius: '12px', fontWeight: '700', boxShadow: '0 4px 15px var(--secondary-border)' }} 
               onClick={() => {
                 setShowPOModal(true);
               }}
@@ -662,7 +662,7 @@ const AdminHub = () => {
           <span style={{ color: 'var(--text-muted)' }}>{isID ? 's/d' : 'to'}</span>
           <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
           {(startDate || endDate || searchTerm) && (
-            <button onClick={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); }} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>Reset</button>
+            <button onClick={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); }} style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>Reset</button>
           )}
         </div>
         <div>
@@ -981,20 +981,20 @@ const AdminHub = () => {
                   <td style={{ padding: '12px', textAlign: 'center' }}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
                       {canWrite && (
-                        <button className="btn-icon" onClick={() => handleEditPO(po)} title={isID ? "Ubah PO" : "Edit PO"} style={{ color: '#3b82f6', background: 'rgba(59,130,246,0.1)' }}>
+                        <button className="btn-icon" onClick={() => handleEditPO(po)} title={isID ? "Ubah PO" : "Edit PO"} style={{ color: 'var(--info)', background: 'var(--info-bg)' }}>
                           <Edit size={15} />
                         </button>
                       )}
-                      <button className="btn-icon" onClick={() => setPrintPO(po)} title={isID ? "Cetak PO" : "Print PO"} style={{ color: 'var(--secondary)', background: 'rgba(212,175,55,0.1)' }}>
+                      <button className="btn-icon" onClick={() => setPrintPO(po)} title={isID ? "Cetak PO" : "Print PO"} style={{ color: 'var(--secondary)', background: 'var(--secondary-bg)' }}>
                         <FileText size={15} />
                       </button>
                       {canWrite && po.status !== 'issued' && (
-                        <ButtonWithLoading className="btn-icon" onClick={() => issuePurchaseOrder(po.id)} title={isID ? "Terbitkan PO" : "Issue PO"} style={{ color: '#10b981', background: 'rgba(16,185,129,0.1)' }}>
+                        <ButtonWithLoading className="btn-icon" onClick={() => issuePurchaseOrder(po.id)} title={isID ? "Terbitkan PO" : "Issue PO"} style={{ color: 'var(--success)', background: 'var(--success-bg)' }}>
                           <CheckCircle size={15} />
                         </ButtonWithLoading>
                       )}
                       {canWrite && (
-                        <button className="btn-icon" onClick={() => setDeletePOConfirm(po)} title={isID ? "Hapus PO" : "Delete PO"} style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }}>
+                        <button className="btn-icon" onClick={() => setDeletePOConfirm(po)} title={isID ? "Hapus PO" : "Delete PO"} style={{ color: 'var(--danger)', background: 'var(--danger-bg)' }}>
                           <Trash2 size={15} />
                         </button>
                       )}
@@ -1096,7 +1096,7 @@ const AdminHub = () => {
                           {canWrite && (
                             <button 
                               className="btn-icon" 
-                              style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', width: '28px', height: '28px' }} 
+                              style={{ color: 'var(--danger)', background: 'var(--danger-bg)', width: '28px', height: '28px' }} 
                               onClick={() => setDeleteJOConfirm(jo)}
                               title={isID ? "Hapus Draft JO" : "Delete Draft JO"}
                             >

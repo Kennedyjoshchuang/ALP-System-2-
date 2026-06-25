@@ -582,7 +582,7 @@ const Marketing = () => {
               className="glass-card" style={{ padding: '40px', maxWidth: '480px', width: '100%', textAlign: 'center' , overflowX: 'auto' }}
             >
               <div style={{ fontSize: '3rem', marginBottom: '20px' }}>🗑️</div>
-              <h3 style={{ marginBottom: '10px', color: '#ef4444' }}>
+              <h3 style={{ marginBottom: '10px', color: 'var(--danger)' }}>
                 {deleteConfirm.type === 'prospect' 
                   ? 'Hapus Prospek?' 
                   : deleteConfirm.type === 'customer' 
@@ -611,7 +611,7 @@ const Marketing = () => {
                 </button>
                 <ButtonWithLoading
                   className="btn"
-                  style={{ flex: 1, background: '#ef4444', color: 'white', border: 'none' }}
+                  style={{ flex: 1, background: 'var(--danger)', color: 'white', border: 'none' }}
                   onClick={handleDeleteConfirm}
                 >
                   Ya, Hapus
@@ -686,11 +686,11 @@ const Marketing = () => {
                     <input required type="number" value={item.rate} onChange={e => updateQuoteItem(index, 'rate', e.target.value)} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
                     <input required type="number" value={item.quantity} onChange={e => updateQuoteItem(index, 'quantity', e.target.value)} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
                     <input type="text" value={item.unit} onChange={e => updateQuoteItem(index, 'unit', e.target.value)} placeholder="Trip/Kg/..." style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
-                    <button type="button" onClick={() => removeQuoteItem(index)} style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                    <button type="button" onClick={() => removeQuoteItem(index)} style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                   </div>
                 ))}
 
-                <button type="button" onClick={addQuoteItem} className="btn" style={{ marginBottom: '20px', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px dashed var(--secondary)', width: '100%' }}>
+                <button type="button" onClick={addQuoteItem} className="btn" style={{ marginBottom: '20px', background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px dashed var(--secondary)', width: '100%' }}>
                   + Add Item
                 </button>
 
@@ -783,11 +783,11 @@ const Marketing = () => {
                     <input required type="number" value={item.rate} onChange={e => updateEditQuoteItem(index, 'rate', e.target.value)} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
                     <input required type="number" value={item.quantity} onChange={e => updateEditQuoteItem(index, 'quantity', e.target.value)} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
                     <input type="text" value={item.unit} onChange={e => updateEditQuoteItem(index, 'unit', e.target.value)} placeholder="Trip/Kg/..." style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
-                    <button type="button" onClick={() => removeEditQuoteItem(index)} style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                    <button type="button" onClick={() => removeEditQuoteItem(index)} style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                   </div>
                 ))}
 
-                <button type="button" onClick={addEditQuoteItem} className="btn" style={{ marginBottom: '20px', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px dashed var(--secondary)', width: '100%' }}>
+                <button type="button" onClick={addEditQuoteItem} className="btn" style={{ marginBottom: '20px', background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px dashed var(--secondary)', width: '100%' }}>
                   + Add Item
                 </button>
 
@@ -946,7 +946,7 @@ const Marketing = () => {
                           const updated = editProspectCustomFields.filter((_, i) => i !== index);
                           setEditProspectCustomFields(updated.length ? updated : [{ key: '', value: '' }]);
                         }}
-                        style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '12px', borderRadius: '12px', cursor: 'pointer' }}
+                        style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-border)', padding: '12px', borderRadius: '12px', cursor: 'pointer' }}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -1040,7 +1040,7 @@ const Marketing = () => {
                           const updated = editCustomerCustomFields.filter((_, i) => i !== index);
                           setEditCustomerCustomFields(updated.length ? updated : [{ key: '', value: '' }]);
                         }}
-                        style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '12px', borderRadius: '12px', cursor: 'pointer' }}
+                        style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-border)', padding: '12px', borderRadius: '12px', cursor: 'pointer' }}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -1305,7 +1305,7 @@ const Marketing = () => {
           <span style={{ color: 'var(--text-muted)' }}>s/d</span>
           <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
           {(startDate || endDate) && (
-            <button onClick={() => { setStartDate(''); setEndDate(''); }} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>Reset</button>
+            <button onClick={() => { setStartDate(''); setEndDate(''); }} style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>Reset</button>
           )}
         </div>
         <div style={{ marginLeft: 'auto' }}>
@@ -1471,7 +1471,7 @@ const Marketing = () => {
                         const updated = prospectCustomFields.filter((_, i) => i !== index);
                         setProspectCustomFields(updated.length ? updated : [{ key: '', value: '' }]);
                       }}
-                      style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '12px', borderRadius: '12px', cursor: 'pointer' }}
+                      style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-border)', padding: '12px', borderRadius: '12px', cursor: 'pointer' }}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -1551,7 +1551,7 @@ const Marketing = () => {
                         const updated = newCustomerCustomFields.filter((_, i) => i !== index);
                         setNewCustomerCustomFields(updated.length ? updated : [{ key: '', value: '' }]);
                       }}
-                      style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '12px', borderRadius: '12px', cursor: 'pointer' }}
+                      style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-border)', padding: '12px', borderRadius: '12px', cursor: 'pointer' }}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -1575,7 +1575,7 @@ const Marketing = () => {
           <div className="glass-card" style={{ padding: '25px', overflowX: 'auto' }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px", flexWrap: "wrap", gap: "15px" }}>
               <h4 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-                <CheckCircle size={20} style={{ color: '#10b981' }} />
+                <CheckCircle size={20} style={{ color: 'var(--success)' }} />
                 {t('activeJobOrders')}
               </h4>
               <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1697,7 +1697,7 @@ const Marketing = () => {
                               {canWrite && (
                                 <ButtonWithLoading
                                   className="btn-icon"
-                                  style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)' }}
+                                  style={{ color: 'var(--warning)', background: 'var(--warning-bg)' }}
                                   onClick={() => unapproveQuotation(quote.id)}
                                   title="Batalkan Approval (kembalikan ke Pending)"
                                 >
@@ -1707,7 +1707,7 @@ const Marketing = () => {
                               {user?.role === 'owner' && (
                                 <button
                                   className="btn-icon"
-                                  style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }}
+                                  style={{ color: 'var(--danger)', background: 'var(--danger-bg)' }}
                                   onClick={() => setDeleteConfirm({ id: quote.id, name: quote.customerName, type: 'quotation' })}
                                   title="Hapus"
                                 >
@@ -1891,7 +1891,7 @@ const Marketing = () => {
                           {canWrite && quote.status === 'pending' && (
                             <ButtonWithLoading
                               className="btn-icon"
-                              style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.1)' }}
+                              style={{ color: 'var(--success)', background: 'var(--success-bg)' }}
                               onClick={async () => {
                                 await approveQuotation(quote.id);
                                 setActiveTab('jobOrders');
@@ -1904,7 +1904,7 @@ const Marketing = () => {
                           {canWrite && quote.status === 'approved' && (
                             <ButtonWithLoading
                               className="btn-icon"
-                              style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)' }}
+                              style={{ color: 'var(--warning)', background: 'var(--warning-bg)' }}
                               onClick={() => unapproveQuotation(quote.id)}
                               title="Batalkan Approval"
                             >
@@ -1913,7 +1913,7 @@ const Marketing = () => {
                           )}
                           <button
                             className="btn-icon"
-                            style={{ color: 'var(--secondary)', background: 'rgba(212, 175, 55, 0.1)' }}
+                            style={{ color: 'var(--secondary)', background: 'var(--secondary-bg)' }}
                             onClick={() => {
                               setSelectedDraft(quote);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1925,7 +1925,7 @@ const Marketing = () => {
                           {canWrite && (
                             <button
                               className="btn-icon"
-                              style={{ color: 'var(--secondary)', background: 'rgba(212, 175, 55, 0.1)' }}
+                              style={{ color: 'var(--secondary)', background: 'var(--secondary-bg)' }}
                               onClick={() => handleOpenEditQuotationModal(quote)}
                               title="Edit Quotation"
                             >
@@ -1935,7 +1935,7 @@ const Marketing = () => {
                           {user?.role === 'owner' && (
                             <button
                               className="btn-icon"
-                              style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' }}
+                              style={{ color: 'var(--danger)', background: 'var(--danger-bg)' }}
                               onClick={() => setDeleteConfirm({ id: quote.id, name: quote.customerName, type: 'quotation' })}
                               title="Hapus Penawaran"
                             >
@@ -2004,8 +2004,8 @@ const Marketing = () => {
                                 customFieldsList.map(([k, v]) => (
                                   <span key={k} style={{ 
                                     padding: '4px 8px', 
-                                    background: 'rgba(212, 175, 55, 0.1)', 
-                                    border: '1px solid rgba(212, 175, 55, 0.2)', 
+                                    background: 'var(--secondary-bg)', 
+                                    border: '1px solid var(--secondary-border)', 
                                     color: 'var(--secondary)', 
                                     borderRadius: '6px', 
                                     fontSize: '0.75rem', 
@@ -2024,7 +2024,7 @@ const Marketing = () => {
                               {canWrite && (
                                 <button
                                   className="btn-icon"
-                                  style={{ color: 'var(--secondary)', background: 'rgba(212, 175, 55, 0.1)', height: '28px', width: '28px' }}
+                                  style={{ color: 'var(--secondary)', background: 'var(--secondary-bg)', height: '28px', width: '28px' }}
                                   onClick={() => handleOpenEditCustomerModal(cust)}
                                   title="Edit Customer"
                                 >
@@ -2034,7 +2034,7 @@ const Marketing = () => {
                               {user?.role === 'owner' && (
                                 <button
                                   className="btn-icon"
-                                  style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', height: '28px', width: '28px' }}
+                                  style={{ color: 'var(--danger)', background: 'var(--danger-bg)', height: '28px', width: '28px' }}
                                   onClick={() => setDeleteConfirm({ id: cust.id, name: cust.name, type: 'customer' })}
                                   title="Delete Customer"
                                 >
@@ -2121,7 +2121,7 @@ const Marketing = () => {
                         {canWrite && (
                           <button
                             className="btn-icon"
-                            style={{ color: 'var(--secondary)', background: 'rgba(212, 175, 55, 0.1)', height: '28px', width: '28px' }}
+                            style={{ color: 'var(--secondary)', background: 'var(--secondary-bg)', height: '28px', width: '28px' }}
                             onClick={() => handleOpenEditProspectModal(prospect)}
                             title="Edit Prospect"
                           >
@@ -2131,7 +2131,7 @@ const Marketing = () => {
                         {canWrite && prospect.status === 'deal' && (
                           <button
                             className="btn-icon"
-                            style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)', height: '28px', width: '28px' }}
+                            style={{ color: 'var(--warning)', background: 'var(--warning-bg)', height: '28px', width: '28px' }}
                             onClick={() => updateProspectStatus(prospect.id, 'negotiation')}
                             title="Batalkan Deal (kembalikan ke Negosiasi)"
                           >
@@ -2141,7 +2141,7 @@ const Marketing = () => {
                         {user?.role === 'owner' && (
                           <button
                             className="btn-icon"
-                            style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', height: '28px', width: '28px' }}
+                            style={{ color: 'var(--danger)', background: 'var(--danger-bg)', height: '28px', width: '28px' }}
                             onClick={() => setDeleteConfirm({ id: prospect.id, name: prospect.name, type: 'prospect' })}
                           >
                             <Trash2 size={14} />

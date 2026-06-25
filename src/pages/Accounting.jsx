@@ -1499,7 +1499,7 @@ const Accounting = () => {
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <h1 style={{ color: '#d4af37', background: 'none', webkitTextFillColor: 'initial', fontSize: '3.5rem', margin: 0, fontWeight: '950', letterSpacing: '-2px' }}>INVOICE</h1>
+                    <h1 style={{ color: 'var(--secondary)', background: 'none', webkitTextFillColor: 'initial', fontSize: '3.5rem', margin: 0, fontWeight: '950', letterSpacing: '-2px' }}>INVOICE</h1>
                     <p style={{ fontWeight: '800', margin: '5px 0 0 0', fontSize: '1.2rem', color: '#0f172a' }}>NO: {selectedInvoice.id}</p>
                   </div>
                 </div>
@@ -1573,7 +1573,7 @@ const Accounting = () => {
                       </div>
                       <div>
                         <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '800' }}>Final Activity Status</span>
-                        <div style={{ fontWeight: '900', fontSize: '1.2rem', color: '#10b981' }}>{linkedJO.activityStatus || 'DELIVERED'}</div>
+                        <div style={{ fontWeight: '900', fontSize: '1.2rem', color: 'var(--success)' }}>{linkedJO.activityStatus || 'DELIVERED'}</div>
                       </div>
                     </div>
 
@@ -1772,7 +1772,7 @@ const Accounting = () => {
                           </select>
                           <input type="number" min="1" value={item.qty} onChange={e=>updatePOItem(i,'qty',e.target.value)} style={{padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--text)',fontSize:'0.85rem',textAlign:'center'}}/>
                           <div style={{padding:'9px',background:'rgba(255,255,255,0.03)',border:'1px solid var(--glass-border)',borderRadius:'8px',fontSize:'0.85rem',fontWeight:'700',color:'var(--secondary)',textAlign:'right'}}>{svc?`Rp ${sub.toLocaleString(isID ? 'id-ID' : 'en-US')}`:'Rp 0'}</div>
-                          <button type="button" onClick={()=>removePOItem(i)} disabled={poItems.length===1} style={{background:'rgba(239,68,68,0.1)',color:'#ef4444',border:'none',borderRadius:'8px',height:'36px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}><X size={13}/></button>
+                          <button type="button" onClick={()=>removePOItem(i)} disabled={poItems.length===1} style={{background:'var(--danger-bg)',color:'var(--danger)',border:'none',borderRadius:'8px',height:'36px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}><X size={13}/></button>
                         </div>
                       );
                     })}
@@ -1797,7 +1797,7 @@ const Accounting = () => {
 
               <div style={{display:'flex',gap:'12px',marginTop:'20px' }}>
                 <button type="button" onClick={resetPOForm} className="btn" style={{flex:1,background:'rgba(255,255,255,0.05)',border:'1px solid var(--border)',color:'var(--text)'}}>{isID ? 'Batal' : 'Cancel'}</button>
-                <ButtonWithLoading type="button" onClick={handleSavePODraft} className="btn" style={{flex:1,background:'rgba(212,175,55,0.1)',color:'var(--secondary)',border:'1px solid var(--secondary)'}} disabled={!poVendorId}>💾 {isID ? 'Simpan Draft' : 'Save Draft'}</ButtonWithLoading>
+                <ButtonWithLoading type="button" onClick={handleSavePODraft} className="btn" style={{flex:1,background:'var(--secondary-bg)',color:'var(--secondary)',border:'1px solid var(--secondary)'}} disabled={!poVendorId}>💾 {isID ? 'Simpan Draft' : 'Save Draft'}</ButtonWithLoading>
                 <ButtonWithLoading type="button" onClick={handleIssuePO} className="btn btn-gold" style={{flex:2}} disabled={!poVendorId}>🚀 {isID ? 'Terbitkan PO' : 'Issue PO'}</ButtonWithLoading>
               </div>
             </form>
@@ -1978,7 +1978,7 @@ const Accounting = () => {
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '2.5rem', fontWeight: '900', color: '#d4af37' }}>INVOICE</div>
+                        <div style={{ fontSize: '2.5rem', fontWeight: '900', color: 'var(--secondary)' }}>INVOICE</div>
                         <div style={{ marginTop: '6px', fontWeight: '800', fontSize: '0.95rem' }}>No: {inv.id}</div>
                       </div>
                     </div>
@@ -2021,7 +2021,7 @@ const Accounting = () => {
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '40px' }}>
                       <div style={{ background: '#1e293b', color: 'white', padding: '18px 30px', borderRadius: '12px', textAlign: 'right', minWidth: '280px' }}>
                         <div style={{ fontSize: '0.68rem', fontWeight: '800', color: '#94a3b8' }}>TOTAL DUE</div>
-                        <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#d4af37' }}>Rp {parseFloat(inv.amount).toLocaleString('id-ID')}</div>
+                        <div style={{ fontSize: '2.2rem', fontWeight: '900', color: 'var(--secondary)' }}>Rp {parseFloat(inv.amount).toLocaleString('id-ID')}</div>
                       </div>
                     </div>
                     <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
@@ -2110,7 +2110,7 @@ const Accounting = () => {
           `}</style>
           <div className="no-print" style={{ position: 'sticky', top: '10px', right: '10px', display: 'flex', gap: '10px', justifyContent: 'flex-end', background: 'rgba(255,255,255,0.9)', padding: '10px', borderRadius: '8px', zIndex: 10001 }}>
             <button className="btn" style={{ background: '#eee', color: '#333' }} onClick={() => { setBatchPrintPaidInvoices(null); setSelectedLedger(new Set()); }}>Close</button>
-            <button className="btn btn-primary" style={{ background:'#10b981' }} onClick={() => window.print()}><FileText size={18}/> Print All Selected (Full Doc)</button>
+            <button className="btn btn-primary" style={{ background:'var(--success)' }} onClick={() => window.print()}><FileText size={18}/> Print All Selected (Full Doc)</button>
           </div>
           
           <div style={{ maxWidth: '850px', margin: '0 auto' }}>
@@ -2160,9 +2160,9 @@ const Accounting = () => {
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '2.5rem', fontWeight: '900', color: '#10b981' }}>INVOICE</div>
+                        <div style={{ fontSize: '2.5rem', fontWeight: '900', color: 'var(--success)' }}>INVOICE</div>
                         <div style={{ marginTop: '6px', fontWeight: '800', fontSize: '0.95rem' }}>No: {inv.id}</div>
-                        <div style={{ color: '#10b981', fontWeight: '900', fontSize: '0.8rem', marginTop: '5px' }}>SETTLED / PAID</div>
+                        <div style={{ color: 'var(--success)', fontWeight: '900', fontSize: '0.8rem', marginTop: '5px' }}>SETTLED / PAID</div>
                       </div>
                     </div>
                     <div className="grid-responsive-2" style={{ gap: '40px', marginBottom: '36px' }}>
@@ -2204,7 +2204,7 @@ const Accounting = () => {
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '40px' }}>
                       <div style={{ background: '#1e293b', color: 'white', padding: '18px 30px', borderRadius: '12px', textAlign: 'right', minWidth: '280px' }}>
                         <div style={{ fontSize: '0.68rem', fontWeight: '800', color: '#94a3b8' }}>TOTAL PELUNASAN</div>
-                        <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#10b981' }}>Rp {parseFloat(inv.amount).toLocaleString('id-ID')}</div>
+                        <div style={{ fontSize: '2.2rem', fontWeight: '900', color: 'var(--success)' }}>Rp {parseFloat(inv.amount).toLocaleString('id-ID')}</div>
                       </div>
                     </div>
                     <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
@@ -2403,7 +2403,7 @@ const Accounting = () => {
                     ))}
                     <tr style={{ borderTop:'2px solid var(--glass-border)' }}>
                       <td colSpan="3" style={{padding:'10px 8px',fontWeight:'700',textAlign:'right'}}>{isID ? 'Grand Total Biaya' : 'Grand Total Cost'}</td>
-                      <td style={{padding:'10px 8px',textAlign:'right',fontWeight:'800',color:'#ef4444',fontSize:'1.1rem'}}>Rp {costModal.costs.reduce((s,c)=>s+(c.total||0),0).toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
+                      <td style={{padding:'10px 8px',textAlign:'right',fontWeight:'800',color:'var(--danger)',fontSize:'1.1rem'}}>Rp {costModal.costs.reduce((s,c)=>s+(c.total||0),0).toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
                       <td></td>
                     </tr>
                   </tbody>
@@ -2447,7 +2447,7 @@ const Accounting = () => {
                         Rp {lineTotal.toLocaleString(isID ? 'id-ID' : 'en-US')}
                       </div>
                       
-                      <button onClick={()=>removeCostLine(i)} disabled={costLines.length===1} style={{ background:'rgba(239,68,68,0.1)',color:'#ef4444',border:'none',borderRadius:'8px',height:'36px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}><X size={14}/></button>
+                      <button onClick={()=>removeCostLine(i)} disabled={costLines.length===1} style={{ background:'var(--danger-bg)',color:'var(--danger)',border:'none',borderRadius:'8px',height:'36px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}><X size={14}/></button>
                     </div>
 
                     {/* Custom Fields Sub-row */}
@@ -2508,7 +2508,7 @@ const Accounting = () => {
           style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
-            background: activeTab === 'billing' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255,255,255,0.05)',
+            background: activeTab === 'billing' ? 'linear-gradient(135deg, var(--info), #1d4ed8)' : 'rgba(255,255,255,0.05)',
             color: activeTab === 'billing' ? '#ffffff' : 'var(--text-muted)',
             boxShadow: activeTab === 'billing' ? '0 4px 15px rgba(59,130,246,0.4)' : 'none',
             border: activeTab === 'billing' ? 'none' : '1px solid var(--glass-border)'
@@ -2522,7 +2522,7 @@ const Accounting = () => {
           style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
-            background: activeTab === 'costing' ? 'linear-gradient(135deg, #d4af37, #a07d1c)' : 'rgba(255,255,255,0.05)',
+            background: activeTab === 'costing' ? 'linear-gradient(135deg, var(--secondary), #a07d1c)' : 'rgba(255,255,255,0.05)',
             color: activeTab === 'costing' ? '#1a1200' : 'var(--text-muted)',
             boxShadow: activeTab === 'costing' ? '0 4px 15px rgba(212,175,55,0.4)' : 'none',
             border: activeTab === 'costing' ? 'none' : '1px solid var(--glass-border)'
@@ -2530,7 +2530,7 @@ const Accounting = () => {
         >
           <DollarSign size={17} /> {isID ? 'Laba & Rugi' : 'Profit and Loss'}
           {activeJOs.length > 0 && (
-            <span style={{ background: activeTab === 'costing' ? 'rgba(0,0,0,0.2)' : 'rgba(212,175,55,0.2)', color: activeTab === 'costing' ? '#1a1200' : 'var(--secondary)', borderRadius: '20px', padding: '1px 8px', fontSize: '0.72rem', fontWeight: '800' }}>
+            <span style={{ background: activeTab === 'costing' ? 'rgba(0,0,0,0.2)' : 'var(--secondary-border)', color: activeTab === 'costing' ? '#1a1200' : 'var(--secondary)', borderRadius: '20px', padding: '1px 8px', fontSize: '0.72rem', fontWeight: '800' }}>
               {activeJOs.length}
             </span>
           )}
@@ -2541,7 +2541,7 @@ const Accounting = () => {
             style={{
               display: 'flex', alignItems: 'center', gap: '8px',
               padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
-              background: activeTab === 'piutang' ? 'linear-gradient(135deg, #10b981, #047857)' : 'rgba(255,255,255,0.05)',
+              background: activeTab === 'piutang' ? 'linear-gradient(135deg, var(--success), #047857)' : 'rgba(255,255,255,0.05)',
               color: activeTab === 'piutang' ? '#ffffff' : 'var(--text-muted)',
               boxShadow: activeTab === 'piutang' ? '0 4px 15px rgba(16,185,129,0.4)' : 'none',
               border: activeTab === 'piutang' ? 'none' : '1px solid var(--glass-border)'
@@ -2599,7 +2599,7 @@ const Accounting = () => {
           style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
-            background: activeTab === 'hutang' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(255,255,255,0.05)',
+            background: activeTab === 'hutang' ? 'linear-gradient(135deg, var(--warning), #d97706)' : 'rgba(255,255,255,0.05)',
             color: activeTab === 'hutang' ? '#ffffff' : 'var(--text-muted)',
             boxShadow: activeTab === 'hutang' ? '0 4px 15px rgba(245,158,11,0.4)' : 'none',
             border: activeTab === 'hutang' ? 'none' : '1px solid var(--glass-border)'
@@ -2655,10 +2655,10 @@ const Accounting = () => {
             style={{
               display: 'flex', alignItems: 'center', gap: '8px',
               padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
-              background: 'linear-gradient(135deg, #10b981, #059669)',
+              background: 'linear-gradient(135deg, var(--success), #059669)',
               color: '#ffffff',
               border: 'none',
-              boxShadow: '0 4px 15px rgba(16,185,129,0.3)',
+              boxShadow: '0 4px 15px var(--success-border)',
               marginLeft: '12px'
             }}
           >
@@ -2696,7 +2696,7 @@ const Accounting = () => {
           <span style={{ color: 'var(--text-muted)' }}>{isID ? 's/d' : 'to'}</span>
           <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
           {(startDate || endDate || searchTerm) && (
-            <button onClick={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); }} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>Reset</button>
+            <button onClick={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); }} style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>Reset</button>
           )}
         </div>
         <div style={{ marginLeft: 'auto' }}>
@@ -2716,9 +2716,9 @@ const Accounting = () => {
             <div style={{ display:'flex', gap:'15px', flexShrink:0 }}>
               {[
                 {label: isID ? 'Total JO' : 'Total JO', val:activeJOs.length, color:'var(--secondary)'},
-                {label: isID ? 'Total Pendapatan' : 'Total Revenue', val:'Rp ' + plFinancials.revenue.toLocaleString('id-ID'), color:'#10b981'},
-                {label: isID ? 'Total Biaya' : 'Total Cost', val:'Rp ' + plFinancials.cost.toLocaleString('id-ID'), color:'#ef4444'},
-                {label: isID ? 'Total Laba' : 'Total Profit', val:'Rp ' + (plFinancials.revenue - plFinancials.cost).toLocaleString('id-ID'), color: (plFinancials.revenue - plFinancials.cost) >= 0 ? '#10b981' : '#ef4444'}
+                {label: isID ? 'Total Pendapatan' : 'Total Revenue', val:'Rp ' + plFinancials.revenue.toLocaleString('id-ID'), color:'var(--success)'},
+                {label: isID ? 'Total Biaya' : 'Total Cost', val:'Rp ' + plFinancials.cost.toLocaleString('id-ID'), color:'var(--danger)'},
+                {label: isID ? 'Total Laba' : 'Total Profit', val:'Rp ' + (plFinancials.revenue - plFinancials.cost).toLocaleString('id-ID'), color: (plFinancials.revenue - plFinancials.cost) >= 0 ? 'var(--success)' : 'var(--danger)'}
               ].map(stat=>(
                 <div key={stat.label} style={{ textAlign:'center', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', borderRadius:'10px', padding:'10px 16px', minWidth: '120px' }}>
                   <div style={{ fontSize:'1rem', fontWeight:'800', color:stat.color }}>{stat.val}</div>
@@ -2769,19 +2769,19 @@ const Accounting = () => {
                          {invoice ? new Date(invoice.date).toLocaleDateString() : '—'}
                        </td>
                        <td style={{padding:'12px'}}><span className={`badge badge-${jo.status}`} style={{fontSize:'0.7rem'}}>{jo.status}</span></td>
-                      <td style={{padding:'12px', textAlign:'right', fontWeight:'700', color: revenue > 0 ? '#10b981' : 'var(--text-muted)'}}>
+                      <td style={{padding:'12px', textAlign:'right', fontWeight:'700', color: revenue > 0 ? 'var(--success)' : 'var(--text-muted)'}}>
                         {revenue > 0 ? `Rp ${revenue.toLocaleString('id-ID')}` : '—'}
                       </td>
-                      <td style={{padding:'12px',textAlign:'right',fontWeight:'700',color: totalCost>0 ? '#ef4444' : 'var(--text-muted)'}}>
+                      <td style={{padding:'12px',textAlign:'right',fontWeight:'700',color: totalCost>0 ? 'var(--danger)' : 'var(--text-muted)'}}>
                         {totalCost>0 ? `Rp ${totalCost.toLocaleString('id-ID')}` : '—'}
                       </td>
-                      <td style={{padding:'12px', textAlign:'right', fontWeight:'800', color: profitLoss > 0 ? '#10b981' : profitLoss < 0 ? '#ef4444' : 'var(--text-muted)'}}>
+                      <td style={{padding:'12px', textAlign:'right', fontWeight:'800', color: profitLoss > 0 ? 'var(--success)' : profitLoss < 0 ? 'var(--danger)' : 'var(--text-muted)'}}>
                         {revenue > 0 || totalCost > 0 ? `Rp ${profitLoss.toLocaleString('id-ID')}` : '—'}
                       </td>
                       <td style={{padding:'12px', textAlign:'center'}}>
                         <div style={{display:'flex', gap:'8px', justifyContent:'center'}}>
                           {canWrite && (
-                            <button className="btn" style={{padding:'7px 14px',fontSize:'0.8rem',gap:'6px', background:'rgba(212,175,55,0.1)', color:'var(--secondary)', border:'1px solid var(--secondary)'}} onClick={()=>{ setCostModal(jo); setCostLines([{vendorId:'',serviceIdx:'',qty:1,customVendorName:'',customServiceDescription:'',customPrice:''}]); }}>
+                            <button className="btn" style={{padding:'7px 14px',fontSize:'0.8rem',gap:'6px', background:'var(--secondary-bg)', color:'var(--secondary)', border:'1px solid var(--secondary)'}} onClick={()=>{ setCostModal(jo); setCostLines([{vendorId:'',serviceIdx:'',qty:1,customVendorName:'',customServiceDescription:'',customPrice:''}]); }}>
                               <Plus size={14}/> {isID ? 'Biaya' : 'Costs'}
                             </button>
                           )}
@@ -2846,7 +2846,7 @@ const Accounting = () => {
                         {/* Quotation Group Folder Row */}
                         <tr 
                           style={{ 
-                            background: 'rgba(212, 175, 55, 0.05)', 
+                            background: 'var(--secondary-bg)', 
                             borderBottom: '2px solid var(--secondary)',
                             cursor: 'pointer'
                           }}
@@ -2909,7 +2909,7 @@ const Accounting = () => {
                                 {jo.photos && jo.photos.length > 0 ? (
                                   <button 
                                     onClick={() => setPhotoViewer({ joId: jo.id, photos: jo.photos })}
-                                    style={{ background: 'rgba(212, 175, 55, 0.1)', border: '1px solid var(--secondary)', borderRadius: '6px', padding: '5px 10px', color: 'var(--secondary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem' }}
+                                    style={{ background: 'var(--secondary-bg)', border: '1px solid var(--secondary)', borderRadius: '6px', padding: '5px 10px', color: 'var(--secondary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem' }}
                                   >
                                     <Image size={14} /> {jo.photos.length} {isID ? 'Foto' : 'Photos'}
                                   </button>
@@ -2926,12 +2926,12 @@ const Accounting = () => {
                                   ) : (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                                       {undoConfirmJoId === jo.id ? (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '4px 10px' }}>
-                                          <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: '600' }}>{isID ? 'Batalkan invoice ini?' : 'Cancel this invoice?'}</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid var(--danger-border)', borderRadius: '8px', padding: '4px 10px' }}>
+                                          <span style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: '600' }}>{isID ? 'Batalkan invoice ini?' : 'Cancel this invoice?'}</span>
                                           <button
                                             disabled={!canWrite}
                                             onClick={() => handleUndoInvoice(jo.id)}
-                                            style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '5px', padding: '3px 10px', fontSize: '0.72rem', fontWeight: '700', cursor: canWrite ? 'pointer' : 'not-allowed', opacity: canWrite ? 1 : 0.5 }}
+                                            style={{ background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '5px', padding: '3px 10px', fontSize: '0.72rem', fontWeight: '700', cursor: canWrite ? 'pointer' : 'not-allowed', opacity: canWrite ? 1 : 0.5 }}
                                           >
                                             {isID ? 'Ya, Batalkan' : 'Yes, Cancel'}
                                           </button>
@@ -2944,14 +2944,14 @@ const Accounting = () => {
                                         </div>
                                       ) : (
                                         <>
-                                          <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', fontWeight: '600' }}>
+                                          <span style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', fontWeight: '600' }}>
                                             <CheckCircle size={16} /> {isID ? 'Sudah Di-invoice' : 'Invoiced'}
                                           </span>
                                           <button
                                             onClick={() => setUndoConfirmJoId(jo.id)}
                                             style={{
-                                              background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444',
-                                              border: '1px solid rgba(239, 68, 68, 0.2)', padding: '4px 10px',
+                                              background: 'var(--danger-bg)', color: 'var(--danger)',
+                                              border: '1px solid var(--danger-border)', padding: '4px 10px',
                                               borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer',
                                               display: 'flex', alignItems: 'center', gap: '5px'
                                             }}
@@ -2965,7 +2965,7 @@ const Accounting = () => {
                                   )}
                                   <button 
                                     className="btn" 
-                                    style={{ padding: '8px 16px', fontSize: '0.85rem', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px solid var(--secondary)' }} 
+                                    style={{ padding: '8px 16px', fontSize: '0.85rem', background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px solid var(--secondary)' }} 
                                     onClick={() => handleCreatePOFromAccounting(jo.id)}
                                   >
                                     + Purchase Order
@@ -3046,13 +3046,13 @@ const Accounting = () => {
                       <td style={{ padding: '15px', fontWeight: '600' }}>{inv.customerName}</td>
                       <td style={{ padding: '15px', fontSize: '0.85rem' }}>{new Date(inv.date).toLocaleDateString()}</td>
                       <td 
-                        style={{ padding: '15px', textAlign: 'right', fontWeight: '700', color: '#10b981', fontSize: '1rem', cursor: 'pointer' }}
+                        style={{ padding: '15px', textAlign: 'right', fontWeight: '700', color: 'var(--success)', fontSize: '1rem', cursor: 'pointer' }}
                         onClick={() => { setActiveTab('costing'); setSearchTerm(inv.joId); }}
                         title={isID ? 'Lihat Detail di Catatan JO' : 'View Detail in JO Records'}
                       >
                         Rp {(inv.amount || inv.subtotal).toLocaleString('id-ID')}
                       </td>
-                      <td style={{ padding: '15px', textAlign: 'right', fontWeight: '700', color: '#ef4444' }}>
+                      <td style={{ padding: '15px', textAlign: 'right', fontWeight: '700', color: 'var(--danger)' }}>
                         {(() => {
                           const jo = jobOrders.find(j => j.id === inv.joId);
                           if (!jo) return '—';
@@ -3072,7 +3072,7 @@ const Accounting = () => {
                           const revenue = inv.amount || inv.subtotal;
                           const profit = revenue - totalCost;
                           return (
-                            <span style={{ color: profit > 0 ? '#10b981' : profit < 0 ? '#ef4444' : 'inherit' }}>
+                            <span style={{ color: profit > 0 ? 'var(--success)' : profit < 0 ? 'var(--danger)' : 'inherit' }}>
                               Rp {profit.toLocaleString('id-ID')}
                             </span>
                           );
@@ -3082,12 +3082,12 @@ const Accounting = () => {
                          <div style={{ display:'flex', flexDirection:'column', gap:'5px', alignItems:'center' }}>
                            <div style={{ display:'flex', gap:'8px' }}>
                              {inv.signedInvoicePhoto ? (
-                               <button onClick={() => setPhotoViewer({ title: `Signed Invoice - ${inv.id}`, photos: [inv.signedInvoicePhoto] })} style={{ background:'none', border:'none', color:'#10b981', cursor:'pointer' }} title={isID ? 'Invoice TTD Diunggah' : 'Signed Invoice Uploaded'}><ShieldCheck size={18}/></button>
+                               <button onClick={() => setPhotoViewer({ title: `Signed Invoice - ${inv.id}`, photos: [inv.signedInvoicePhoto] })} style={{ background:'none', border:'none', color:'var(--success)', cursor:'pointer' }} title={isID ? 'Invoice TTD Diunggah' : 'Signed Invoice Uploaded'}><ShieldCheck size={18}/></button>
                              ) : (
                                <button onClick={() => setUploadSignedModal({ invId: inv.id, type: 'invoice' })} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }} title={isID ? 'Unggah Invoice TTD' : 'Upload Signed Invoice'}><Image size={18}/></button>
                              )}
                              {inv.signedReceiptPhoto ? (
-                               <button onClick={() => setPhotoViewer({ title: `Signed Delivery Receipt - ${inv.id}`, photos: [inv.signedReceiptPhoto] })} style={{ background:'none', border:'none', color:'#3b82f6', cursor:'pointer' }} title={isID ? 'STT TTD Diunggah' : 'Signed STT Uploaded'}><ShieldCheck size={18}/></button>
+                               <button onClick={() => setPhotoViewer({ title: `Signed Delivery Receipt - ${inv.id}`, photos: [inv.signedReceiptPhoto] })} style={{ background:'none', border:'none', color:'var(--info)', cursor:'pointer' }} title={isID ? 'STT TTD Diunggah' : 'Signed STT Uploaded'}><ShieldCheck size={18}/></button>
                              ) : (
                                <button onClick={() => setUploadSignedModal({ invId: inv.id, type: 'receipt' })} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }} title={isID ? 'Unggah STT TTD' : 'Upload Signed STT'}><FileText size={18}/></button>
                              )}
@@ -3119,7 +3119,7 @@ const Accounting = () => {
                           {canWrite && (
                             <button 
                               className="btn" 
-                              style={{ padding: '6px 10px', fontSize: '0.75rem', gap: '5px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }} 
+                              style={{ padding: '6px 10px', fontSize: '0.75rem', gap: '5px', background: 'var(--success-bg)', color: 'var(--success)', border: '1px solid var(--success-border)' }} 
                               onClick={() => setEditingInvoice(inv)}
                             >
                               <Edit3 size={14} /> Edit
@@ -3127,7 +3127,7 @@ const Accounting = () => {
                           )}
                           <button 
                             className="btn" 
-                            style={{ padding: '6px 10px', fontSize: '0.75rem', gap: '5px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.2)' }} 
+                            style={{ padding: '6px 10px', fontSize: '0.75rem', gap: '5px', background: 'var(--info-bg)', color: 'var(--info)', border: '1px solid var(--info-border)' }} 
                             onClick={() => {
                               const linkedJO = jobOrders.find(j => String(j.id) === String(inv.joId));
                               const linkedQuo = linkedJO ? quotations.find(q => String(q.id) === String(linkedJO.quotationId)) : null;
@@ -3139,7 +3139,7 @@ const Accounting = () => {
                           </button>
                           <button 
                             className="btn" 
-                            style={{ padding: '6px 10px', fontSize: '0.75rem', gap: '5px', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px solid var(--secondary)' }} 
+                            style={{ padding: '6px 10px', fontSize: '0.75rem', gap: '5px', background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px solid var(--secondary)' }} 
                             onClick={() => {
                               const linkedJO = jobOrders.find(j => String(j.id) === String(inv.joId));
                               const allAtts = [
@@ -3162,7 +3162,7 @@ const Accounting = () => {
                           {canWrite && (
                             <button 
                               className="btn" 
-                              style={{ padding: '6px 10px', fontSize: '0.75rem', gap: '5px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }} 
+                              style={{ padding: '6px 10px', fontSize: '0.75rem', gap: '5px', background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-border)' }} 
                               onClick={() => {
                                 setDeleteConfirmModal(inv);
                                 setVerifyStep(1);
@@ -3187,7 +3187,7 @@ const Accounting = () => {
             )}
 
             {selectedIssued.size > 0 && !isIssuedCollapsed && (
-              <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(59,130,246,0.05)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #3b82f6' }}>
+              <div style={{ marginTop: '20px', padding: '15px', background: 'var(--info-bg)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--info)' }}>
                 <span style={{ fontWeight: '600', color:'var(--text)' }}>{selectedIssued.size} {isID ? 'Invoice Terpilih' : 'Invoices Selected'}</span>
                 <button className="btn btn-primary" onClick={handleBatchPrintIssued} style={{ display:'flex', alignItems:'center', gap:'8px' }}>
                   <ExternalLink size={16} /> {isID ? 'Lihat Sekaligus (Inv + Lampiran)' : 'Batch View (Inv + Att)'}
@@ -3216,7 +3216,7 @@ const Accounting = () => {
               onClick={() => { setReceivableSubTab('lunas'); setSelectedLedger(new Set()); }}
               style={{
                 padding: '8px 20px', borderRadius: '8px', border: 'none',
-                background: receivableSubTab === 'lunas' ? '#10b981' : 'transparent',
+                background: receivableSubTab === 'lunas' ? 'var(--success)' : 'transparent',
                 color: receivableSubTab === 'lunas' ? 'white' : 'var(--text-muted)',
                 fontWeight: '600', cursor: 'pointer', transition: 'all 0.3s'
               }}
@@ -3250,11 +3250,11 @@ const Accounting = () => {
                   
                   return Object.entries(grouped).map(([name, total]) => (
                     <div key={name} className="glass-card" style={{ padding: '25px', display: 'flex', alignItems: 'center', gap: '20px', border: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.03)' }}>
-                      <div style={{ padding: '12px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
+                      <div style={{ padding: '12px', borderRadius: '12px', background: 'var(--info-bg)', color: 'var(--info)' }}>
                         <Wallet size={24} />
                       </div>
                       <div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: '900', color: '#3b82f6' }}>Rp {total.toLocaleString()}</div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: '900', color: 'var(--info)' }}>Rp {total.toLocaleString()}</div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px', marginTop: '2px' }}>{name}</div>
                         <div style={{ fontSize: '0.65rem', color: 'var(--secondary)', fontWeight: '700', marginTop: '4px' }}>{isID ? 'TOTAL OUTSTANDING' : 'TOTAL OUTSTANDING'}</div>
                       </div>
@@ -3268,7 +3268,7 @@ const Accounting = () => {
           )}
 
           <div className="glass-card" style={{ padding: '25px' }}>
-            <h4 style={{ marginBottom: '20px', color: receivableSubTab === 'outstanding' ? 'var(--secondary)' : '#10b981' }}>
+            <h4 style={{ marginBottom: '20px', color: receivableSubTab === 'outstanding' ? 'var(--secondary)' : 'var(--success)' }}>
               {receivableSubTab === 'outstanding' ? (isID ? 'Buku Besar Piutang Usaha' : 'Accounts Receivable Ledger') : (isID ? 'Arsip Invoice Lunas' : 'Settled Invoices Archive')}
             </h4>
             <div className="table-container"><div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -3317,7 +3317,7 @@ const Accounting = () => {
                       </td>
                       {receivableSubTab === 'lunas' && (
                         <td style={{ padding: '15px' }}>
-                          <div style={{ color: '#ef4444', fontWeight: '600' }}>Rp {(item.tax_deduction || 0).toLocaleString()}</div>
+                          <div style={{ color: 'var(--danger)', fontWeight: '600' }}>Rp {(item.tax_deduction || 0).toLocaleString()}</div>
                           {item.tax_deduction_proof && (
                             <button 
                               onClick={() => setPhotoViewer({ title: `${isID ? 'Bukti Potong Pajak' : 'Bukti Potong Pajak'} - ${item.id}`, photos: item.tax_deduction_proof })}
@@ -3332,7 +3332,7 @@ const Accounting = () => {
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button 
                             className="btn" 
-                            style={{ padding: '6px 12px', fontSize: '0.8rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.2)' }}
+                            style={{ padding: '6px 12px', fontSize: '0.8rem', background: 'var(--info-bg)', color: 'var(--info)', border: '1px solid var(--info-border)' }}
                             onClick={() => handleDownloadInvoice(item)}
                           >
                             <ShieldCheck size={14} /> {isID ? 'Dokumen' : 'Doc'}
@@ -3340,7 +3340,7 @@ const Accounting = () => {
                           {canWrite && (
                             <button 
                               className="btn" 
-                              style={{ padding: '6px 12px', fontSize: '0.8rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}
+                              style={{ padding: '6px 12px', fontSize: '0.8rem', background: 'var(--success-bg)', color: 'var(--success)', border: '1px solid var(--success-border)' }}
                               onClick={() => {
                                 const originalInv = invoices.find(i => i.id === item.id || i.id === item.invoiceId);
                                 setEditingInvoice(originalInv || item);
@@ -3358,7 +3358,7 @@ const Accounting = () => {
                                 </ButtonWithLoading>
                                 <button 
                                   className="btn" 
-                                  style={{ padding: '8px 12px', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }} 
+                                  style={{ padding: '8px 12px', fontSize: '0.8rem', background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-border)' }} 
                                   onClick={() => {
                                     setDeleteConfirmModal(item);
                                     setVerifyStep(1);
@@ -3388,7 +3388,7 @@ const Accounting = () => {
                                   </button>
                                   <button 
                                     className="btn" 
-                                    style={{ padding: '8px 12px', fontSize: '0.8rem', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.2)', gap: '5px' }} 
+                                    style={{ padding: '8px 12px', fontSize: '0.8rem', background: 'var(--warning-bg)', color: 'var(--warning)', border: '1px solid rgba(245, 158, 11, 0.2)', gap: '5px' }} 
                                     onClick={() => handleUndoPaidInvoice(item)}
                                     title={isID ? "Batal Pembayaran" : "Undo Payment"}
                                   >
@@ -3406,7 +3406,7 @@ const Accounting = () => {
                               {canWrite && (
                                 <button 
                                   className="btn" 
-                                  style={{ padding: '8px 12px', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }} 
+                                  style={{ padding: '8px 12px', fontSize: '0.8rem', background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-border)' }} 
                                   onClick={() => {
                                     setDeleteConfirmModal(item);
                                     setVerifyStep(1);
@@ -3434,10 +3434,10 @@ const Accounting = () => {
             </table></div></div>
 
             {selectedLedger.size > 0 && (
-              <div style={{ marginTop: '20px', padding: '15px', background: receivableSubTab === 'lunas' ? 'rgba(16,185,129,0.05)' : 'rgba(212,175,55,0.05)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: receivableSubTab === 'lunas' ? '1px solid #10b981' : '1px solid var(--secondary)' }}>
+              <div style={{ marginTop: '20px', padding: '15px', background: receivableSubTab === 'lunas' ? 'var(--success-bg)' : 'var(--secondary-bg)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: receivableSubTab === 'lunas' ? '1px solid var(--success)' : '1px solid var(--secondary)' }}>
                 <span style={{ fontWeight: '600', color:'var(--text)' }}>{selectedLedger.size} {isID ? 'Invoice Terpilih' : 'Invoices Selected'}</span>
                 {receivableSubTab === 'lunas' ? (
-                  <button className="btn" style={{ background:'#10b981', color:'white', display:'flex', alignItems:'center', gap:'8px' }} onClick={handleBatchPrintPaidInvoices}>
+                  <button className="btn" style={{ background:'var(--success)', color:'white', display:'flex', alignItems:'center', gap:'8px' }} onClick={handleBatchPrintPaidInvoices}>
                     <ExternalLink size={16} /> {isID ? 'Lihat Sekaligus (Dokumen Lengkap)' : 'Batch View (Full Doc)'}
                   </button>
                 ) : (
@@ -3490,10 +3490,10 @@ const Accounting = () => {
                     </td>
                     <td style={{ padding: '15px' }}>{s.period}</td>
                     <td style={{ padding: '15px', textAlign: 'right', fontWeight: '600' }}>Rp {parseFloat(s.baseSalary || 0).toLocaleString()}</td>
-                    <td style={{ padding: '15px', textAlign: 'right', color: '#ef4444' }}>
+                    <td style={{ padding: '15px', textAlign: 'right', color: 'var(--danger)' }}>
                       - Rp {s.taxes.reduce((acc, t) => acc + parseFloat(t.amount || 0), 0).toLocaleString()}
                     </td>
-                    <td style={{ padding: '15px', textAlign: 'right', fontWeight: '800', color: '#10b981' }}>
+                    <td style={{ padding: '15px', textAlign: 'right', fontWeight: '800', color: 'var(--success)' }}>
                       Rp {parseFloat(s.totalToPay || 0).toLocaleString()}
                     </td>
                     <td style={{ padding: '15px', textAlign: 'center' }}>
@@ -3507,7 +3507,7 @@ const Accounting = () => {
                           <Download size={14} /> {isID ? 'Slip' : 'Slip'}
                         </button>
                         {canWrite && (
-                          <button className="btn btn-sm" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--secondary)', border: '1px solid var(--secondary)', display:'flex', alignItems:'center', justifyContent:'center', width:'32px', height:'32px', borderRadius:'6px', cursor:'pointer' }} onClick={() => { setSalaryForm(s); setSalaryModal(true); }}>
+                          <button className="btn btn-sm" style={{ background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px solid var(--secondary)', display:'flex', alignItems:'center', justifyContent:'center', width:'32px', height:'32px', borderRadius:'6px', cursor:'pointer' }} onClick={() => { setSalaryForm(s); setSalaryModal(true); }}>
                             <Edit3 size={14} />
                           </button>
                         )}
@@ -3611,8 +3611,8 @@ const Accounting = () => {
                             onChange={(e) => handleUpdateReimbursementStatus(r, e.target.value)}
                             style={{ 
                               padding: '6px 12px', borderRadius: '20px', border: 'none', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', cursor: canWrite ? 'pointer' : 'not-allowed',
-                              background: r.status === 'paid' ? 'rgba(16,185,129,0.1)' : r.status === 'approved' ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)',
-                              color: r.status === 'paid' ? '#10b981' : r.status === 'approved' ? '#3b82f6' : '#f59e0b',
+                              background: r.status === 'paid' ? 'var(--success-bg)' : r.status === 'approved' ? 'var(--info-bg)' : 'var(--warning-bg)',
+                              color: r.status === 'paid' ? 'var(--success)' : r.status === 'approved' ? 'var(--info)' : 'var(--warning)',
                               opacity: canWrite ? 1 : 0.7
                             }}
                           >
@@ -3624,7 +3624,7 @@ const Accounting = () => {
                         <td style={{ padding: '15px', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                             {canWrite && (
-                              <button onClick={() => handleEditReimbursement(r)} style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title={isID ? 'Edit Data' : 'Edit Data'}>
+                              <button onClick={() => handleEditReimbursement(r)} style={{ background: 'var(--info-bg)', color: 'var(--info)', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title={isID ? 'Edit Data' : 'Edit Data'}>
                                 <Edit3 size={16} />
                               </button>
                             )}
@@ -3640,7 +3640,7 @@ const Accounting = () => {
                                   }
                                 );
                                 if (confirmed) deleteOtherExpense(r.id);
-                              }} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title={isID ? 'Hapus Data' : 'Delete Data'}>
+                              }} style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title={isID ? 'Hapus Data' : 'Delete Data'}>
                                 <Trash2 size={16} />
                               </button>
                             )}
@@ -3664,7 +3664,7 @@ const Accounting = () => {
               </h4>
               <div style={{ display: 'flex', gap: '10px' }}>
                 {canWrite && (
-                  <button className="btn" style={{ background: 'linear-gradient(135deg, #10b981, #047857)', color: 'white', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={() => handleNewOtherTransaction('income')}>
+                  <button className="btn" style={{ background: 'linear-gradient(135deg, var(--success), #047857)', color: 'white', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={() => handleNewOtherTransaction('income')}>
                     <Plus size={16} /> {isID ? 'Tambah Pendapatan' : 'Add Income'}
                   </button>
                 )}
@@ -3694,7 +3694,7 @@ const Accounting = () => {
                   onClick={() => setTransactionTypeFilter('income')}
                   style={{
                     padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '0.85rem', transition: 'all 0.2s',
-                    background: transactionTypeFilter === 'income' ? 'linear-gradient(135deg, #10b981, #047857)' : 'transparent',
+                    background: transactionTypeFilter === 'income' ? 'linear-gradient(135deg, var(--success), #047857)' : 'transparent',
                     color: transactionTypeFilter === 'income' ? 'white' : 'var(--text-muted)',
                     border: 'none'
                   }}
@@ -3737,7 +3737,7 @@ const Accounting = () => {
                         <span style={{
                           fontSize: '0.65rem', padding: '2px 6px', borderRadius: '12px',
                           background: t.type === 'income' ? 'rgba(16,185,129,0.15)' : 'rgba(236,72,153,0.15)',
-                          color: t.type === 'income' ? '#10b981' : '#ec4899', fontWeight: '800', textTransform: 'uppercase'
+                          color: t.type === 'income' ? 'var(--success)' : '#ec4899', fontWeight: '800', textTransform: 'uppercase'
                         }}>
                           {isID ? (t.type === 'income' ? 'MASUK' : 'KELUAR') : (t.type === 'income' ? 'INCOME' : 'EXPENSE')}
                         </span>
@@ -3801,7 +3801,7 @@ const Accounting = () => {
                                   : (isID ? 'Sumber (Rek. Perusahaan):' : 'Source (Company Acc):')}
                               </span>
                               <div style={{ fontSize: '0.85rem', color: 'var(--text)' }}>{companyBank.bankName}</div>
-                              <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: '600' }}>{companyBank.accountNumber}</div>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--success)', fontWeight: '600' }}>{companyBank.accountNumber}</div>
                             </div>
                           );
                         }
@@ -3810,12 +3810,12 @@ const Accounting = () => {
                     </td>
                     <td style={{ padding: '15px' }}>{new Date(t.expenseDate || t.date).toLocaleDateString(isID ? 'id-ID' : 'en-US', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                     <td style={{ padding: '15px', textAlign: 'right', fontWeight: '600' }}>Rp {parseFloat(t.amount || 0).toLocaleString()}</td>
-                    <td style={{ padding: '15px', textAlign: 'right', color: '#ef4444' }}>
+                    <td style={{ padding: '15px', textAlign: 'right', color: 'var(--danger)' }}>
                       {t.taxes && t.taxes.length > 0 ? `- Rp ${t.taxes.reduce((acc, x) => acc + parseFloat(x.amount || 0), 0).toLocaleString()}` : '-'}
                     </td>
                     <td style={{
                       padding: '15px', textAlign: 'right', fontWeight: '800',
-                      color: t.type === 'income' ? '#10b981' : '#ec4899'
+                      color: t.type === 'income' ? 'var(--success)' : '#ec4899'
                     }}>
                       {t.type === 'income' ? '+' : '-'} Rp {parseFloat(t.totalAfterTax || t.amount || 0).toLocaleString()}
                     </td>
@@ -3827,7 +3827,7 @@ const Accounting = () => {
                     <td style={{ padding: '15px', textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                         {canWrite && (
-                          <button className="btn btn-sm" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--secondary)', border: '1px solid var(--secondary)', display:'flex', alignItems:'center', justifyContent:'center', width:'32px', height:'32px', borderRadius:'6px', cursor:'pointer' }} onClick={() => handleEditOtherTransaction(t)}>
+                          <button className="btn btn-sm" style={{ background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px solid var(--secondary)', display:'flex', alignItems:'center', justifyContent:'center', width:'32px', height:'32px', borderRadius:'6px', cursor:'pointer' }} onClick={() => handleEditOtherTransaction(t)}>
                             <Edit3 size={14} />
                           </button>
                         )}
@@ -3857,7 +3857,7 @@ const Accounting = () => {
                 onClick={() => setPayableSubTab('outstanding')}
                 style={{
                   padding: '8px 20px', borderRadius: '8px', border: 'none',
-                  background: payableSubTab === 'outstanding' ? '#f59e0b' : 'transparent',
+                  background: payableSubTab === 'outstanding' ? 'var(--warning)' : 'transparent',
                   color: payableSubTab === 'outstanding' ? 'black' : 'var(--text-muted)',
                   fontWeight: '600', cursor: 'pointer', transition: 'all 0.3s'
                 }}
@@ -3868,7 +3868,7 @@ const Accounting = () => {
                 onClick={() => { setPayableSubTab('lunas'); setSelectedPayables(new Set()); }}
                 style={{
                   padding: '8px 20px', borderRadius: '8px', border: 'none',
-                  background: payableSubTab === 'lunas' ? '#10b981' : 'transparent',
+                  background: payableSubTab === 'lunas' ? 'var(--success)' : 'transparent',
                   color: payableSubTab === 'lunas' ? 'white' : 'var(--text-muted)',
                   fontWeight: '600', cursor: 'pointer', transition: 'all 0.3s'
                 }}
@@ -3892,7 +3892,7 @@ const Accounting = () => {
           </div>
 
           <div className="glass-card" style={{ padding: '25px' }}>
-            <h4 style={{ marginBottom: '20px', color: payableSubTab === 'outstanding' ? '#f59e0b' : '#10b981' }}>
+            <h4 style={{ marginBottom: '20px', color: payableSubTab === 'outstanding' ? 'var(--warning)' : 'var(--success)' }}>
               {payableSubTab === 'outstanding' ? (isID ? 'Buku Besar Hutang Vendor Outstanding' : 'Outstanding Vendor Payables') : (isID ? 'Arsip Hutang Vendor Lunas' : 'Settled Vendor Payables')}
             </h4>
             <div className="table-container"><div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -3946,10 +3946,10 @@ const Accounting = () => {
                       <td style={{ padding: '15px' }}>{new Date(po.date).toLocaleDateString(isID ? 'id-ID' : 'en-US', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                       <td style={{ padding: '15px', textAlign: 'right' }}>
                         {payableSubTab === 'outstanding' ? (
-                          <div style={{ fontWeight: '800', color: '#f59e0b' }}>Rp {parseFloat(po.grandTotal || 0).toLocaleString()}</div>
+                          <div style={{ fontWeight: '800', color: 'var(--warning)' }}>Rp {parseFloat(po.grandTotal || 0).toLocaleString()}</div>
                         ) : (
                           <div>
-                            <div style={{ fontWeight: '900', color: '#10b981', fontSize: '1rem' }}>
+                            <div style={{ fontWeight: '900', color: 'var(--success)', fontSize: '1rem' }}>
                               Rp {(parseFloat(po.grandTotal || 0) - (parseFloat(po.tax_amount) || 0)).toLocaleString()}
                             </div>
                             {po.tax_amount > 0 && (
@@ -3981,13 +3981,13 @@ const Accounting = () => {
                                     }
                                   );
                                   if (confirmed) handleUploadVendorInvoice(po.id, []);
-                                }} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer' }}><Trash2 size={14}/></button>
+                                }} style={{ background:'none', border:'none', color:'var(--danger)', cursor:'pointer' }}><Trash2 size={14}/></button>
                               </>
                             )}
                           </div>
                         ) : (
                           canWrite ? (
-                            <button onClick={() => { setModalPhotos([]); setVendorInvoiceModal(po); }} style={{ background:'rgba(59,130,246,0.1)', color:'#3b82f6', border:'1px dashed #3b82f6', padding:'4px 8px', borderRadius:'6px', fontSize:'0.7rem', cursor:'pointer' }}>{isID ? '+ Unggah' : '+ Upload'}</button>
+                            <button onClick={() => { setModalPhotos([]); setVendorInvoiceModal(po); }} style={{ background:'var(--info-bg)', color:'var(--info)', border:'1px dashed var(--info)', padding:'4px 8px', borderRadius:'6px', fontSize:'0.7rem', cursor:'pointer' }}>{isID ? '+ Unggah' : '+ Upload'}</button>
                           ) : (
                             <span style={{ color:'var(--text-muted)', fontSize:'0.75rem' }}>—</span>
                           )
@@ -4006,7 +4006,7 @@ const Accounting = () => {
                       <td style={{ padding: '15px', textAlign: 'center' }}>
                         {po.paymentProofPhoto && po.paymentProofPhoto.length > 0 ? (
                            <div style={{ display:'flex', gap:'5px', justifyContent:'center' }}>
-                              <button onClick={() => setPhotoViewer({ title: `${isID ? 'Bukti Pembayaran' : 'Payment Proof'} - ${po.vendorName}`, photos: po.paymentProofPhoto })} style={{ background:'none', border:'none', color:'#10b981', cursor:'pointer', display:'flex', alignItems:'center', gap:'4px' }}>
+                              <button onClick={() => setPhotoViewer({ title: `${isID ? 'Bukti Pembayaran' : 'Payment Proof'} - ${po.vendorName}`, photos: po.paymentProofPhoto })} style={{ background:'none', border:'none', color:'var(--success)', cursor:'pointer', display:'flex', alignItems:'center', gap:'4px' }}>
                                 <CheckCircle size={18}/>
                                 <span style={{ fontSize:'0.7rem', fontWeight:'700' }}>({po.paymentProofPhoto.length})</span>
                               </button>
@@ -4044,7 +4044,7 @@ const Accounting = () => {
                                       }
                                     );
                                     if (confirmed) handleSettlePayable(po.id, { tax_proof_photo: [] });
-                                  }} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer' }}><Trash2 size={14}/></button>
+                                  }} style={{ background:'none', border:'none', color:'var(--danger)', cursor:'pointer' }}><Trash2 size={14}/></button>
                                 </>
                               )}
                            </div>
@@ -4089,12 +4089,12 @@ const Accounting = () => {
                           )
                         ) : (
                           <div style={{ textAlign:'center' }}>
-                            <div style={{ color:'#10b981', fontWeight:'700', fontSize:'0.8rem' }}>{isID ? 'Dilunasi pada' : 'Settled on'} {po.paidDate}</div>
+                            <div style={{ color:'var(--success)', fontWeight:'700', fontSize:'0.8rem' }}>{isID ? 'Dilunasi pada' : 'Settled on'} {po.paidDate}</div>
                             <div style={{ display: 'flex', justifyContent: 'center', gap: '5px', marginTop: '6px' }}>
                               {canWrite && (
                                 <button 
                                   className="btn" 
-                                  style={{ padding: '4px 10px', fontSize: '0.65rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius:'6px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.2)' }}
+                                  style={{ padding: '4px 10px', fontSize: '0.65rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius:'6px', background: 'var(--warning-bg)', color: 'var(--warning)', border: '1px solid rgba(245, 158, 11, 0.2)' }}
                                   onClick={() => handleUndoPaidPO(po)}
                                   title={isID ? "Batal Pembayaran" : "Undo Payment"}
                                 >
@@ -4126,18 +4126,18 @@ const Accounting = () => {
             </table></div></div>
 
             {payableSubTab === 'lunas' && selectedPayables.size > 0 && (
-              <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(16,185,129,0.05)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #10b981' }}>
+              <div style={{ marginTop: '20px', padding: '15px', background: 'var(--success-bg)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--success)' }}>
                 <span style={{ fontWeight: '600', color:'var(--text)' }}>{selectedPayables.size} {isID ? 'PO Terpilih' : 'PO Selected'}</span>
-                <button className="btn btn-gold" onClick={handleBatchPrintPayable} style={{ background:'#10b981', borderColor:'#10b981', color:'white', display:'flex', alignItems:'center', gap:'8px' }}>
+                <button className="btn btn-gold" onClick={handleBatchPrintPayable} style={{ background:'var(--success)', borderColor:'var(--success)', color:'white', display:'flex', alignItems:'center', gap:'8px' }}>
                   <ExternalLink size={16} /> {isID ? 'Lihat Sekaligus (Dokumen Lengkap)' : 'Batch View (Full Docs)'}
                 </button>
               </div>
             )}
 
             {payableSubTab === 'outstanding' && selectedPayables.size > 0 && (
-              <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(245,158,11,0.05)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #f59e0b' }}>
+              <div style={{ marginTop: '20px', padding: '15px', background: 'var(--warning-bg)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--warning)' }}>
                 <span style={{ fontWeight: '600', color:'var(--text)' }}>{selectedPayables.size} {isID ? 'PO Terpilih' : 'PO Selected'}</span>
-                <button className="btn btn-gold" onClick={handleBatchDownloadVendorInvoice} style={{ background:'#f59e0b', borderColor:'#f59e0b', color:'white', display:'flex', alignItems:'center', gap:'8px' }}>
+                <button className="btn btn-gold" onClick={handleBatchDownloadVendorInvoice} style={{ background:'var(--warning)', borderColor:'var(--warning)', color:'white', display:'flex', alignItems:'center', gap:'8px' }}>
                   <Download size={16} /> {isID ? 'Unduh Invoice Vendor (Masal)' : 'Download Vendor Invoices (Batch)'}
                 </button>
               </div>
@@ -4217,16 +4217,16 @@ const Accounting = () => {
               const netProfit = reportData.revenue - (totalExpenses + reportData.taxPiutang);
 
               return [
-                { label: isID ? 'Omset per Periode' : 'Revenue per Period', val: reportData.revenue, color: '#10b981', icon: <Receipt size={24}/> },
-                { label: isID ? 'Hutang Outstanding (Total)' : 'Outstanding Payable (Total)', val: reportData.totalHutang, color: '#f59e0b', icon: <Briefcase size={24}/> },
-                { label: isID ? 'Piutang Outstanding (Total)' : 'Outstanding Receivable (Total)', val: reportData.totalPiutang, color: '#3b82f6', icon: <Wallet size={24}/> },
-                { label: isID ? 'Keuntungan Bersih' : 'Net Profit', val: netProfit, color: netProfit >= 0 ? '#10b981' : '#ef4444', icon: <DollarSign size={24}/>, highlight: true },
-                { label: isID ? 'Penerimaan Dana (Periode)' : 'Cash Inflow (Period)', val: reportData.cashInflow, color: '#10b981', icon: <CheckCircle size={20}/>, small: true },
-                { label: isID ? 'Pengeluaran Dana (Periode)' : 'Cash Outflow (Period)', val: reportData.cashOutflow, color: '#ef4444', icon: <XCircle size={20}/>, small: true },
+                { label: isID ? 'Omset per Periode' : 'Revenue per Period', val: reportData.revenue, color: 'var(--success)', icon: <Receipt size={24}/> },
+                { label: isID ? 'Hutang Outstanding (Total)' : 'Outstanding Payable (Total)', val: reportData.totalHutang, color: 'var(--warning)', icon: <Briefcase size={24}/> },
+                { label: isID ? 'Piutang Outstanding (Total)' : 'Outstanding Receivable (Total)', val: reportData.totalPiutang, color: 'var(--info)', icon: <Wallet size={24}/> },
+                { label: isID ? 'Keuntungan Bersih' : 'Net Profit', val: netProfit, color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)', icon: <DollarSign size={24}/>, highlight: true },
+                { label: isID ? 'Penerimaan Dana (Periode)' : 'Cash Inflow (Period)', val: reportData.cashInflow, color: 'var(--success)', icon: <CheckCircle size={20}/>, small: true },
+                { label: isID ? 'Pengeluaran Dana (Periode)' : 'Cash Outflow (Period)', val: reportData.cashOutflow, color: 'var(--danger)', icon: <XCircle size={20}/>, small: true },
                 { label: isID ? 'Pajak Invoice Piutang' : 'Receivable Invoice Tax', val: reportData.taxPiutang, color: '#8b5cf6', icon: <ShieldCheck size={20}/>, small: true },
                 { label: isID ? 'Pajak Invoice Hutang' : 'Payable Invoice Tax', val: reportData.taxHutang, color: '#ec4899', icon: <ShieldAlert size={20}/>, small: true }
               ].map(stat => (
-                <div key={stat.label} className="glass-card" style={{ padding:'25px', display:'flex', alignItems:'center', gap:'20px', border: stat.highlight ? `2px solid ${stat.color}` : '1px solid var(--glass-border)', background: stat.highlight ? `rgba(${stat.color === '#10b981' ? '16,185,129' : '239,68,68'}, 0.05)` : 'rgba(255,255,255,0.03)' }}>
+                <div key={stat.label} className="glass-card" style={{ padding:'25px', display:'flex', alignItems:'center', gap:'20px', border: stat.highlight ? `2px solid ${stat.color}` : '1px solid var(--glass-border)', background: stat.highlight ? `rgba(${stat.color === 'var(--success)' ? '16,185,129' : '239,68,68'}, 0.05)` : 'rgba(255,255,255,0.03)' }}>
                   <div style={{ padding:'12px', borderRadius:'12px', background: `${stat.color}15`, color: stat.color }}>{stat.icon}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: stat.small ? '1.1rem' : '1.4rem', fontWeight:'900', color: stat.color }}>Rp {stat.val.toLocaleString()}</div>
@@ -4255,8 +4255,8 @@ const Accounting = () => {
                   <tbody>
                     {(() => {
                       const logs = [
-                        ...invoices.filter(i => filterByDate(i.date)).map(i => ({ date: i.date, desc: `Invoice: ${i.id} (${i.customerName})`, cat: isID ? 'PENDAPATAN' : 'REVENUE', amt: i.amount, color: '#10b981' })),
-                        ...purchaseOrders.filter(p => filterByDate(p.date)).map(p => ({ date: p.date, desc: `PO: ${p.id} (${p.vendorName})`, cat: isID ? 'BIAYA OP' : 'OP COST', amt: -p.grandTotal, color: '#f59e0b' })),
+                        ...invoices.filter(i => filterByDate(i.date)).map(i => ({ date: i.date, desc: `Invoice: ${i.id} (${i.customerName})`, cat: isID ? 'PENDAPATAN' : 'REVENUE', amt: i.amount, color: 'var(--success)' })),
+                        ...purchaseOrders.filter(p => filterByDate(p.date)).map(p => ({ date: p.date, desc: `PO: ${p.id} (${p.vendorName})`, cat: isID ? 'BIAYA OP' : 'OP COST', amt: -p.grandTotal, color: 'var(--warning)' })),
                         ...salaries.filter(s => filterByDate(s.expenseDate || s.date)).map(s => ({ date: s.expenseDate || s.date, desc: isID ? `Gaji: ${s.name} (${s.period})` : `Payroll: ${s.name} (${s.period})`, cat: isID ? 'BIAYA GAJI' : 'PAYROLL', amt: -s.totalToPay, color: '#8b5cf6' })),
                         ...enrichedOtherTransactions.filter(e => filterByDate(e.expenseDate || e.date)).map(e => {
                           const isIncome = e.type === 'income';
@@ -4278,7 +4278,7 @@ const Accounting = () => {
                               ? (isID ? 'PENDAPATAN LAIN' : 'OTHER INCOME') 
                               : ((isID ? (e.category || 'PENGELUARAN') : (e.category || 'EXPENSE')) + (e.subcategory ? ` - ${e.subcategory}` : '')).toUpperCase(),
                             amt: isIncome ? e.totalAfterTax || e.amount : -e.totalAfterTax,
-                            color: isIncome ? '#10b981' : '#ec4899'
+                            color: isIncome ? 'var(--success)' : '#ec4899'
                           };
                         }),
                         ...reimbursementsList.filter(r => r.status === 'paid' && filterByDate(r.expenseDate || r.date)).map(r => {
@@ -4305,7 +4305,7 @@ const Accounting = () => {
                           <td style={{ padding:'12px' }}>
                             <span style={{ fontSize:'0.65rem', padding:'2px 8px', borderRadius:'10px', background: `${log.color}20`, color: log.color, fontWeight:'700' }}>{log.cat}</span>
                           </td>
-                          <td style={{ padding:'12px', textAlign:'right', fontWeight:'700', color: log.amt >= 0 ? '#10b981' : '#ef4444' }}>
+                          <td style={{ padding:'12px', textAlign:'right', fontWeight:'700', color: log.amt >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                             {log.amt >= 0 ? '+' : '-'} Rp {Math.abs(log.amt).toLocaleString()}
                           </td>
                         </tr>
@@ -4337,10 +4337,10 @@ const Accounting = () => {
                 const ms = Object.values(customExpenseGroups).reduce((s, v) => s + v, 0);
 
                 const expenseCategories = [
-                  { label: isID ? 'Operasional' : 'Operational', val: op, color: '#f59e0b' },
+                  { label: isID ? 'Operasional' : 'Operational', val: op, color: 'var(--warning)' },
                   { label: isID ? 'Payroll (Gaji)' : 'Payroll (Salaries)', val: pr, color: '#8b5cf6' },
                   ...Object.keys(customExpenseGroups).map((catName, idx) => {
-                    const colors = ['#ec4899', '#3b82f6', '#14b8a6', '#f43f5e', '#a855f7', '#06b6d4'];
+                    const colors = ['#ec4899', 'var(--info)', '#14b8a6', '#f43f5e', '#a855f7', '#06b6d4'];
                     const color = colors[idx % colors.length];
                     return { label: catName, val: customExpenseGroups[catName], color };
                   })
@@ -4365,7 +4365,7 @@ const Accounting = () => {
                     
                     <div style={{ marginTop:'20px', padding:'20px', background:'rgba(255,255,255,0.02)', borderRadius:'15px', border:'1px solid var(--glass-border)' }}>
                        <div style={{ fontSize:'0.8rem', color:'var(--text-muted)', marginBottom:'5px' }}>Efficiency Ratio</div>
-                       <div style={{ fontSize:'1.2rem', fontWeight:'800', color: (op + pr + ms) < invoices.reduce((s,i)=>s+parseFloat(i.amount||0),0) ? '#10b981' : '#ef4444' }}>
+                       <div style={{ fontSize:'1.2rem', fontWeight:'800', color: (op + pr + ms) < invoices.reduce((s,i)=>s+parseFloat(i.amount||0),0) ? 'var(--success)' : 'var(--danger)' }}>
                          {((op + pr + ms) / (invoices.reduce((s,i)=>s+parseFloat(i.amount||0),0) || 1) * 100).toFixed(1)}%
                        </div>
                        <div style={{ fontSize:'0.7rem', color:'var(--text-muted)' }}>{isID ? 'Biaya sebagai % dari Pendapatan' : 'Cost as % of Revenue'}</div>
@@ -4405,7 +4405,7 @@ const Accounting = () => {
                   <label style={{ fontSize:'0.75rem', color:'var(--text-muted)', textTransform:'uppercase', fontWeight:'700' }}>Biaya Tambahan (Extra Charges)</label>
                   <button 
                     onClick={() => setEditingInvoice({...editingInvoice, extra_charges: [...(editingInvoice.extra_charges || []), { description: '', amount: 0 }]})}
-                    style={{ background:'rgba(212,175,55,0.1)', color:'var(--secondary)', border:'1px solid var(--secondary)', borderRadius:'6px', padding:'4px 10px', fontSize:'0.7rem', cursor:'pointer' }}
+                    style={{ background:'var(--secondary-bg)', color:'var(--secondary)', border:'1px solid var(--secondary)', borderRadius:'6px', padding:'4px 10px', fontSize:'0.7rem', cursor:'pointer' }}
                   >
                     + Tambah Biaya
                   </button>
@@ -4441,7 +4441,7 @@ const Accounting = () => {
                           const n = (editingInvoice.extra_charges || []).filter((_, i) => i !== idx);
                           setEditingInvoice({...editingInvoice, extra_charges: n});
                         }}
-                        style={{ background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'none', borderRadius:'6px', height:'32px', cursor:'pointer' }}
+                        style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'none', borderRadius:'6px', height:'32px', cursor:'pointer' }}
                       >
                         <X size={14} />
                       </button>
@@ -4453,7 +4453,7 @@ const Accounting = () => {
                 </div>
               </div>
 
-              <div style={{ marginTop:'10px', padding:'15px', background:'rgba(212,175,55,0.05)', borderRadius:'10px', border:'1px solid rgba(212,175,55,0.1)' }}>
+              <div style={{ marginTop:'10px', padding:'15px', background:'var(--secondary-bg)', borderRadius:'10px', border:'1px solid var(--secondary-bg)' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'5px', fontSize:'0.85rem' }}>
                   <span style={{ color:'var(--text-muted)' }}>Base Amount</span>
                   <span>Rp {parseFloat(editingInvoice.subtotal || editingInvoice.amount || 0).toLocaleString()}</span>
@@ -4531,7 +4531,7 @@ const Accounting = () => {
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:10000, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }}>
           <div className="glass-card" style={{ width:'100%', maxWidth:'850px', padding:'35px', maxHeight:'90vh', overflowY:'auto', position:'relative' }}>
             <button onClick={() => setShowCustomInvoiceModal(false)} style={{ position:'absolute', top:'15px', right:'15px', background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}><X size={20}/></button>
-            <h3 style={{ color:'#10b981', marginBottom:'25px', display:'flex', alignItems:'center', gap:'10px' }}><Plus size={24}/> {isID ? 'Buat Invoice Kustom Baru' : 'Create New Custom Invoice'}</h3>
+            <h3 style={{ color:'var(--success)', marginBottom:'25px', display:'flex', alignItems:'center', gap:'10px' }}><Plus size={24}/> {isID ? 'Buat Invoice Kustom Baru' : 'Create New Custom Invoice'}</h3>
             
             <form onSubmit={handleCreateCustomInvoice}>
               <div className="grid-responsive-2" style={{ gap:'20px', marginBottom:'20px' }}>
@@ -4626,7 +4626,7 @@ const Accounting = () => {
                   <button 
                     type="button" 
                     onClick={addCustomInvoiceItem}
-                    style={{ background:'rgba(16,185,129,0.1)', color:'#10b981', border:'1px solid #10b981', borderRadius:'6px', padding:'4px 10px', fontSize:'0.75rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'4px' }}
+                    style={{ background:'var(--success-bg)', color:'var(--success)', border:'1px solid var(--success)', borderRadius:'6px', padding:'4px 10px', fontSize:'0.75rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'4px' }}
                   >
                     <Plus size={14}/> {isID ? 'Tambah Item' : 'Add Item'}
                   </button>
@@ -4680,7 +4680,7 @@ const Accounting = () => {
                             type="button"
                             onClick={() => removeCustomInvoiceItem(idx)}
                             disabled={customInvoiceForm.items.length <= 1}
-                            style={{ background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.3)', borderRadius:'6px', width:'32px', height:'32px', display:'flex', alignItems:'center', justifyContent:'center', cursor: customInvoiceForm.items.length <= 1 ? 'not-allowed' : 'pointer' }}
+                            style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'1px solid var(--danger-border)', borderRadius:'6px', width:'32px', height:'32px', display:'flex', alignItems:'center', justifyContent:'center', cursor: customInvoiceForm.items.length <= 1 ? 'not-allowed' : 'pointer' }}
                           >
                             <Trash2 size={16}/>
                           </button>
@@ -4727,7 +4727,7 @@ const Accounting = () => {
                 <button 
                   type="submit" 
                   className="btn btn-gold" 
-                  style={{ background:'linear-gradient(135deg, #10b981, #059669)', border:'none', color:'#ffffff', padding:'10px 25px', boxShadow:'0 4px 15px rgba(16,185,129,0.3)' }}
+                  style={{ background:'linear-gradient(135deg, var(--success), #059669)', border:'none', color:'#ffffff', padding:'10px 25px', boxShadow:'0 4px 15px var(--success-border)' }}
                 >
                   <CheckCircle size={16} style={{ marginRight:'6px' }}/> {isID ? 'Simpan Invoice' : 'Save Invoice'}
                 </button>
@@ -4821,7 +4821,7 @@ const Accounting = () => {
                 <div key={idx} style={{ display:'grid', gridTemplateColumns:'1fr 120px 32px', gap:'10px', marginBottom:'8px' }}>
                   <input type="text" placeholder={isID ? "Deskripsi (misal PPh21)" : "Description (e.g. Tax PPh21)"} value={tax.name} onChange={e => { const n=[...salaryForm.taxes]; n[idx].name=e.target.value; setSalaryForm({...salaryForm, taxes:n}); }} style={{ padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }} />
                   <input type="number" placeholder={isID ? "Nominal" : "Amount"} value={tax.amount} onChange={e => { const n=[...salaryForm.taxes]; n[idx].amount=e.target.value; setSalaryForm({...salaryForm, taxes:n}); }} style={{ padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }} />
-                  <button onClick={() => setSalaryForm({...salaryForm, taxes: salaryForm.taxes.filter((_,i)=>i!==idx)})} style={{ background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'none', borderRadius:'6px', cursor:'pointer' }}><X size={14}/></button>
+                  <button onClick={() => setSalaryForm({...salaryForm, taxes: salaryForm.taxes.filter((_,i)=>i!==idx)})} style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'none', borderRadius:'6px', cursor:'pointer' }}><X size={14}/></button>
                 </div>
               ))}
             </div>
@@ -4844,9 +4844,9 @@ const Accounting = () => {
               </div>
             </div>
 
-            <div style={{ background:'rgba(16,185,129,0.05)', padding:'20px', borderRadius:'15px', border:'1px solid #10b981', marginBottom:'30px', textAlign:'right' }}>
+            <div style={{ background:'var(--success-bg)', padding:'20px', borderRadius:'15px', border:'1px solid var(--success)', marginBottom:'30px', textAlign:'right' }}>
               <div style={{ fontSize:'0.8rem', color:'var(--text-muted)', marginBottom:'5px' }}>{isID ? 'Total Gaji yang Dibayarkan (Setelah Potongan)' : 'Total Salary Paid (After Deductions)'}</div>
-              <div style={{ fontSize:'1.8rem', fontWeight:'900', color:'#10b981' }}>
+              <div style={{ fontSize:'1.8rem', fontWeight:'900', color:'var(--success)' }}>
                 Rp {(parseFloat(salaryForm.baseSalary || 0) - salaryForm.taxes.reduce((acc, t) => acc + parseFloat(t.amount || 0), 0)).toLocaleString(isID ? 'id-ID' : 'en-US')}
               </div>
             </div>
@@ -4922,7 +4922,7 @@ const Accounting = () => {
                     style={{ flex: 1, padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)' }}
                   />
                   {reimbursementForm.items.length > 1 && (
-                    <button onClick={() => { const items = reimbursementForm.items.filter((_, i) => i !== idx); setReimbursementForm({ ...reimbursementForm, items }); }} style={{ padding: '10px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                    <button onClick={() => { const items = reimbursementForm.items.filter((_, i) => i !== idx); setReimbursementForm({ ...reimbursementForm, items }); }} style={{ padding: '10px', background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
                       <Trash2 size={18} />
                     </button>
                   )}
@@ -5010,7 +5010,7 @@ const Accounting = () => {
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:10000, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }}>
           <div className="glass-card" style={{ width:'100%', maxWidth:'700px', padding:'35px', maxHeight:'90vh', overflowY:'auto', position:'relative' }}>
             <button onClick={() => setOtherExpenseModal(false)} style={{ position:'absolute', top:'15px', right:'15px', background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}><X size={20}/></button>
-            <h3 style={{ color: otherExpenseForm.type === 'income' ? '#10b981' : '#ec4899', marginBottom:'25px', display:'flex', alignItems:'center', gap:'10px' }}>
+            <h3 style={{ color: otherExpenseForm.type === 'income' ? 'var(--success)' : '#ec4899', marginBottom:'25px', display:'flex', alignItems:'center', gap:'10px' }}>
               <Briefcase size={24}/> {otherExpenseForm.id ? (isID ? 'Perbarui Transaksi' : 'Update Transaction') : (isID ? 'Tambah Transaksi Baru' : 'Add New Transaction')}
             </h3>
 
@@ -5023,10 +5023,10 @@ const Accounting = () => {
                   onClick={() => setOtherExpenseForm({ ...otherExpenseForm, type: 'income' })}
                   style={{
                     flex: 1, padding: '12px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s',
-                    background: otherExpenseForm.type === 'income' ? 'linear-gradient(135deg, #10b981, #047857)' : 'rgba(255,255,255,0.05)',
+                    background: otherExpenseForm.type === 'income' ? 'linear-gradient(135deg, var(--success), #047857)' : 'rgba(255,255,255,0.05)',
                     color: otherExpenseForm.type === 'income' ? 'white' : 'var(--text-muted)',
                     border: 'none',
-                    boxShadow: otherExpenseForm.type === 'income' ? '0 4px 10px rgba(16,185,129,0.3)' : 'none'
+                    boxShadow: otherExpenseForm.type === 'income' ? '0 4px 10px var(--success-border)' : 'none'
                   }}
                 >
                   {isID ? '🟢 PENDAPATAN' : '🟢 INCOME'}
@@ -5180,7 +5180,7 @@ const Accounting = () => {
                   <User size={16} /> 
                   <span>{isID ? 'Detail Karyawan & Rekening Penerima' : 'Employee Details & Recipient Account'}</span>
                   {otherExpenseForm.employeeName && otherExpenseForm.employeeName !== 'Umum' ? (
-                    <span style={{ fontSize: '0.75rem', background: 'rgba(212,175,55,0.15)', color: 'var(--secondary)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(212,175,55,0.3)', fontWeight: '700' }}>
+                    <span style={{ fontSize: '0.75rem', background: 'rgba(212,175,55,0.15)', color: 'var(--secondary)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--secondary-border)', fontWeight: '700' }}>
                       {isID ? 'Terpilih' : 'Selected'}: {otherExpenseForm.employeeName} ({otherExpenseForm.position || (isID ? 'Karyawan' : 'Employee')})
                     </span>
                   ) : (
@@ -5216,7 +5216,7 @@ const Accounting = () => {
                             style={{
                               background: 'none',
                               border: 'none',
-                              color: '#ef4444',
+                              color: 'var(--danger)',
                               fontSize: '0.75rem',
                               cursor: 'pointer',
                               padding: 0,
@@ -5313,7 +5313,7 @@ const Accounting = () => {
                 <div key={idx} style={{ display:'grid', gridTemplateColumns:'1fr 120px 32px', gap:'10px', marginBottom:'8px' }}>
                   <input type="text" placeholder={isID ? 'Deskripsi Potongan' : 'Deduction Description'} value={tax.name} onChange={e => { const n=[...otherExpenseForm.taxes]; n[idx].name=e.target.value; setOtherExpenseForm({...otherExpenseForm, taxes:n}); }} style={{ padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }} />
                   <input type="number" placeholder={isID ? 'Nominal' : 'Amount'} value={tax.amount} onChange={e => { const n=[...otherExpenseForm.taxes]; n[idx].amount=e.target.value; setOtherExpenseForm({...otherExpenseForm, taxes:n}); }} style={{ padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }} />
-                  <button onClick={() => setOtherExpenseForm({...otherExpenseForm, taxes: otherExpenseForm.taxes.filter((_,i)=>i!==idx)})} style={{ background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'none', borderRadius:'6px', cursor:'pointer' }}><X size={14}/></button>
+                  <button onClick={() => setOtherExpenseForm({...otherExpenseForm, taxes: otherExpenseForm.taxes.filter((_,i)=>i!==idx)})} style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'none', borderRadius:'6px', cursor:'pointer' }}><X size={14}/></button>
                 </div>
               ))}
             </div>
@@ -5333,20 +5333,20 @@ const Accounting = () => {
 
             {/* Total calculation panel */}
             <div style={{
-              background: otherExpenseForm.type === 'income' ? 'rgba(16,185,129,0.05)' : 'rgba(236,72,153,0.05)',
+              background: otherExpenseForm.type === 'income' ? 'var(--success-bg)' : 'rgba(236,72,153,0.05)',
               padding:'20px', borderRadius:'15px',
-              border: otherExpenseForm.type === 'income' ? '1px solid #10b981' : '1px solid #ec4899',
+              border: otherExpenseForm.type === 'income' ? '1px solid var(--success)' : '1px solid #ec4899',
               marginBottom:'30px', textAlign:'right'
             }}>
               <div style={{ fontSize:'0.8rem', color:'var(--text-muted)', marginBottom:'5px' }}>
                 {otherExpenseForm.type === 'income' ? (isID ? 'Total Pendapatan Bersih (Setelah Potongan)' : 'Total Net Income (After Deductions)') : (isID ? 'Total Pengeluaran Bersih (Setelah Pajak)' : 'Total Net Expense (After Taxes)')}
               </div>
-              <div style={{ fontSize:'1.8rem', fontWeight:'900', color: otherExpenseForm.type === 'income' ? '#10b981' : '#ec4899' }}>
+              <div style={{ fontSize:'1.8rem', fontWeight:'900', color: otherExpenseForm.type === 'income' ? 'var(--success)' : '#ec4899' }}>
                 Rp {(parseFloat(otherExpenseForm.amount || 0) - (otherExpenseForm.taxes || []).reduce((acc, t) => acc + parseFloat(t.amount || 0), 0)).toLocaleString(isID ? 'id-ID' : 'en-US')}
               </div>
             </div>
 
-            <ButtonWithLoading className="btn btn-primary" style={{ width:'100%', padding:'15px', background: otherExpenseForm.type === 'income' ? '#10b981' : '#ec4899' }} onClick={handleSaveOtherTransaction}>
+            <ButtonWithLoading className="btn btn-primary" style={{ width:'100%', padding:'15px', background: otherExpenseForm.type === 'income' ? 'var(--success)' : '#ec4899' }} onClick={handleSaveOtherTransaction}>
               {otherExpenseForm.id ? (isID ? '💾 Perbarui Transaksi' : '💾 Update Transaction') : (isID ? '💾 Simpan Transaksi' : '💾 Save Transaction')}
             </ButtonWithLoading>
           </div>
@@ -5413,18 +5413,18 @@ const Accounting = () => {
 
                {/* Deductions */}
                <div>
-                 <h4 style={{ borderBottom:'2px solid #ef4444', paddingBottom:'8px', marginBottom:'15px' }}>{isID ? 'POTONGAN' : 'DEDUCTIONS'}</h4>
+                 <h4 style={{ borderBottom:'2px solid var(--danger)', paddingBottom:'8px', marginBottom:'15px' }}>{isID ? 'POTONGAN' : 'DEDUCTIONS'}</h4>
                  {salarySlip.taxes.map((t, idx) => (
                    <div key={idx} style={{ display:'flex', justifyContent:'space-between', marginBottom:'10px' }}>
                      <span>{t.name}</span>
-                     <span style={{ color:'#ef4444' }}>- Rp {parseFloat(t.amount).toLocaleString(isID ? 'id-ID' : 'en-US')}</span>
+                     <span style={{ color:'var(--danger)' }}>- Rp {parseFloat(t.amount).toLocaleString(isID ? 'id-ID' : 'en-US')}</span>
                    </div>
                  ))}
                  {salarySlip.taxes.length === 0 && <div style={{ color:'#888', fontStyle:'italic', fontSize:'0.85rem' }}>{isID ? 'Tidak ada potongan.' : 'No deductions.'}</div>}
                  
                  <div style={{ borderTop:'1px solid #eee', paddingTop:'10px', marginTop:'20px', display:'flex', justifyContent:'space-between', fontWeight:'800' }}>
                    <span>{isID ? 'Total Potongan' : 'Total Deductions'}</span>
-                   <span style={{ color:'#ef4444' }}>Rp {salarySlip.taxes.reduce((acc, t) => acc + parseFloat(t.amount), 0).toLocaleString(isID ? 'id-ID' : 'en-US')}</span>
+                   <span style={{ color:'var(--danger)' }}>Rp {salarySlip.taxes.reduce((acc, t) => acc + parseFloat(t.amount), 0).toLocaleString(isID ? 'id-ID' : 'en-US')}</span>
                  </div>
                </div>
             </div>
@@ -5528,7 +5528,7 @@ const Accounting = () => {
             </div>
 
             {/* Tax Deduction Section */}
-            <div style={{ marginBottom:'25px', padding:'20px', background:'rgba(212,175,55,0.03)', borderRadius:'12px', border:'1px solid rgba(212,175,55,0.1)' }}>
+            <div style={{ marginBottom:'25px', padding:'20px', background:'rgba(212,175,55,0.03)', borderRadius:'12px', border:'1px solid var(--secondary-bg)' }}>
               <label style={{ display:'block', fontSize:'0.75rem', color:'var(--secondary)', marginBottom:'15px', textTransform:'uppercase', fontWeight:'800', letterSpacing:'0.5px' }}>2. {isID ? 'Pemotongan Pajak (Opsional)' : 'Tax Deduction (Optional)'}</label>
               
               <div className="grid-responsive-2" style={{ gap:'15px' }}>
@@ -5560,7 +5560,7 @@ const Accounting = () => {
                   <span style={{ color:'var(--text-muted)' }}>{isID ? 'Total Invoice:' : 'Total Invoice:'}</span>
                   <span style={{ fontWeight:'700' }}>Rp {settlePayableModal.grandTotal.toLocaleString(isID ? 'id-ID' : 'en-US')}</span>
                </div>
-               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'8px', color:'#ef4444' }}>
+               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'8px', color:'var(--danger)' }}>
                   <span>{isID ? 'Potongan Pajak' : 'Tax Deduction'} ({settlePayableForm.taxName || (isID ? 'Pajak' : 'Tax')}):</span>
                   <span style={{ fontWeight:'700' }}>- Rp {(parseFloat(settlePayableForm.taxAmount) || 0).toLocaleString(isID ? 'id-ID' : 'en-US')}</span>
                </div>
@@ -5626,7 +5626,7 @@ const Accounting = () => {
                   <div style={{ fontSize:'0.8rem', color:'#991b1b', textTransform:'uppercase', fontWeight:'700', marginBottom:'10px' }}>{isID ? 'Total Pengeluaran' : 'Total Expenses'}</div>
                   <div style={{ fontSize:'1.6rem', fontWeight:'900', color:'#dc2626' }}>Rp {(financialReport.opCosts + financialReport.payroll + financialReport.misc).toLocaleString(isID ? 'id-ID' : 'en-US')}</div>
                </div>
-               <div style={{ background:'#fffbeb', padding:'25px', borderRadius:'8px', border:'2px solid #f59e0b' }}>
+               <div style={{ background:'#fffbeb', padding:'25px', borderRadius:'8px', border:'2px solid var(--warning)' }}>
                   <div style={{ fontSize:'0.8rem', color:'#92400e', textTransform:'uppercase', fontWeight:'700', marginBottom:'10px' }}>{isID ? 'Laba Bersih' : 'Net Profit'}</div>
                   {(() => {
                     const net = financialReport.revenue - (financialReport.opCosts + financialReport.payroll + financialReport.misc);
@@ -5759,7 +5759,7 @@ const Accounting = () => {
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:10000, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }}>
           <div className="glass-card" style={{ width:'100%', maxWidth:'600px', padding:'35px', textAlign:'center', maxHeight:'90vh', overflowY:'auto' }}>
             <button onClick={() => { setReceivableProofModal(null); setModalPhotos([]); setModalTaxPhotos([]); }} style={{ position:'absolute', top:'15px', right:'15px', background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}><X size={20}/></button>
-            <h3 style={{ color:'#10b981', marginBottom:'20px' }}>{isID ? 'Unggah Bukti Pembayaran & Pajak' : 'Upload Payment & Tax Proof'}</h3>
+            <h3 style={{ color:'var(--success)', marginBottom:'20px' }}>{isID ? 'Unggah Bukti Pembayaran & Pajak' : 'Upload Payment & Tax Proof'}</h3>
             <p style={{ color:'var(--text-muted)', fontSize:'0.85rem', marginBottom:'25px' }}>Invoice: <strong>{receivableProofModal.id}</strong> - {receivableProofModal.customerName}</p>
             
             {/* Payment Proof Section */}
@@ -5889,7 +5889,7 @@ const Accounting = () => {
                   />
                   <button 
                     onClick={() => setSettleForm({...settleForm, taxes: settleForm.taxes.filter((_, i) => i !== idx)})}
-                    style={{ background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'none', borderRadius:'8px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+                    style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'none', borderRadius:'8px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
                   >
                     <X size={14}/>
                   </button>
@@ -5928,7 +5928,7 @@ const Accounting = () => {
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'15px' }}>
                 <span style={{ fontSize:'0.85rem', color:'var(--text-muted)' }}>{isID ? 'Total Pemotongan Pajak:' : 'Total Tax Deduction:'}</span>
-                <span style={{ fontWeight:'600', color:'#ef4444' }}>- Rp {settleForm.taxes.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0).toLocaleString(isID ? 'id-ID' : 'en-US')}</span>
+                <span style={{ fontWeight:'600', color:'var(--danger)' }}>- Rp {settleForm.taxes.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0).toLocaleString(isID ? 'id-ID' : 'en-US')}</span>
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', paddingTop:'10px', borderTop:'1px solid var(--glass-border)' }}>
                 <span style={{ fontWeight:'700' }}>{isID ? 'Pelunasan Akhir:' : 'Final Settlement:'}</span>
@@ -6001,11 +6001,11 @@ const Accounting = () => {
                   {canWrite && (
                     <div style={{ display:'flex', gap:'10px', alignItems: 'center' }}>
                       {bankToDelete === bank.id ? (
-                        <div style={{ display:'flex', gap:'8px', background:'rgba(239,68,68,0.1)', padding:'5px 10px', borderRadius:'8px', border:'1px solid rgba(239,68,68,0.2)' }}>
-                          <span style={{ fontSize:'0.75rem', color:'#ef4444', fontWeight:'700' }}>{isID ? 'Hapus?' : 'Delete?'}</span>
+                        <div style={{ display:'flex', gap:'8px', background:'var(--danger-bg)', padding:'5px 10px', borderRadius:'8px', border:'1px solid var(--danger-border)' }}>
+                          <span style={{ fontSize:'0.75rem', color:'var(--danger)', fontWeight:'700' }}>{isID ? 'Hapus?' : 'Delete?'}</span>
                           <button 
                             className="btn btn-sm" 
-                            style={{ background:'#ef4444', color:'white', border:'none', padding:'2px 8px', fontSize:'0.7rem' }}
+                            style={{ background:'var(--danger)', color:'white', border:'none', padding:'2px 8px', fontSize:'0.7rem' }}
                             onClick={async () => {
                               try {
                                 await deleteCompanyBank(bank.id);
@@ -6023,8 +6023,8 @@ const Accounting = () => {
                         </div>
                       ) : (
                         <>
-                          <button className="btn" style={{ padding:'6px 12px', fontSize:'0.75rem', background:'rgba(59, 130, 246, 0.1)', color:'#3b82f6' }} onClick={() => setBankModal(bank)}><Edit3 size={14}/> {isID ? 'Ubah' : 'Edit'}</button>
-                          <button className="btn" style={{ padding:'6px 12px', fontSize:'0.75rem', background:'rgba(239, 68, 68, 0.1)', color:'#ef4444' }} onClick={() => setBankToDelete(bank.id)}><Trash2 size={14}/> {isID ? 'Hapus' : 'Delete'}</button>
+                          <button className="btn" style={{ padding:'6px 12px', fontSize:'0.75rem', background:'var(--info-bg)', color:'var(--info)' }} onClick={() => setBankModal(bank)}><Edit3 size={14}/> {isID ? 'Ubah' : 'Edit'}</button>
+                          <button className="btn" style={{ padding:'6px 12px', fontSize:'0.75rem', background:'var(--danger-bg)', color:'var(--danger)' }} onClick={() => setBankToDelete(bank.id)}><Trash2 size={14}/> {isID ? 'Hapus' : 'Delete'}</button>
                         </>
                       )}
                     </div>
@@ -6101,7 +6101,7 @@ const Accounting = () => {
                 {isUploading ? (
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ 
-                      width: '32px', height: '32px', border: '3px solid rgba(212, 175, 55, 0.1)', 
+                      width: '32px', height: '32px', border: '3px solid var(--secondary-bg)', 
                       borderTop: '3px solid var(--secondary)', borderRadius: '50%',
                       animation: 'spin 1s linear infinite', margin: '0 auto 10px'
                     }} />
@@ -6154,7 +6154,7 @@ const Accounting = () => {
                 {companyBankAccounts.length === 0 && <option value="" style={{ background: 'var(--bg)', color: 'var(--text-muted)' }}>{isID ? 'Belum ada rekening terdaftar' : 'No registered bank accounts'}</option>}
               </select>
               {companyBankAccounts.length === 0 && (
-                <p style={{ color:'#ef4444', fontSize:'0.75rem', marginTop:'10px' }}>
+                <p style={{ color:'var(--danger)', fontSize:'0.75rem', marginTop:'10px' }}>
                   {isID ? 'Mohon tambahkan rekening perusahaan di menu Pengaturan Rekening Bank terlebih dahulu.' : 'Please add a company bank account in the Settings menu first.'}
                 </p>
               )}
@@ -6191,8 +6191,8 @@ const Accounting = () => {
       {/* Delete Invoice Verification Modal */}
       {deleteConfirmModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.9)', zIndex:20000, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }}>
-          <div className="glass-card" style={{ width:'100%', maxWidth:'450px', padding:'40px', textAlign:'center', border:'1px solid #ef4444' }}>
-            <div style={{ width:'70px', height:'70px', borderRadius:'50%', background:'rgba(239, 68, 68, 0.1)', color:'#ef4444', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 25px' }}>
+          <div className="glass-card" style={{ width:'100%', maxWidth:'450px', padding:'40px', textAlign:'center', border:'1px solid var(--danger)' }}>
+            <div style={{ width:'70px', height:'70px', borderRadius:'50%', background:'var(--danger-bg)', color:'var(--danger)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 25px' }}>
               <ShieldAlert size={35} />
             </div>
             
@@ -6243,7 +6243,7 @@ const Accounting = () => {
               <ButtonWithLoading
                 className="btn"
                 loading={isAuthorizing}
-                style={{ flex:1, background:'#ef4444', color:'white' }}
+                style={{ flex:1, background:'var(--danger)', color:'white' }}
                 onClick={async () => {
                   if (verifyStep === 1) {
                     if (verifyText.toUpperCase() !== 'DELETE') return toast(isID ? 'Teks verifikasi tidak sesuai.' : 'Verification text does not match.');

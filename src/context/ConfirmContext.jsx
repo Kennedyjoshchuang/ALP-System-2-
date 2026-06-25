@@ -123,8 +123,8 @@ export const ConfirmProvider = ({ children }) => {
                   width: '45px',
                   height: '45px',
                   borderRadius: '50%',
-                  background: modal.options.isDanger ? 'rgba(239, 68, 68, 0.1)' : 'rgba(212, 175, 55, 0.1)',
-                  color: modal.options.isDanger ? '#ef4444' : 'var(--secondary)'
+                  background: modal.options.isDanger ? 'var(--danger-bg)' : 'var(--secondary-bg)',
+                  color: modal.options.isDanger ? 'var(--danger)' : 'var(--secondary)'
                 }}
               >
                 {modal.options.isDanger ? <AlertTriangle size={24} /> : <HelpCircle size={24} />}
@@ -135,8 +135,8 @@ export const ConfirmProvider = ({ children }) => {
                   fontSize: '1.25rem',
                   fontWeight: '700',
                   background: modal.options.isDanger ? 'none' : undefined,
-                  WebkitTextFillColor: modal.options.isDanger ? '#ef4444' : undefined,
-                  color: modal.options.isDanger ? '#ef4444' : undefined
+                  WebkitTextFillColor: modal.options.isDanger ? 'var(--danger)' : undefined,
+                  color: modal.options.isDanger ? 'var(--danger)' : undefined
                 }}
               >
                 {modal.options.title}

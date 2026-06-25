@@ -206,6 +206,15 @@ export const AppProvider = ({ children }) => {
     }
   }, [user]);
 
+  useEffect(() => {
+    const body = document.body;
+    if (theme === 'light') {
+      body.classList.add('light-theme');
+    } else {
+      body.classList.remove('light-theme');
+    }
+  }, [theme]);
+
   const addCustomer = async (customer) => {
     const newCustomer = { ...customer, id: customer.id || `CUST-${Date.now().toString().slice(-4)}` };
     // Use the mutation provided by useCustomers (optimistic update handled there)

@@ -115,9 +115,9 @@ const SystemControl = () => {
   };
 
   const stats = [
-    { label: isID ? 'Total Pelanggan' : 'Total Customers', value: safeCustomers.length, icon: Users, color: '#10b981' },
-    { label: isID ? 'Job Order Aktif' : 'Active Job Orders', value: safeJobOrders.length, icon: Briefcase, color: '#d4af37' },
-    { label: isID ? 'Faktur Sistem' : 'System Invoices', value: safeInvoices.length, icon: FileText, color: '#3b82f6' },
+    { label: isID ? 'Total Pelanggan' : 'Total Customers', value: safeCustomers.length, icon: Users, color: 'var(--success)' },
+    { label: isID ? 'Job Order Aktif' : 'Active Job Orders', value: safeJobOrders.length, icon: Briefcase, color: 'var(--secondary)' },
+    { label: isID ? 'Faktur Sistem' : 'System Invoices', value: safeInvoices.length, icon: FileText, color: 'var(--info)' },
   ];
 
   return (
@@ -127,12 +127,12 @@ const SystemControl = () => {
           width: '50px',
           height: '50px',
           borderRadius: '15px',
-          background: 'rgba(239, 68, 68, 0.1)',
+          background: 'var(--danger-bg)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: '#ef4444',
-          border: '1px solid rgba(239, 68, 68, 0.2)'
+          color: 'var(--danger)',
+          border: '1px solid var(--danger-border)'
         }}>
           <ShieldAlert size={28} />
         </div>
@@ -147,8 +147,8 @@ const SystemControl = () => {
           <div style={{ 
             padding: '15px', 
             borderRadius: '15px', 
-            background: maintenanceMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-            color: maintenanceMode ? '#f59e0b' : '#10b981'
+            background: maintenanceMode ? 'var(--warning-bg)' : 'var(--success-bg)',
+            color: maintenanceMode ? 'var(--warning)' : 'var(--success)'
           }}>
             <Settings size={24} className={maintenanceMode ? 'animate-spin' : ''} style={{ animationDuration: '3s' }} />
           </div>
@@ -192,15 +192,15 @@ const SystemControl = () => {
       </div>
 
       {canWrite ? (
-        <div className="glass-card" style={{ padding: '40px', border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.02)' }}>
+        <div className="glass-card" style={{ padding: '40px', border: '1px solid var(--danger-border)', background: 'rgba(239, 68, 68, 0.02)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
             <div>
-              <h3 style={{ color: '#ef4444', marginBottom: '5px' }}>{isID ? 'Tindakan Sistem Kritis' : 'Critical System Actions'}</h3>
+              <h3 style={{ color: 'var(--danger)', marginBottom: '5px' }}>{isID ? 'Tindakan Sistem Kritis' : 'Critical System Actions'}</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{isID ? 'Tindakan ini bersifat permanen dan tidak dapat dibatalkan.' : 'These actions are permanent and cannot be undone.'}</p>
             </div>
             <button
               className="btn"
-              style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+              style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-border)' }}
               onClick={() => openConfirm('all', null, 'ALL SYSTEM DATA')}
             >
               <AlertTriangle size={18} />
@@ -221,7 +221,7 @@ const SystemControl = () => {
                       <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{c.name || c.customerName}</div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID: {c.id}</div>
                     </div>
-                    <button onClick={() => openConfirm('customer', c.id, c.name || c.customerName)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>
+                    <button onClick={() => openConfirm('customer', c.id, c.name || c.customerName)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>
                       <Trash2 size={16} />
                     </button>
                   </div>
@@ -243,7 +243,7 @@ const SystemControl = () => {
                       <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{jo.id}</div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{jo.customerName}</div>
                     </div>
-                    <button onClick={() => openConfirm('jo', jo.id, jo.id)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>
+                    <button onClick={() => openConfirm('jo', jo.id, jo.id)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>
                       <Trash2 size={16} />
                     </button>
                   </div>
@@ -286,7 +286,7 @@ const SystemControl = () => {
                 maxWidth: '500px',
                 width: '100%',
                 padding: '40px',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
+                border: '1px solid var(--danger-border)',
                 position: 'relative'
               }}
             >
@@ -299,17 +299,17 @@ const SystemControl = () => {
                   width: '80px',
                   height: '80px',
                   borderRadius: '50%',
-                  background: 'rgba(239, 68, 68, 0.1)',
+                  background: 'var(--danger-bg)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   margin: '0 auto 25px',
-                  color: '#ef4444'
+                  color: 'var(--danger)'
                 }}>
                   <AlertTriangle size={40} />
                 </div>
 
-                <h2 style={{ fontSize: '1.5rem', marginBottom: '10px', color: '#ef4444' }}>
+                <h2 style={{ fontSize: '1.5rem', marginBottom: '10px', color: 'var(--danger)' }}>
                   {verifyStep === 1 ? (isID ? 'Hapus Permanen?' : 'Permanent Deletion?') : (isID ? 'Verifikasi Akhir' : 'Final Verification')}
                 </h2>
                 <p style={{ color: 'var(--text-muted)', marginBottom: '30px' }}>
@@ -330,9 +330,9 @@ const SystemControl = () => {
                         fontSize: '1.2rem',
                         letterSpacing: '2px',
                         fontWeight: '700',
-                        border: '2px solid rgba(239, 68, 68, 0.3)',
-                        background: 'rgba(239, 68, 68, 0.05)',
-                        color: '#ef4444'
+                        border: '2px solid var(--danger-border)',
+                        background: 'var(--danger-bg)',
+                        color: 'var(--danger)'
                       }}
                       autoFocus
                     />
@@ -354,7 +354,7 @@ const SystemControl = () => {
                         letterSpacing: '15px',
                         fontWeight: '900',
                         border: '2px solid var(--secondary)',
-                        background: 'rgba(212, 175, 55, 0.05)',
+                        background: 'var(--secondary-bg)',
                         color: 'var(--secondary)'
                       }}
                       autoFocus
@@ -372,7 +372,7 @@ const SystemControl = () => {
                     disabled={(verifyStep === 2 && verifyText.toUpperCase() !== 'DELETE') || (verifyStep === 3 && otpInput.length !== 4)}
                     style={{
                       flex: 1,
-                      background: (verifyStep === 1 || (verifyStep === 2 && verifyText.toUpperCase() === 'DELETE') || (verifyStep === 3 && otpInput.length === 4)) ? '#ef4444' : '#374151',
+                      background: (verifyStep === 1 || (verifyStep === 2 && verifyText.toUpperCase() === 'DELETE') || (verifyStep === 3 && otpInput.length === 4)) ? 'var(--danger)' : '#374151',
                       color: 'white',
                       cursor: ((verifyStep === 2 && verifyText.toUpperCase() !== 'DELETE') || (verifyStep === 3 && otpInput.length !== 4)) ? 'not-allowed' : 'pointer',
                       opacity: ((verifyStep === 2 && verifyText.toUpperCase() !== 'DELETE') || (verifyStep === 3 && otpInput.length !== 4)) ? 0.6 : 1

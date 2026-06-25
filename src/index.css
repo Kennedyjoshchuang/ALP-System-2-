@@ -1,30 +1,107 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --primary: #065f46; /* Emerald Green */
-  --primary-light: #10b981;
-  --secondary: #d4af37; /* Gold */
-  --gold-metallic: linear-gradient(135deg, #d4af37 0%, #f1c40f 50%, #d4af37 100%);
-  --emerald-metallic: linear-gradient(135deg, #065f46 0%, #10b981 50%, #065f46 100%);
+  /* Strict Base Palette (Max 4 shades per family) */
+  --green-dark: #042f2e;
+  --green-base: #065f46;
+  --green-contrast: #047857;
+  --green-vibrant: #10b981;
+
+  --gold-contrast: #8a6d10;
+  --gold-base: #d4af37;
+  --gold-vibrant: #f1c40f;
+  --gold-dark: #b45309;
+
+  --red-contrast: #b91c1c;
+  --red-vibrant: #ef4444;
+
+  --blue-contrast: #1d4ed8;
+  --blue-vibrant: #3b82f6;
+
+  /* Semantic Theme Variables (Dark Theme defaults) */
+  --primary: var(--green-base);
+  --primary-light: var(--green-vibrant);
+  --secondary: var(--gold-base);
+  
+  --success: var(--green-vibrant);
+  --success-bg: rgba(16, 185, 129, 0.1);
+  --success-border: rgba(16, 185, 129, 0.3);
+
+  --danger: var(--red-vibrant);
+  --danger-bg: rgba(239, 68, 68, 0.1);
+  --danger-border: rgba(239, 68, 68, 0.2);
+
+  --warning: var(--gold-vibrant);
+  --warning-bg: rgba(245, 158, 11, 0.1);
+  --warning-border: rgba(245, 158, 11, 0.3);
+
+  --info: var(--blue-vibrant);
+  --info-bg: rgba(59, 130, 246, 0.1);
+  --info-border: rgba(59, 130, 246, 0.3);
+
+  --secondary-bg: rgba(212, 175, 55, 0.1);
+  --secondary-border: rgba(212, 175, 55, 0.2);
+
   --bg: #030712; /* Deepest Midnight */
   --card-bg: rgba(17, 24, 39, 0.6);
   --text: #ecfdf5; /* Emerald Tinted White for high contrast */
   --text-muted: #94a3b8;
   --border: rgba(255, 255, 255, 0.05);
   --glass: rgba(3, 7, 18, 0.8);
-  --glass-border: rgba(212, 175, 55, 0.2);
+  --glass-border: var(--secondary-border);
   --input-bg: rgba(255, 255, 255, 0.03);
+
+  /* Background glow alphas */
+  --bg-gradient-1: rgba(6, 95, 70, 0.15);
+  --bg-gradient-2: rgba(212, 175, 55, 0.1);
+  --card-item-bg: rgba(255, 255, 255, 0.02);
+
+  --gold-metallic: linear-gradient(135deg, var(--gold-base) 0%, var(--gold-vibrant) 50%, var(--gold-base) 100%);
+  --emerald-metallic: linear-gradient(135deg, var(--green-base) 0%, var(--green-vibrant) 50%, var(--green-base) 100%);
 }
 
 .light-theme {
   --bg: #f8fafc;
-  --card-bg: rgba(255, 255, 255, 0.7);
-  --text: #042f2e; /* Very Deep Emerald for maximum readability */
+  --card-bg: rgba(255, 255, 255, 0.85); /* 85% opacity to block text bleeding from page scroll */
+  --text: var(--green-dark); /* Very Deep Emerald for maximum readability */
   --text-muted: #4b5563; /* Slate 600 */
-  --border: rgba(6, 95, 70, 0.1);
+  --border: rgba(6, 95, 70, 0.25); /* Accessible form control borders */
   --glass: rgba(255, 255, 255, 0.9);
   --glass-border: rgba(6, 95, 70, 0.15);
   --input-bg: #ffffff;
+
+  /* Overrides for text highlights and primary variables to follow WCAG using regular colors */
+  --secondary: var(--green-base); /* Deep green (#065f46) for clean, high-contrast labels and headers */
+  --primary-light: var(--green-contrast); /* Deep green (#047857) */
+
+  /* BG Alphas */
+  --bg-gradient-1: rgba(6, 95, 70, 0.04);
+  --bg-gradient-2: rgba(180, 83, 9, 0.03);
+  --card-item-bg: rgba(6, 95, 70, 0.03);
+
+  /* Semantic Theme Variables Overrides (Light Theme - Standard Colors) */
+  --success: #15803d; /* Green 700 */
+  --success-bg: rgba(21, 128, 61, 0.08);
+  --success-border: rgba(21, 128, 61, 0.15);
+
+  --danger: #b91c1c; /* Red 700 */
+  --danger-bg: rgba(185, 28, 28, 0.06);
+  --danger-border: rgba(185, 28, 28, 0.12);
+
+  --warning: #b45309; /* Amber 800 */
+  --warning-bg: rgba(180, 83, 9, 0.08);
+  --warning-border: rgba(180, 83, 9, 0.15);
+
+  --info: #1d4ed8; /* Blue 700 */
+  --info-bg: rgba(29, 78, 216, 0.08);
+  --info-border: rgba(29, 78, 216, 0.15);
+
+  --secondary-bg: rgba(6, 95, 70, 0.08);
+  --secondary-border: rgba(6, 95, 70, 0.15);
+
+  /* Keep metallic gradients bright and golden in both themes */
+  --gold-metallic: linear-gradient(135deg, var(--gold-base) 0%, var(--gold-vibrant) 50%, var(--gold-base) 100%);
+  --emerald-metallic: linear-gradient(135deg, var(--green-base) 0%, var(--green-vibrant) 50%, var(--green-base) 100%);
 }
 
 * {
@@ -37,8 +114,8 @@ body {
   font-family: 'Outfit', sans-serif;
   background-color: var(--bg);
   background-image: 
-    radial-gradient(at 0% 0%, rgba(6, 95, 70, 0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(212, 175, 55, 0.1) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, var(--bg-gradient-1) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, var(--bg-gradient-2) 0px, transparent 50%);
   color: var(--text);
   min-height: 100vh;
   overflow-x: hidden;
@@ -100,17 +177,17 @@ body {
 }
 
 .btn-danger {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.2);
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+  box-shadow: 0 4px 14px 0 var(--danger-border);
 }
 
 .btn-danger:hover {
-  background: #ef4444;
+  background: var(--danger);
   color: white;
   transform: translateY(-2px) scale(1.05);
-  box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 8px 25px var(--danger-border);
 }
 
 .btn-sm {
@@ -188,9 +265,11 @@ h1, h2, h3 {
   letter-spacing: 1px;
 }
 
-.badge-pending { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
-.badge-approved { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
-.badge-done { background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
+.badge-pending { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
+.badge-approved { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
+.badge-done { background: var(--info-bg); color: var(--info); border: 1px solid var(--info-border); }
+.badge-draft { background: rgba(148, 163, 184, 0.1); color: var(--text-muted); border: 1px solid rgba(148, 163, 184, 0.2); }
+.badge-issued { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
 
 /* Table Enhancements */
 table thead th {
@@ -564,5 +643,17 @@ table thead th {
 .login-accounts-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
 @media (min-width: 600px) { .login-accounts-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); } }
 
+/* Accessibility Focus Rings */
+:focus-visible {
+  outline: 3px solid var(--secondary) !important;
+  outline-offset: 2px !important;
+}
 
-
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--secondary) !important;
+  outline-offset: 2px !important;
+}

@@ -36,7 +36,7 @@ const Login = () => {
   ];
 
   return (
-    <div className={theme === 'light' ? 'light-theme' : ''} style={{ 
+    <div style={{ 
       height: '100vh', 
       display: 'flex', 
       alignItems: 'center', 
@@ -157,7 +157,7 @@ const Login = () => {
                 />
                 <Lock size={18} color="var(--secondary)" style={{ position: 'absolute', left: '18px', top: '50%', transform: 'translateY(-50%)', opacity: 0.6 }} />
               </div>
-              {error && <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '10px' }}>{error}</p>}
+              {error && <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '10px' }}>{error}</p>}
             </div>
 
             <button type="submit" className="btn btn-gold" style={{ width: '100%', height: '54px', justifyContent: 'center' }}>
@@ -183,7 +183,7 @@ const Login = () => {
           
           <div className="login-accounts-grid">
             {accounts.map(acc => (
-              <div key={acc.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+              <div key={acc.id} style={{ padding: '12px', background: 'var(--card-item-bg)', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <div style={{ fontWeight: '600', color: 'var(--text)', fontSize: '0.85rem', marginBottom: '2px' }}>{acc.name}</div>
                 <div style={{ color: 'var(--primary-light)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '1px' }}>{acc.access}</div>
               </div>

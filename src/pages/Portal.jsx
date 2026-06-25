@@ -19,7 +19,7 @@ const Portal = () => {
   };
 
   return (
-    <div className={theme === 'light' ? 'light-theme' : ''} style={{
+    <div style={{
       height: '100vh',
       width: '100vw',
       display: 'flex',
@@ -101,7 +101,7 @@ const Portal = () => {
         {/* System Stats / Indicators */}
         <div className="portal-stats">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 10px #10b981' }} />
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 10px #10b981' }} />
             <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Status: Online</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
