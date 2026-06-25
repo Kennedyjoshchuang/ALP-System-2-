@@ -57,7 +57,7 @@ async function migrate() {
               // If it's already an object or null, leave it
             }
           } else {
-            newRow[col] = []; // Default to empty array for JSONB
+            newRow[col] = col === 'customData' ? {} : []; // Default to empty object/array for JSONB
           }
         }
       }
