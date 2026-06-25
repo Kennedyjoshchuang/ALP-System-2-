@@ -441,7 +441,7 @@ app.get('/api/job-orders', async (req, res) => {
 app.post('/api/job-orders', async (req, res) => {
   try {
     const { quotationId, customerName, jobDescription, phone, email, rate, quantity, quoteValidity } = req.body;
-    const id = 'JO-' + Date.now();
+    const id = 'JO-' + Date.now() + String(Math.floor(Math.random() * 1000)).padStart(3, '0');
     const date = new Date().toISOString().split('T')[0];
     const { error } = await supabase.from('job_orders').insert({
       id, quotationId, customerName, instruction: jobDescription,
@@ -454,6 +454,41 @@ app.post('/api/job-orders', async (req, res) => {
     res.status(201).json({ id });
   } catch (err) {
     console.error('Create JO Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/job-orders/bulk', async (req, res) => {
+  try {
+    const jobOrders = req.body;
+    if (!Array.isArray(jobOrders)) {
+      return res.status(400).json({ error: 'Body must be an array' });
+    }
+    const insertedJOs = [];
+    const date = new Date().toISOString().split('T')[0];
+    for (const jo of jobOrders) {
+      const id = 'JO-' + Date.now() + String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+      const { quotationId, customerName, jobDescription, phone, email, rate, quantity, quoteValidity } = jo;
+      const { error } = await supabase.from('job_orders').insert({
+        id, quotationId, customerName, instruction: jobDescription,
+        status: 'pending', quantity, issueQuantity: 0,
+        phone, email, rate, quoteValidity, date,
+        photos: [], costs: [],
+        containerNo: [], vehicleNo: [], driverName: []
+      });
+      if (error) throw error;
+      insertedJOs.push({
+        id, quotationId, customerName, instruction: jobDescription,
+        status: 'pending', quantity, issueQuantity: 0,
+        phone, email, rate, quoteValidity, date,
+        photos: [], costs: [],
+        containerNo: [], vehicleNo: [], driverName: [],
+        jobDescription
+      });
+    }
+    res.status(201).json(insertedJOs);
+  } catch (err) {
+    console.error('Bulk Create JO Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -558,9 +593,11 @@ app.post('/api/invoices', async (req, res) => {
     }
 
     // 3. Update Job Order status to 'invoiced'
-    const { error: joErr } = await supabase.from('job_orders').update({ status: 'invoiced' }).eq('id', joId);
-    if (joErr) {
-      console.error(`[POST /invoices] JO Update error for ${joId}:`, joErr.message);
+    if (joId) {
+      const { error: joErr } = await supabase.from('job_orders').update({ status: 'invoiced' }).eq('id', joId);
+      if (joErr) {
+        console.error(`[POST /invoices] JO Update error for ${joId}:`, joErr.message);
+      }
     }
 
     console.log(`[POST /invoices] Everything complete for ${id}`);

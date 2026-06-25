@@ -324,6 +324,15 @@ export const AppProvider = ({ children }) => {
     return finalJO;
   };
 
+  const createBulkJOs = async (joDataArray) => {
+    const createdJOs = await apiRequest('job-orders/bulk', {
+      method: 'POST',
+      body: JSON.stringify(joDataArray)
+    });
+    setJobOrders(prev => [...prev, ...createdJOs]);
+    return createdJOs;
+  };
+
   const dispatchJO = async (joId, quantity) => {
     const dispatchedAt = new Date().toISOString();
     await updateJOStatus(joId, { status: 'dispatched', issueQuantity: quantity, dispatchedAt });
@@ -492,6 +501,50 @@ export const AppProvider = ({ children }) => {
       return finalInvoice;
     } catch (error) {
       console.error("Failed to create invoice:", error);
+      throw error;
+    }
+  };
+
+  const createCustomInvoice = async (invoiceData) => {
+    console.log("Starting createCustomInvoice for customer:", invoiceData.customerName);
+    const newInvoiceId = invoiceData.id || `INV-CUST-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+    
+    const newInvoice = {
+      id: newInvoiceId,
+      joId: invoiceData.joId || null,
+      consolidatedJOs: invoiceData.joId ? [invoiceData.joId] : [],
+      customerName: invoiceData.customerName || 'Pelanggan',
+      amount: cleanNumber(invoiceData.amount),
+      subtotal: cleanNumber(invoiceData.subtotal || invoiceData.amount),
+      tax: cleanNumber(invoiceData.tax || 0),
+      date: invoiceData.date || new Date().toISOString(),
+      status: invoiceData.status || 'unpaid',
+      extra_charges: invoiceData.extra_charges || [],
+      signedReceiptPhoto: null,
+      signedInvoicePhoto: null,
+      deliveryStatus: 'not_sent'
+    };
+
+    try {
+      const data = await apiRequest('invoices', {
+        method: 'POST',
+        body: JSON.stringify(newInvoice)
+      });
+      
+      const finalInvoice = { ...newInvoice, id: data.id || newInvoice.id };
+      
+      setInvoices(prev => [...prev, finalInvoice]);
+      setReceivables(prev => [...prev, { ...finalInvoice, balance: finalInvoice.amount }]);
+      
+      if (newInvoice.joId) {
+        setJobOrders(prev => prev.map(j => 
+          j.id === newInvoice.joId ? { ...j, status: 'invoiced' } : j
+        ));
+      }
+      
+      return finalInvoice;
+    } catch (error) {
+      console.error("Failed to create custom invoice:", error);
       throw error;
     }
   };
@@ -819,8 +872,8 @@ export const AppProvider = ({ children }) => {
       prospects, addProspect, updateProspectStatus, convertProspectToCustomer, deleteProspect, updateProspect,
       prospectDrafts,
       quotations, createQuotation, updateQuotation, approveQuotation, unapproveQuotation, deleteQuotation,
-      jobOrders, createJO, dispatchJO, updateJOStatus, completeJO, deleteJO,
-      invoices, createInvoice, settleInvoice, deleteInvoice, updateInvoice,
+      jobOrders, createJO, createBulkJOs, dispatchJO, updateJOStatus, completeJO, deleteJO,
+      invoices, createInvoice, createCustomInvoice, settleInvoice, deleteInvoice, updateInvoice,
       receivables, settleReceivable,
       salaries, addSalary, deleteSalary, updateSalary,
       otherExpenses, addOtherExpense, deleteOtherExpense, updateOtherExpense,

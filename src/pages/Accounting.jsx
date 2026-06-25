@@ -1,25 +1,10 @@
+import toast from 'react-hot-toast';
+import { useConfirm } from '../context/ConfirmContext';
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { useConfirm } from '../context/ConfirmContext';
-import { CreditCard, Download, Receipt, Wallet, CheckCircle, Plus, X, XCircle, DollarSign, Search, FileSpreadsheet, RotateCcw, Edit3, Save, Image, ChevronDown, ChevronUp, User, Briefcase, Banknote, Calendar, FileText, Trash2, Settings, ExternalLink, ShieldCheck, ShieldAlert, ChevronRight, Folder, FolderOpen } from 'lucide-react';
+import { CreditCard, Download, Receipt, Wallet, CheckCircle, Plus, X, XCircle, DollarSign, Search, FileSpreadsheet, RotateCcw, Edit3, Save, Image, ChevronDown, ChevronUp, User, Briefcase, Banknote, Calendar, FileText, Trash2, Settings, ExternalLink, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
-import toast from 'react-hot-toast';
-
-const alert = (message) => {
-  if (!message) return;
-  const msgLower = String(message).toLowerCase();
-  const successKeywords = ['berhasil', 'success', 'lunas', 'dispatched', 'sent', 'selesai', 'done', 'saved', 'updated', 'uploaded', 'terbitkan', 'issued', 'settled'];
-  const errorKeywords = ['gagal', 'failed', 'error', 'salah', 'incorrect', 'tidak ditemukan', 'not found', 'incomplete', 'tidak lengkap', 'invalid', 'masalah', 'kurang'];
-  
-  if (errorKeywords.some(keyword => msgLower.includes(keyword))) {
-    toast.error(message);
-  } else if (successKeywords.some(keyword => msgLower.includes(keyword))) {
-    toast.success(message);
-  } else {
-    toast(message);
-  }
-};
 
 const defaultSubcategories = {
   'Gaji': [
@@ -93,6 +78,17 @@ const Accounting = () => {
   const [poNotes, setPoNotes] = useState('');
   const [printPO, setPrintPO] = useState(null);
 
+  // Custom Invoice States
+  const [showCustomInvoiceModal, setShowCustomInvoiceModal] = useState(false);
+  const [customInvoiceForm, setCustomInvoiceForm] = useState({
+    id: '',
+    joId: '',
+    customerName: '',
+    date: new Date().toISOString().substring(0, 10),
+    taxPercent: 0,
+    items: [{ description: '', qty: 1, rate: 0 }]
+  });
+
   // Salary States
   const [salaryModal, setSalaryModal] = useState(false);
   const [salaryForm, setSalaryForm] = useState({
@@ -165,6 +161,7 @@ const Accounting = () => {
   // Invoice Bank Selection
   const [issuingInvoiceJoId, setIssuingInvoiceJoId] = useState(null);
   const [selectedBankId, setSelectedBankId] = useState('');
+  const [expandedCompletedGroups, setExpandedCompletedGroups] = useState({});
   const [receivableProofModal, setReceivableProofModal] = useState(null); // invoice to upload proof for
   const [settleModal, setSettleModal] = useState(null); // { id, amount, ... }
   const [settleForm, setSettleForm] = useState({ paymentProof: [], taxes: [{ name: '', amount: 0 }], taxProof: [] });
@@ -176,17 +173,16 @@ const Accounting = () => {
   const [otpInput, setOtpInput] = useState('');
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [expandedBillingQuotes, setExpandedBillingQuotes] = useState({});
-  const [expandedCostingQuotes, setExpandedCostingQuotes] = useState({});
   const fileInputRef = useRef(null);
 
   const { 
-    jobOrders = [], invoices = [], createInvoice, settleInvoice, deleteInvoice, updateInvoice, 
+    jobOrders = [], invoices = [], createInvoice, createCustomInvoice, settleInvoice, deleteInvoice, updateInvoice, 
     receivables = [], vendors = [], purchaseOrders = [], updateJOStatus, updatePurchaseOrder, patchPurchaseOrderLocal,
     quotations = [],
     salaries = [], addSalary, deleteSalary, updateSalary,
     otherExpenses = [], addOtherExpense, deleteOtherExpense, updateOtherExpense,
     employees = [], companyBankAccounts = [], updateCompanyBank, deleteCompanyBank,
+    customers = [],
     getSystemConfig,
     loading,
     t,
@@ -396,7 +392,7 @@ const Accounting = () => {
       }
       setOtherExpenseModal(false);
     } catch (err) {
-      alert('Gagal menyimpan transaksi: ' + err.message);
+      toast.error('Gagal menyimpan transaksi: ' + err.message);
     }
   };
 
@@ -475,7 +471,7 @@ const Accounting = () => {
       }
       setReimbursementModal(false);
     } catch (err) {
-      alert('Gagal menyimpan reimbursement: ' + err.message);
+      toast.error('Gagal menyimpan reimbursement: ' + err.message);
     }
   };
 
@@ -509,7 +505,7 @@ const Accounting = () => {
     try {
       await updateOtherExpense(r.id, payload);
     } catch (err) {
-      alert('Gagal mengubah status: ' + err.message);
+      toast.error('Gagal mengubah status: ' + err.message);
     }
   };
 
@@ -619,9 +615,9 @@ const Accounting = () => {
 
   const buildPOPayload = () => {
     const jo = jobOrders.find(j => j.id === poJoId);
-    if (!jo) { alert('Job Order tidak ditemukan.'); return null; }
+    if (!jo) { toast.error('Job Order tidak ditemukan.'); return null; }
     const vendor = vendorList.find(v => v.id === poVendorId);
-    if (!vendor) { alert('Vendor tidak ditemukan.'); return null; }
+    if (!vendor) { toast.error('Vendor tidak ditemukan.'); return null; }
 
     const items = poItems
       .filter(it => it.serviceIdx !== '')
@@ -636,7 +632,7 @@ const Accounting = () => {
         };
       });
 
-    if (items.length === 0) { alert('Pilih minimal satu layanan vendor.'); return null; }
+    if (items.length === 0) { toast('Pilih minimal satu layanan vendor.'); return null; }
 
     return {
       joId: jo.id,
@@ -666,7 +662,7 @@ const Accounting = () => {
       await context.createPurchaseOrder({ ...payload, status: 'draft' });
       resetPOForm();
     } catch (err) {
-      alert('Gagal menyimpan draft: ' + err.message);
+      toast.error('Gagal menyimpan draft: ' + err.message);
     }
   };
 
@@ -681,7 +677,7 @@ const Accounting = () => {
       setActiveTab('hutang');
       setPayableSubTab('outstanding');
     } catch (err) {
-      alert('Gagal menerbitkan Purchase Order: ' + err.message);
+      toast.error('Gagal menerbitkan Purchase Order: ' + err.message);
     }
   };
 
@@ -748,16 +744,16 @@ const Accounting = () => {
             tax_proof_photo: data.tax_proof_photo,
           });
 
-          alert("Pembayaran berhasil disimpan. Catatan: Kolom pajak belum ada di database — jalankan migrasi 'add_tax_columns_po.cjs' untuk menyimpan permanen.");
+          toast.success("Pembayaran berhasil disimpan. Catatan: Kolom pajak belum ada di database — jalankan migrasi 'add_tax_columns_po.cjs' untuk menyimpan permanen.");
           setSettlePayableModal(null);
           setPaymentProofModal(null);
           setModalPhotos([]);
           return;
         } catch (fallbackErr) {
-          alert("Gagal memproses pembayaran: " + fallbackErr.message);
+          toast.error("Gagal memproses pembayaran: " + fallbackErr.message);
         }
       } else {
-        alert("Gagal memproses pembayaran: " + err.message);
+        toast.error("Gagal memproses pembayaran: " + err.message);
       }
     }
   };
@@ -839,7 +835,7 @@ const Accounting = () => {
     }
 
     if (dataToExport.length === 0) {
-      alert("Tidak ada data untuk di-export pada rentang tanggal ini.");
+      toast("Tidak ada data untuk di-export pada rentang tanggal ini.");
       return;
     }
 
@@ -853,21 +849,21 @@ const Accounting = () => {
     for (const l of costLines) {
       if (l.vendorId === 'custom') {
         if (!l.customVendorName?.trim() || !l.customServiceDescription?.trim() || l.customPrice === '') {
-          alert(isID ? "Harap lengkapi semua field input manual untuk Vendor Custom!" : "Please fill in all manual input fields for the Custom Vendor!");
+          toast(isID ? "Harap lengkapi semua field input manual untuk Vendor Custom!" : "Please fill in all manual input fields for the Custom Vendor!");
           return;
         }
       } else if (l.vendorId) {
         if (l.serviceIdx === 'custom') {
           if (!l.customServiceDescription?.trim() || l.customPrice === '') {
-            alert(isID ? "Harap lengkapi semua field input manual untuk Layanan Custom!" : "Please fill in all manual input fields for the Custom Service!");
+            toast(isID ? "Harap lengkapi semua field input manual untuk Layanan Custom!" : "Please fill in all manual input fields for the Custom Service!");
             return;
           }
         } else if (l.serviceIdx === '') {
-          alert(isID ? "Harap pilih layanan atau pilih 'Custom Layanan'!" : "Please select a service or select 'Custom Service'!");
+          toast(isID ? "Harap pilih layanan atau pilih 'Custom Layanan'!" : "Please select a service or select 'Custom Service'!");
           return;
         }
       } else {
-        alert(isID ? "Harap pilih vendor terlebih dahulu!" : "Please select a vendor first!");
+        toast(isID ? "Harap pilih vendor terlebih dahulu!" : "Please select a vendor first!");
         return;
       }
     }
@@ -1035,8 +1031,170 @@ const Accounting = () => {
       
     } catch (err) {
       console.error("Issue Invoice error:", err);
-      alert("Error saat menerbitkan invoice: " + (err.message || "Unknown error"));
+      toast.error("Error saat menerbitkan invoice: " + (err.message || "Unknown error"));
     }
+  };
+
+  const handleCreateCustomInvoice = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    try {
+      const { id, joId, customerName, date, taxPercent, items } = customInvoiceForm;
+
+      if (!customerName.trim()) {
+        toast.error(isID ? "Nama customer harus diisi" : "Customer name is required");
+        return;
+      }
+
+      if (!items || items.length === 0) {
+        toast.error(isID ? "Invoice harus memiliki minimal 1 item" : "Invoice must have at least 1 item");
+        return;
+      }
+
+      for (let i = 0; i < items.length; i++) {
+        if (!items[i].description.trim()) {
+          toast.error(isID ? `Deskripsi item ke-${i+1} harus diisi` : `Item ${i+1} description is required`);
+          return;
+        }
+        if (parseFloat(items[i].qty) <= 0 || parseFloat(items[i].rate) < 0) {
+          toast.error(isID ? `Jumlah & Harga item ke-${i+1} harus valid` : `Item ${i+1} quantity & price must be valid`);
+          return;
+        }
+      }
+
+      // Calculations
+      let subtotal = 0;
+      const extra_charges = items.map(item => {
+        const qty = parseFloat(item.qty) || 1;
+        const rate = parseFloat(item.rate) || 0;
+        const itemAmount = qty * rate;
+        subtotal += itemAmount;
+        return {
+          description: item.description,
+          qty,
+          rate,
+          amount: itemAmount
+        };
+      });
+
+      const tax = (subtotal * (parseFloat(taxPercent) || 0)) / 100;
+      const grandTotal = subtotal + tax;
+
+      const invoiceData = {
+        id: id.trim() || undefined,
+        joId: joId || null,
+        customerName: customerName.trim(),
+        date,
+        amount: grandTotal,
+        subtotal,
+        tax,
+        extra_charges
+      };
+
+      console.log("Creating custom invoice:", invoiceData);
+      await createCustomInvoice(invoiceData);
+
+      // Reset Form and Modal
+      setCustomInvoiceForm({
+        id: '',
+        joId: '',
+        customerName: '',
+        date: new Date().toISOString().substring(0, 10),
+        taxPercent: 0,
+        items: [{ description: '', qty: 1, rate: 0 }]
+      });
+      setShowCustomInvoiceModal(false);
+      toast.error(isID ? "Invoice kustom berhasil dibuat!" : "Custom invoice created successfully!");
+    } catch (err) {
+      console.error("Error creating custom invoice:", err);
+      toast.error("Error: " + (err.message || "Failed to create custom invoice"));
+    }
+  };
+
+  const updateCustomInvoiceItem = (index, field, value) => {
+    setCustomInvoiceForm(prev => {
+      const newItems = [...prev.items];
+      newItems[index] = { ...newItems[index], [field]: value };
+      return { ...prev, items: newItems };
+    });
+  };
+
+  const addCustomInvoiceItem = () => {
+    setCustomInvoiceForm(prev => ({
+      ...prev,
+      items: [...prev.items, { description: '', qty: 1, rate: 0 }]
+    }));
+  };
+
+  const removeCustomInvoiceItem = (index) => {
+    setCustomInvoiceForm(prev => {
+      if (prev.items.length <= 1) return prev;
+      return {
+        ...prev,
+        items: prev.items.filter((_, i) => i !== index)
+      };
+    });
+  };
+
+  const handleJOChangePrefill = (selectedJoId) => {
+    if (!selectedJoId) {
+      setCustomInvoiceForm(prev => ({
+        ...prev,
+        joId: '',
+        customerName: '',
+        items: [{ description: '', qty: 1, rate: 0 }]
+      }));
+      return;
+    }
+
+    const foundJo = jobOrders.find(j => String(j.id) === String(selectedJoId));
+    if (!foundJo) return;
+
+    // Fetch quotation items if any
+    const quotation = foundJo.quotationId 
+      ? quotations.find(q => String(q.id) === String(foundJo.quotationId))
+      : null;
+
+    let prefilledItems = [];
+    if (quotation && quotation.items) {
+      try {
+        const parsedItems = typeof quotation.items === 'string' ? JSON.parse(quotation.items) : quotation.items;
+        if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+          const targetDesc = (foundJo.instruction || foundJo.jobDescription || "").trim().toLowerCase();
+          const item = parsedItems.find(i => (i.description || "").trim().toLowerCase() === targetDesc);
+          
+          if (item) {
+            prefilledItems = [{
+              description: item.description || foundJo.instruction || foundJo.jobDescription || 'Freight & Logistics Services',
+              qty: parseFloat(foundJo.issueQuantity || foundJo.quantity || 1),
+              rate: parseFloat(item.rate || foundJo.rate || 0)
+            }];
+          } else {
+            prefilledItems = parsedItems.map(i => ({
+              description: i.description || 'Logistics Service',
+              qty: parseFloat(i.quantity || 1),
+              rate: parseFloat(i.rate || 0)
+            }));
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing quotation items for prefill:", e);
+      }
+    }
+
+    if (prefilledItems.length === 0) {
+      prefilledItems = [{
+        description: foundJo.instruction || foundJo.jobDescription || 'Freight & Logistics Services',
+        qty: parseFloat(foundJo.issueQuantity || foundJo.quantity || 1),
+        rate: parseFloat(foundJo.rate || 0)
+      }];
+    }
+
+    setCustomInvoiceForm(prev => ({
+      ...prev,
+      joId: selectedJoId,
+      customerName: foundJo.customerName || '',
+      items: prefilledItems
+    }));
   };
 
   const handleUploadReceivableProof = async (invId, paymentPhotos, taxPhotos) => {
@@ -1049,7 +1207,7 @@ const Accounting = () => {
       setModalPhotos([]);
       setModalTaxPhotos([]);
     } catch (err) {
-      alert("Gagal upload bukti: " + err.message);
+      toast.error("Gagal upload bukti: " + err.message);
     }
   };
 
@@ -1119,9 +1277,9 @@ const Accounting = () => {
     try {
       await settleInvoice(settleModal.id, settleForm.paymentProof, settleForm.taxes, settleForm.taxProof);
       setSettleModal(null);
-      alert('Payment settled! Invoice moved to Lunas Records.');
+      toast.error('Payment settled! Invoice moved to Lunas Records.');
     } catch (err) {
-      alert('Gagal settle pembayaran: ' + err.message);
+      toast.error('Gagal settle pembayaran: ' + err.message);
     }
   };
 
@@ -1129,13 +1287,13 @@ const Accounting = () => {
     if (!canWrite) return;
     const inv = invoices.find(i => i.joId === joId);
     if (!inv) {
-      alert('Invoice tidak ditemukan.');
+      toast.error('Invoice tidak ditemukan.');
       return;
     }
     try {
       await deleteInvoice(inv.id);
     } catch (err) {
-      alert('Gagal membatalkan invoice: ' + err.message);
+      toast.error('Gagal membatalkan invoice: ' + err.message);
     } finally {
       setUndoConfirmJoId(null);
     }
@@ -1158,7 +1316,7 @@ const Accounting = () => {
       try {
         await updateInvoice(inv.id, { status: 'issued' });
       } catch (err) {
-        alert('Failed to undo invoice: ' + err.message);
+        toast.error('Failed to undo invoice: ' + err.message);
       }
     }
   };
@@ -1180,7 +1338,7 @@ const Accounting = () => {
       try {
         await updatePurchaseOrder(po.id, { status: 'issued' });
       } catch (err) {
-        alert('Failed to undo PO payment: ' + err.message);
+        toast.error('Failed to undo PO payment: ' + err.message);
       }
     }
   };
@@ -1197,7 +1355,7 @@ const Accounting = () => {
       extra_charges: editingInvoice.extra_charges || []
     });
     setEditingInvoice(null);
-    alert('Invoice updated successfully!');
+    toast.success('Invoice updated successfully!');
   };
 
   const handleCreatePOFromAccounting = (joId) => {
@@ -1258,7 +1416,7 @@ const Accounting = () => {
       }
     });
     if (downloaded === 0) {
-      alert('Tidak ada invoice vendor yang tersedia untuk di-download pada PO yang dipilih.');
+      toast.success('Tidak ada invoice vendor yang tersedia untuk di-download pada PO yang dipilih.');
     }
   };
 
@@ -2479,6 +2637,34 @@ const Accounting = () => {
             <Settings size={17} /> {isID ? 'Rekening Bank' : 'Bank Accounts'}
           </button>
         )}
+
+        {canWrite && activeTab === 'billing' && (
+          <button
+            onClick={() => {
+              const dateVal = new Date().toISOString().substring(0, 10);
+              setCustomInvoiceForm({
+                id: `INV-CUST-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+                joId: '',
+                customerName: '',
+                date: dateVal,
+                taxPercent: 0,
+                items: [{ description: '', qty: 1, rate: 0 }]
+              });
+              setShowCustomInvoiceModal(true);
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              color: '#ffffff',
+              border: 'none',
+              boxShadow: '0 4px 15px rgba(16,185,129,0.3)',
+              marginLeft: '12px'
+            }}
+          >
+            <Plus size={17} /> {isID ? 'Buat Invoice Kustom' : 'Create Custom Invoice'}
+          </button>
+        )}
       </div>
 
       {/* Filter Bar */}
@@ -2563,132 +2749,52 @@ const Accounting = () => {
                 </tr>
               </thead>
               <tbody>
-                {(() => {
-                  const groups = {};
-                  sortedActiveJOs.forEach(jo => {
-                    const qId = jo.quotationId || 'no-quotation';
-                    if (!groups[qId]) {
-                      groups[qId] = {
-                        quotationId: qId,
-                        customerName: jo.customerName,
-                        date: jo.date,
-                        jobOrders: []
-                      };
-                    }
-                    groups[qId].jobOrders.push(jo);
-                  });
+                {sortedActiveJOs.map(jo => {
+                  const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s,c)=>s+parseFloat(c.total||0),0) : 0;
+                  const poCost = (poMap[jo.id] || []).reduce((s,p)=>s+parseFloat(p.grandTotal||0),0);
+                  const totalCost = manualCost + poCost;
+                  
+                  const invoice = invoiceMap[String(jo.id)];
+                  const revenue = invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : 0;
+                  const profitLoss = revenue - totalCost;
 
-                  const groupedArray = Object.values(groups).sort((a, b) => {
-                    const timeA = a.date ? new Date(a.date).getTime() : 0;
-                    const timeB = b.date ? new Date(b.date).getTime() : 0;
-                    return timeB - timeA;
-                  });
-
-                  return groupedArray.map(group => {
-                    const isExpanded = !!expandedCostingQuotes[group.quotationId];
-                    
-                    // Aggregate financials
-                    let groupRevenue = 0;
-                    let groupCost = 0;
-                    
-                    group.jobOrders.forEach(jo => {
-                      const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s,c)=>s+parseFloat(c.total||0),0) : 0;
-                      const poCost = (poMap[jo.id] || []).reduce((s,p)=>s+parseFloat(p.grandTotal||0),0);
-                      groupCost += (manualCost + poCost);
-                      
-                      const invoice = invoiceMap[String(jo.id)];
-                      groupRevenue += invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : 0;
-                    });
-                    
-                    const groupPL = groupRevenue - groupCost;
-
-                    return (
-                      <React.Fragment key={group.quotationId}>
-                        {/* Folder Header Row */}
-                        <tr 
-                          style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(212, 175, 55, 0.05)', cursor: 'pointer' }} 
-                          className="table-row-hover" 
-                          onClick={() => setExpandedCostingQuotes(prev => ({ ...prev, [group.quotationId]: !prev[group.quotationId] }))}
-                        >
-                          <td colSpan="5" style={{ padding: '12px', fontWeight: '800' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              {isExpanded ? <ChevronDown size={14} style={{ color: 'var(--secondary)' }} /> : <ChevronRight size={14} style={{ color: 'var(--secondary)' }} />}
-                              {isExpanded ? <FolderOpen size={16} style={{ color: 'var(--secondary)' }} /> : <Folder size={16} style={{ color: 'var(--secondary)' }} />}
-                              <span style={{ color: 'var(--secondary)' }}>{group.quotationId}</span>
-                              <span style={{ color: 'var(--text-muted)' }}>|</span>
-                              <span>{group.customerName}</span>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'normal', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '20px', marginLeft: '5px' }}>
-                                {group.jobOrders.length} {isID ? 'JO' : 'JOs'}
-                              </span>
-                            </div>
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: groupRevenue > 0 ? '#10b981' : 'var(--text-muted)' }}>
-                            {groupRevenue > 0 ? `Rp ${groupRevenue.toLocaleString('id-ID')}` : '—'}
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: groupCost > 0 ? '#ef4444' : 'var(--text-muted)' }}>
-                            {groupCost > 0 ? `Rp ${groupCost.toLocaleString('id-ID')}` : '—'}
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800', color: groupPL > 0 ? '#10b981' : groupPL < 0 ? '#ef4444' : 'var(--text-muted)' }}>
-                            {groupRevenue > 0 || groupCost > 0 ? `Rp ${groupPL.toLocaleString('id-ID')}` : '—'}
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                              {isExpanded ? (isID ? 'Tutup' : 'Collapse') : (isID ? 'Buka' : 'Expand')}
-                            </span>
-                          </td>
-                        </tr>
-
-                        {/* Child JO Rows */}
-                        {isExpanded && group.jobOrders.map(jo => {
-                          const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s,c)=>s+parseFloat(c.total||0),0) : 0;
-                          const poCost = (poMap[jo.id] || []).reduce((s,p)=>s+parseFloat(p.grandTotal||0),0);
-                          const totalCost = manualCost + poCost;
-                          
-                          const invoice = invoiceMap[String(jo.id)];
-                          const revenue = invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : 0;
-                          const profitLoss = revenue - totalCost;
-
-                          return (
-                            <tr key={jo.id} style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.01)' }} className="table-row-hover">
-                              <td style={{ padding: '12px 12px 12px 25px', fontWeight: '700', color: 'var(--secondary)', fontSize: '0.85rem', borderLeft: '3px solid var(--secondary)' }}>{jo.id}</td>
-                              <td style={{ padding: '12px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{jo.jobDescription}</td>
-                              <td style={{ padding: '12px', fontSize: '0.8rem', fontWeight: '700', color: 'var(--secondary)' }}>
-                                {invoice ? invoice.id : <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{isID ? 'Belum Ada' : 'None Yet'}</span>}
-                              </td>
-                              <td style={{ padding: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                {invoice ? new Date(invoice.date).toLocaleDateString() : '—'}
-                              </td>
-                              <td style={{ padding: '12px' }}><span className={`badge badge-${jo.status}`} style={{ fontSize: '0.7rem' }}>{jo.status}</span></td>
-                              <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: revenue > 0 ? '#10b981' : 'var(--text-muted)' }}>
-                                {revenue > 0 ? `Rp ${revenue.toLocaleString('id-ID')}` : '—'}
-                              </td>
-                              <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: totalCost > 0 ? '#ef4444' : 'var(--text-muted)' }}>
-                                {totalCost > 0 ? `Rp ${totalCost.toLocaleString('id-ID')}` : '—'}
-                              </td>
-                              <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800', color: profitLoss > 0 ? '#10b981' : profitLoss < 0 ? '#ef4444' : 'var(--text-muted)' }}>
-                                {revenue > 0 || totalCost > 0 ? `Rp ${profitLoss.toLocaleString('id-ID')}` : '—'}
-                              </td>
-                              <td style={{ padding: '12px', textAlign: 'center' }}>
-                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                                  {canWrite && (
-                                    <button className="btn" style={{ padding: '6px 12px', fontSize: '0.75rem', gap: '4px', background: 'rgba(212,175,55,0.1)', color: 'var(--secondary)', border: '1px solid var(--secondary)' }} onClick={() => { setCostModal(jo); setCostLines([{ vendorId: '', serviceIdx: '', qty: 1, customVendorName: '', customServiceDescription: '', customPrice: '' }]); }}>
-                                      <Plus size={12} /> {isID ? 'Biaya' : 'Costs'}
-                                    </button>
-                                  )}
-                                  {!invoice && canWrite && (
-                                    <ButtonWithLoading className="btn btn-gold" style={{ padding: '6px 12px', fontSize: '0.75rem', gap: '4px' }} onClick={() => handleIssueInvoice(jo.id)}>
-                                      <Receipt size={12} /> {isID ? 'Invoice' : 'Invoice'}
-                                    </ButtonWithLoading>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </React.Fragment>
-                    );
-                  });
-                })()}
+                  return (
+                    <tr key={jo.id} style={{ borderBottom:'1px solid var(--glass-border)' }} className="table-row-hover">
+                       <td style={{padding:'12px',fontWeight:'700',color:'var(--secondary)',fontSize:'0.85rem'}}>{jo.id}</td>
+                       <td style={{padding:'12px',fontWeight:'600'}}>{jo.customerName}</td>
+                       <td style={{padding:'12px',fontSize:'0.8rem',fontWeight:'700',color:'var(--secondary)'}}>
+                         {invoice ? invoice.id : <span style={{color:'var(--text-muted)', fontWeight:'400'}}>{isID ? 'Belum Ada' : 'None Yet'}</span>}
+                       </td>
+                       <td style={{padding:'12px',fontSize:'0.8rem',color:'var(--text-muted)'}}>
+                         {invoice ? new Date(invoice.date).toLocaleDateString() : '—'}
+                       </td>
+                       <td style={{padding:'12px'}}><span className={`badge badge-${jo.status}`} style={{fontSize:'0.7rem'}}>{jo.status}</span></td>
+                      <td style={{padding:'12px', textAlign:'right', fontWeight:'700', color: revenue > 0 ? '#10b981' : 'var(--text-muted)'}}>
+                        {revenue > 0 ? `Rp ${revenue.toLocaleString('id-ID')}` : '—'}
+                      </td>
+                      <td style={{padding:'12px',textAlign:'right',fontWeight:'700',color: totalCost>0 ? '#ef4444' : 'var(--text-muted)'}}>
+                        {totalCost>0 ? `Rp ${totalCost.toLocaleString('id-ID')}` : '—'}
+                      </td>
+                      <td style={{padding:'12px', textAlign:'right', fontWeight:'800', color: profitLoss > 0 ? '#10b981' : profitLoss < 0 ? '#ef4444' : 'var(--text-muted)'}}>
+                        {revenue > 0 || totalCost > 0 ? `Rp ${profitLoss.toLocaleString('id-ID')}` : '—'}
+                      </td>
+                      <td style={{padding:'12px', textAlign:'center'}}>
+                        <div style={{display:'flex', gap:'8px', justifyContent:'center'}}>
+                          {canWrite && (
+                            <button className="btn" style={{padding:'7px 14px',fontSize:'0.8rem',gap:'6px', background:'rgba(212,175,55,0.1)', color:'var(--secondary)', border:'1px solid var(--secondary)'}} onClick={()=>{ setCostModal(jo); setCostLines([{vendorId:'',serviceIdx:'',qty:1,customVendorName:'',customServiceDescription:'',customPrice:''}]); }}>
+                              <Plus size={14}/> {isID ? 'Biaya' : 'Costs'}
+                            </button>
+                          )}
+                          {!invoice && canWrite && (
+                            <ButtonWithLoading className="btn btn-gold" style={{padding:'7px 14px',fontSize:'0.8rem',gap:'6px'}} onClick={() => handleIssueInvoice(jo.id)}>
+                              <Receipt size={14}/> {isID ? 'Invoice' : 'Invoice'}
+                            </ButtonWithLoading>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table></div></div>
           )}
@@ -2716,89 +2822,86 @@ const Accounting = () => {
               </thead>
               <tbody>
                 {(() => {
+                  // Group completed JOs by quotationId
                   const groups = {};
                   completedJOs.forEach(jo => {
-                    const qId = jo.quotationId || 'no-quotation';
+                    const qId = jo.quotationId || 'direct';
                     if (!groups[qId]) {
                       groups[qId] = {
                         quotationId: qId,
-                        customerName: jo.customerName,
-                        date: jo.date,
+                        customerName: jo.customerName || 'Direct Customer',
                         jobOrders: []
                       };
                     }
                     groups[qId].jobOrders.push(jo);
                   });
 
-                  const groupedArray = Object.values(groups).sort((a, b) => {
-                    const timeA = a.date ? new Date(a.date).getTime() : 0;
-                    const timeB = b.date ? new Date(b.date).getTime() : 0;
-                    return timeB - timeA;
-                  });
-
-                  if (groupedArray.length === 0) {
-                    return (
-                      <tr>
-                        <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                          {isID ? 'Tidak ada data operational selesai.' : 'No completed operational data.'}
-                        </td>
-                      </tr>
-                    );
-                  }
-
-                  return groupedArray.map(group => {
-                    const isExpanded = !!expandedBillingQuotes[group.quotationId];
+                  return Object.values(groups).map(group => {
+                    const isGroupExpanded = expandedCompletedGroups[group.quotationId] !== false;
                     const uninvoicedJOs = group.jobOrders.filter(jo => !invoices.some(inv => String(inv.joId) === String(jo.id)));
-                    const hasUninvoiced = uninvoicedJOs.length > 0;
+                    const allInvoiced = uninvoicedJOs.length === 0;
 
                     return (
                       <React.Fragment key={group.quotationId}>
-                        {/* Folder Header Row */}
+                        {/* Quotation Group Folder Row */}
                         <tr 
-                          style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(212, 175, 55, 0.05)', cursor: 'pointer' }} 
-                          className="table-row-hover" 
-                          onClick={() => setExpandedBillingQuotes(prev => ({ ...prev, [group.quotationId]: !prev[group.quotationId] }))}
+                          style={{ 
+                            background: 'rgba(212, 175, 55, 0.05)', 
+                            borderBottom: '2px solid var(--secondary)',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => setExpandedCompletedGroups({ ...expandedCompletedGroups, [group.quotationId]: !isGroupExpanded })}
                         >
-                          <td colSpan="4" style={{ padding: '15px', fontWeight: '800' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              {isExpanded ? <ChevronDown size={14} style={{ color: 'var(--secondary)' }} /> : <ChevronRight size={14} style={{ color: 'var(--secondary)' }} />}
-                              {isExpanded ? <FolderOpen size={16} style={{ color: 'var(--secondary)' }} /> : <Folder size={16} style={{ color: 'var(--secondary)' }} />}
-                              <span style={{ color: 'var(--secondary)' }}>{group.quotationId}</span>
-                              <span style={{ color: 'var(--text-muted)' }}>|</span>
-                              <span>{group.customerName}</span>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'normal', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '20px', marginLeft: '5px' }}>
-                                {group.jobOrders.length} JO Selesai
-                              </span>
-                            </div>
-                          </td>
-                          <td style={{ padding: '15px', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', alignItems: 'center' }}>
-                              {hasUninvoiced && canWrite && (
-                                <ButtonWithLoading 
-                                  className="btn btn-gold" 
-                                  style={{ padding: '6px 14px', fontSize: '0.75rem' }} 
-                                  onClick={(e) => { e.stopPropagation(); return handleIssueInvoice(uninvoicedJOs[0].id); }}
-                                >
-                                  {isID ? 'Terbitkan Invoice Konsolidasi' : 'Issue Consolidated Invoice'}
-                                </ButtonWithLoading>
-                              )}
-                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                {isExpanded ? (isID ? 'Tutup' : 'Collapse') : (isID ? 'Buka' : 'Expand')}
-                              </span>
+                          <td colSpan="5" style={{ padding: '12px 15px', verticalAlign: 'middle' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ fontSize: '1.2rem' }}>📁</span>
+                                <span style={{ fontWeight: '800', color: 'var(--secondary)' }}>
+                                  {group.quotationId === 'direct' ? (isID ? 'Pekerjaan Langsung' : 'Direct Jobs') : group.quotationId}
+                                </span>
+                                <span style={{ color: 'var(--text)', fontWeight: '700', marginLeft: '5px' }}>
+                                  — {group.customerName}
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                {!allInvoiced && canWrite && (
+                                  <ButtonWithLoading 
+                                    className="btn btn-gold" 
+                                    style={{ padding: '6px 14px', fontSize: '0.75rem', gap: '6px' }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleIssueInvoice(uninvoicedJOs[0].id);
+                                    }}
+                                  >
+                                    {isID ? 'Terbitkan Invoice Gabungan' : 'Issue Combined Invoice'}
+                                  </ButtonWithLoading>
+                                )}
+                                <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                                  {group.jobOrders.length} {isID ? 'Pekerjaan' : 'Jobs'}
+                                </span>
+                                {isGroupExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                              </div>
                             </div>
                           </td>
                         </tr>
 
-                        {/* Child JO Rows */}
-                        {isExpanded && group.jobOrders.map(jo => {
+                        {/* Child Completed Job Orders */}
+                        {isGroupExpanded && group.jobOrders.map(jo => {
                           const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id));
                           return (
                             <tr key={jo.id} style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.01)' }}>
-                              <td style={{ padding: '15px 15px 15px 25px', fontWeight: '700', color: 'var(--secondary)', borderLeft: '3px solid var(--secondary)' }}>
-                                <div>{jo.id}</div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>{jo.jobDescription}</div>
+                              <td style={{ padding: '15px', paddingLeft: '30px', fontWeight: 'bold', color: 'var(--secondary)' }}>
+                                <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>└</span> {jo.id}
                               </td>
-                              <td style={{ padding: '15px' }}>{jo.customerName}</td>
+                              <td style={{ padding: '15px' }}>
+                                <div style={{ fontWeight: '600' }}>{jo.customerName}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                  {jo.instruction || jo.jobDescription}
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                  {isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}
+                                </div>
+                              </td>
                               <td style={{ padding: '15px' }}>
                                 <span className="badge badge-done">{isID ? 'Selesai' : 'Completed'}</span>
                               </td>
@@ -3050,7 +3153,7 @@ const Accounting = () => {
                               if (allAtts.length > 0) {
                                 setPhotoViewer({ title: `Attachments - ${inv.id}`, photos: allAtts });
                               } else {
-                                alert(isID ? "Tidak ada lampiran." : "No attachments.");
+                                toast(isID ? "Tidak ada lampiran." : "No attachments.");
                               }
                             }}
                           >
@@ -3526,17 +3629,17 @@ const Accounting = () => {
                               </button>
                             )}
                             {canWrite && (
-                              <button onClick={async () => { 
+                              <button onClick={async () => {
                                 const confirmed = await confirm(
-                                  isID ? 'Yakin hapus data ini?' : 'Delete this record?', 
-                                  { 
-                                    title: isID ? 'Hapus Data' : 'Delete Data', 
-                                    confirmText: isID ? 'Hapus' : 'Delete', 
-                                    cancelText: isID ? 'Batal' : 'Cancel', 
-                                    isDanger: true 
+                                  isID ? 'Yakin hapus data ini?' : 'Delete this record?',
+                                  {
+                                    title: isID ? 'Hapus Data' : 'Delete Data',
+                                    confirmText: isID ? 'Hapus' : 'Delete',
+                                    cancelText: isID ? 'Batal' : 'Cancel',
+                                    isDanger: true
                                   }
                                 );
-                                if (confirmed) deleteOtherExpense(r.id); 
+                                if (confirmed) deleteOtherExpense(r.id);
                               }} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }} title={isID ? 'Hapus Data' : 'Delete Data'}>
                                 <Trash2 size={16} />
                               </button>
@@ -3867,7 +3970,7 @@ const Accounting = () => {
                             {canWrite && (
                               <>
                                 <button onClick={() => { setModalPhotos(po.vendorInvoicePhoto); setVendorInvoiceModal(po); }} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}><Edit3 size={14}/></button>
-                                <button onClick={async () => { 
+                                <button onClick={async () => {
                                   const confirmed = await confirm(
                                     isID ? 'Hapus semua lampiran invoice vendor?' : 'Delete all vendor invoice attachments?',
                                     {
@@ -3877,7 +3980,7 @@ const Accounting = () => {
                                       isDanger: true
                                     }
                                   );
-                                  if (confirmed) handleUploadVendorInvoice(po.id, []); 
+                                  if (confirmed) handleUploadVendorInvoice(po.id, []);
                                 }} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer' }}><Trash2 size={14}/></button>
                               </>
                             )}
@@ -3930,7 +4033,7 @@ const Accounting = () => {
                                         taxProof: po.tax_proof_photo || []
                                      });
                                   }} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}><Edit3 size={14}/></button>
-                                  <button onClick={async () => { 
+                                  <button onClick={async () => {
                                     const confirmed = await confirm(
                                       isID ? 'Hapus bukti potong pajak?' : 'Delete tax deduction proof?',
                                       {
@@ -3940,7 +4043,7 @@ const Accounting = () => {
                                         isDanger: true
                                       }
                                     );
-                                    if (confirmed) handleSettlePayable(po.id, { tax_proof_photo: [] }); 
+                                    if (confirmed) handleSettlePayable(po.id, { tax_proof_photo: [] });
                                   }} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer' }}><Trash2 size={14}/></button>
                                 </>
                               )}
@@ -4420,6 +4523,216 @@ const Accounting = () => {
             <div style={{ padding:'15px', borderTop:'1px solid var(--glass-border)', textAlign:'right' }}>
               <button onClick={() => setPhotoViewer(null)} className="btn btn-gold" style={{ padding:'10px 25px' }}>Done</button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Custom Invoice Modal */}
+      {showCustomInvoiceModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:10000, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }}>
+          <div className="glass-card" style={{ width:'100%', maxWidth:'850px', padding:'35px', maxHeight:'90vh', overflowY:'auto', position:'relative' }}>
+            <button onClick={() => setShowCustomInvoiceModal(false)} style={{ position:'absolute', top:'15px', right:'15px', background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}><X size={20}/></button>
+            <h3 style={{ color:'#10b981', marginBottom:'25px', display:'flex', alignItems:'center', gap:'10px' }}><Plus size={24}/> {isID ? 'Buat Invoice Kustom Baru' : 'Create New Custom Invoice'}</h3>
+            
+            <form onSubmit={handleCreateCustomInvoice}>
+              <div className="grid-responsive-2" style={{ gap:'20px', marginBottom:'20px' }}>
+                <div>
+                  <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Nomor Invoice (ID)' : 'Invoice Number (ID)'}</label>
+                  <input 
+                    type="text" 
+                    value={customInvoiceForm.id} 
+                    onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, id: e.target.value })}
+                    placeholder="INV-CUST-XXXX"
+                    style={{ width:'100%', padding:'10px 12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontSize:'0.9rem' }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Hubungkan ke Job Order (Opsional)' : 'Link to Job Order (Optional)'}</label>
+                  <select 
+                    value={customInvoiceForm.joId} 
+                    onChange={e => handleJOChangePrefill(e.target.value)}
+                    style={{ width:'100%', padding:'10px 12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontSize:'0.9rem', outline:'none', cursor:'pointer' }}
+                  >
+                    <option value="">{isID ? '-- Pilih Job Order --' : '-- Select Job Order --'}</option>
+                    {jobOrders
+                      .filter(jo => !invoices.some(inv => String(inv.joId) === String(jo.id)))
+                      .map(jo => (
+                        <option key={jo.id} value={jo.id}>{jo.id} - {jo.customerName} ({jo.instruction || jo.jobDescription || 'No Desc'})</option>
+                      ))
+                    }
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid-responsive-2" style={{ gap:'20px', marginBottom:'20px' }}>
+                <div>
+                  <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Isi Cepat dari Pelanggan Terdaftar' : 'Quick Fill from Registered Customer'}</label>
+                  <select 
+                    onChange={e => {
+                      if (e.target.value) {
+                        setCustomInvoiceForm(prev => ({ ...prev, customerName: e.target.value }));
+                      }
+                    }}
+                    style={{ width:'100%', padding:'10px 12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontSize:'0.9rem', outline:'none', cursor:'pointer' }}
+                  >
+                    <option value="">{isID ? '-- Pilih Pelanggan --' : '-- Select Customer --'}</option>
+                    {customers.map(c => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Nama Customer' : 'Customer Name'}</label>
+                  <input 
+                    type="text" 
+                    value={customInvoiceForm.customerName} 
+                    onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, customerName: e.target.value })}
+                    placeholder={isID ? "Nama Customer / Perusahaan" : "Customer / Company Name"}
+                    style={{ width:'100%', padding:'10px 12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontSize:'0.9rem' }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid-responsive-2" style={{ gap:'20px', marginBottom:'20px' }}>
+                <div>
+                  <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Tanggal Invoice' : 'Invoice Date'}</label>
+                  <input 
+                    type="date" 
+                    value={customInvoiceForm.date} 
+                    onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, date: e.target.value })}
+                    style={{ width:'100%', padding:'10px 12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontSize:'0.9rem' }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Pajak / PPN (%)' : 'Tax / VAT (%)'}</label>
+                  <input 
+                    type="number" 
+                    min="0" 
+                    max="100" 
+                    step="any"
+                    value={customInvoiceForm.taxPercent} 
+                    onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, taxPercent: parseFloat(e.target.value) || 0 })}
+                    style={{ width:'100%', padding:'10px 12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontSize:'0.9rem' }}
+                  />
+                </div>
+              </div>
+
+              {/* Items Section */}
+              <div style={{ marginTop:'30px', marginBottom:'20px' }}>
+                <h4 style={{ borderBottom:'1px solid var(--glass-border)', paddingBottom:'8px', color:'var(--text)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span>{isID ? 'Item Layanan' : 'Service Items'}</span>
+                  <button 
+                    type="button" 
+                    onClick={addCustomInvoiceItem}
+                    style={{ background:'rgba(16,185,129,0.1)', color:'#10b981', border:'1px solid #10b981', borderRadius:'6px', padding:'4px 10px', fontSize:'0.75rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'4px' }}
+                  >
+                    <Plus size={14}/> {isID ? 'Tambah Item' : 'Add Item'}
+                  </button>
+                </h4>
+
+                <div style={{ display:'flex', flexDirection:'column', gap:'12px', marginTop:'15px' }}>
+                  {customInvoiceForm.items.map((item, idx) => {
+                    const rowTotal = (parseFloat(item.qty) || 0) * (parseFloat(item.rate) || 0);
+                    return (
+                      <div key={idx} style={{ display:'flex', gap:'12px', alignItems:'flex-end', flexWrap:'wrap', background:'rgba(255,255,255,0.02)', padding:'12px', borderRadius:'8px', border:'1px solid var(--glass-border)' }}>
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                          <label style={{ display:'block', fontSize:'0.65rem', color:'var(--text-muted)', marginBottom:'4px', textTransform:'uppercase' }}>{isID ? 'Deskripsi Layanan' : 'Service Description'}</label>
+                          <input 
+                            type="text"
+                            value={item.description}
+                            onChange={e => updateCustomInvoiceItem(idx, 'description', e.target.value)}
+                            placeholder={isID ? "Contoh: Jasa Pengiriman Trucking" : "e.g., Trucking Delivery Service"}
+                            style={{ width:'100%', padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }}
+                            required
+                          />
+                        </div>
+                        <div style={{ width: '80px' }}>
+                          <label style={{ display:'block', fontSize:'0.65rem', color:'var(--text-muted)', marginBottom:'4px', textTransform:'uppercase' }}>{isID ? 'Jumlah' : 'Qty'}</label>
+                          <input 
+                            type="number"
+                            min="0.01"
+                            step="any"
+                            value={item.qty}
+                            onChange={e => updateCustomInvoiceItem(idx, 'qty', e.target.value)}
+                            style={{ width:'100%', padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }}
+                            required
+                          />
+                        </div>
+                        <div style={{ width: '150px' }}>
+                          <label style={{ display:'block', fontSize:'0.65rem', color:'var(--text-muted)', marginBottom:'4px', textTransform:'uppercase' }}>{isID ? 'Harga Satuan' : 'Unit Rate'}</label>
+                          <input 
+                            type="number"
+                            min="0"
+                            value={item.rate}
+                            onChange={e => updateCustomInvoiceItem(idx, 'rate', e.target.value)}
+                            style={{ width:'100%', padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }}
+                            required
+                          />
+                        </div>
+                        <div style={{ width: '130px', textAlign:'right', paddingBottom:'10px' }}>
+                          <span style={{ display:'block', fontSize:'0.65rem', color:'var(--text-muted)', marginBottom:'4px', textTransform:'uppercase' }}>Total</span>
+                          <span style={{ fontSize:'0.9rem', fontWeight:'700', color:'var(--text)' }}>Rp {rowTotal.toLocaleString('id-ID')}</span>
+                        </div>
+                        <div style={{ width: '40px', paddingBottom:'5px' }}>
+                          <button
+                            type="button"
+                            onClick={() => removeCustomInvoiceItem(idx)}
+                            disabled={customInvoiceForm.items.length <= 1}
+                            style={{ background:'rgba(239,68,68,0.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,0.3)', borderRadius:'6px', width:'32px', height:'32px', display:'flex', alignItems:'center', justifyContent:'center', cursor: customInvoiceForm.items.length <= 1 ? 'not-allowed' : 'pointer' }}
+                          >
+                            <Trash2 size={16}/>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Summary Calculations */}
+              {(() => {
+                const subtotal = customInvoiceForm.items.reduce((s, item) => s + (parseFloat(item.qty) || 0) * (parseFloat(item.rate) || 0), 0);
+                const tax = (subtotal * (parseFloat(customInvoiceForm.taxPercent) || 0)) / 100;
+                const total = subtotal + tax;
+                return (
+                  <div style={{ background:'rgba(255,255,255,0.03)', padding:'20px', borderRadius:'10px', border:'1px solid var(--glass-border)', display:'flex', flexDirection:'column', gap:'8px', marginLeft:'auto', maxWidth:'350px', marginBottom:'25px' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.85rem' }}>
+                      <span style={{ color:'var(--text-muted)' }}>Subtotal:</span>
+                      <span style={{ fontWeight:'600', color:'var(--text)' }}>Rp {subtotal.toLocaleString('id-ID')}</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.85rem' }}>
+                      <span style={{ color:'var(--text-muted)' }}>PPN / Pajak ({customInvoiceForm.taxPercent}%):</span>
+                      <span style={{ fontWeight:'600', color:'var(--text)' }}>Rp {tax.toLocaleString('id-ID')}</span>
+                    </div>
+                    <div style={{ height:'1px', background:'var(--glass-border)', margin:'5px 0' }} />
+                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:'1.05rem', fontWeight:'800' }}>
+                      <span style={{ color:'var(--secondary)' }}>{isID ? 'Total Tagihan:' : 'Grand Total:'}</span>
+                      <span style={{ color:'var(--secondary)' }}>Rp {total.toLocaleString('id-ID')}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div style={{ display:'flex', gap:'12px', borderTop:'1px solid var(--glass-border)', paddingTop:'20px', justifyContent:'flex-end' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setShowCustomInvoiceModal(false)} 
+                  className="btn" 
+                  style={{ background:'rgba(255,255,255,0.05)', border:'1px solid var(--border)', color:'var(--text)', padding:'10px 25px' }}
+                >
+                  {isID ? 'Batal' : 'Cancel'}
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-gold" 
+                  style={{ background:'linear-gradient(135deg, #10b981, #059669)', border:'none', color:'#ffffff', padding:'10px 25px', boxShadow:'0 4px 15px rgba(16,185,129,0.3)' }}
+                >
+                  <CheckCircle size={16} style={{ marginRight:'6px' }}/> {isID ? 'Simpan Invoice' : 'Save Invoice'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -5655,13 +5968,13 @@ const Accounting = () => {
                     style={{ flex:1 }}
                     loading={isSavingBank}
                     onClick={async () => {
-                      if (!bankModal?.bankName || !bankModal?.accountNumber || !bankModal?.accountName) return alert(isID ? 'Data tidak lengkap' : 'Data is incomplete');
+                      if (!bankModal?.bankName || !bankModal?.accountNumber || !bankModal?.accountName) return toast.error(isID ? 'Data tidak lengkap' : 'Data is incomplete');
                       setIsSavingBank(true);
                       try {
                         await updateCompanyBank({ ...bankModal, id: bankModal.id || `BANK-${Date.now()}` });
                         setBankModal(null);
                       } catch (err) {
-                        alert((isID ? "Gagal menyimpan rekening: " : "Failed to save account: ") + err.message);
+                        toast.error((isID ? "Gagal menyimpan rekening: " : "Failed to save account: ") + err.message);
                       } finally {
                         setIsSavingBank(false);
                       }
@@ -5698,7 +6011,7 @@ const Accounting = () => {
                                 await deleteCompanyBank(bank.id);
                                 setBankToDelete(null);
                               } catch (err) {
-                                alert((isID ? "Gagal menghapus: " : "Failed to delete: ") + err.message);
+                                toast.error((isID ? "Gagal menghapus: " : "Failed to delete: ") + err.message);
                               }
                             }}
                           >{isID ? 'Ya' : 'Yes'}</button>
@@ -5757,9 +6070,9 @@ const Accounting = () => {
                       
                       await updateInvoice(uploadSignedModal.invId, updateData);
                       setUploadSignedModal(null);
-                      alert(isID ? "Dokumen berhasil diunggah!" : "Document uploaded successfully!");
+                      toast.error(isID ? "Dokumen berhasil diunggah!" : "Document uploaded successfully!");
                     } catch (err) {
-                      alert((isID ? "Gagal mengunggah dokumen: " : "Failed to upload document: ") + err.message);
+                      toast.error((isID ? "Gagal mengunggah dokumen: " : "Failed to upload document: ") + err.message);
                     } finally {
                       setIsUploading(false);
                       // Clear the input value to allow re-uploading the same file
@@ -5861,7 +6174,7 @@ const Accounting = () => {
                   if (bank) {
                     handleIssueInvoice(issuingInvoiceJoId, bank);
                   } else {
-                    alert(isID ? "Silakan pilih rekening bank yang valid." : "Please select a valid bank account.");
+                    toast.error(isID ? "Silakan pilih rekening bank yang valid." : "Please select a valid bank account.");
                   }
                 }} 
                 className="btn btn-gold" 
@@ -5933,16 +6246,16 @@ const Accounting = () => {
                 style={{ flex:1, background:'#ef4444', color:'white' }}
                 onClick={async () => {
                   if (verifyStep === 1) {
-                    if (verifyText.toUpperCase() !== 'DELETE') return alert(isID ? 'Teks verifikasi tidak sesuai.' : 'Verification text does not match.');
+                    if (verifyText.toUpperCase() !== 'DELETE') return toast(isID ? 'Teks verifikasi tidak sesuai.' : 'Verification text does not match.');
                     setVerifyStep(2);
                   } else {
-                    if (otpInput.length < 4) return alert(isID ? 'Masukkan 4 digit security key.' : 'Please enter the 4-digit security key.');
+                    if (otpInput.length < 4) return toast(isID ? 'Masukkan 4 digit security key.' : 'Please enter the 4-digit security key.');
                     if (!canWrite) return;
                     setIsAuthorizing(true);
                     try {
                       const config = await getSystemConfig();
                       if (!config || !config.otpKey || otpInput !== config.otpKey) {
-                        alert(isID ? 'Security Key Salah! Silakan cek OTP di menu System Control.' : 'Incorrect Security Key! Please check the OTP in the System Control menu.');
+                        toast.error(isID ? 'Security Key Salah! Silakan cek OTP di menu System Control.' : 'Incorrect Security Key! Please check the OTP in the System Control menu.');
                         setOtpInput('');
                         return;
                       }
@@ -5951,9 +6264,9 @@ const Accounting = () => {
                       setVerifyStep(1);
                       setVerifyText('');
                       setOtpInput('');
-                      alert(isID ? 'Invoice berhasil dihapus.' : 'Invoice successfully deleted.');
+                      toast.error(isID ? 'Invoice berhasil dihapus.' : 'Invoice successfully deleted.');
                     } catch (err) {
-                      alert((isID ? 'Gagal menghapus: ' : 'Failed to delete: ') + err.message);
+                      toast.error((isID ? 'Gagal menghapus: ' : 'Failed to delete: ') + err.message);
                     } finally {
                       setIsAuthorizing(false);
                     }

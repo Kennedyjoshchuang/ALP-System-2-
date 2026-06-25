@@ -6,20 +6,7 @@ import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
 import toast from 'react-hot-toast';
 
-const alert = (message) => {
-  if (!message) return;
-  const msgLower = String(message).toLowerCase();
-  const successKeywords = ['berhasil', 'success', 'lunas', 'dispatched', 'sent', 'selesai', 'done', 'saved', 'updated', 'uploaded', 'terbitkan', 'issued', 'settled'];
-  const errorKeywords = ['gagal', 'failed', 'error', 'salah', 'incorrect', 'tidak ditemukan', 'not found', 'incomplete', 'tidak lengkap', 'invalid', 'masalah', 'kurang'];
-  
-  if (errorKeywords.some(keyword => msgLower.includes(keyword))) {
-    toast.error(message);
-  } else if (successKeywords.some(keyword => msgLower.includes(keyword))) {
-    toast.success(message);
-  } else {
-    toast(message);
-  }
-};
+;
 
 const Marketing = () => {
   const context = useApp();
@@ -193,7 +180,7 @@ const Marketing = () => {
       setActiveProspectForEdit(null);
     } catch (error) {
       console.error("Gagal update prospek:", error);
-      alert("Gagal memperbarui data calon pelanggan.");
+      toast.error("Gagal memperbarui data calon pelanggan.");
     }
   };
 
@@ -223,7 +210,7 @@ const Marketing = () => {
 
     // Validate items
     if (quoteItems.length === 0 || quoteItems.some(item => !item.description || !item.rate || !item.quantity)) {
-      alert("Please fill in all item details (Description, Rate, and Quantity).");
+      toast("Please fill in all item details (Description, Rate, and Quantity).");
       return;
     }
 
@@ -308,7 +295,7 @@ const Marketing = () => {
     if (!activeQuotationForEdit) return;
 
     if (editQuoteItems.length === 0 || editQuoteItems.some(item => !item.description || !item.rate || !item.quantity)) {
-      alert("Please fill in all item details (Description, Rate, and Quantity).");
+      toast("Please fill in all item details (Description, Rate, and Quantity).");
       return;
     }
 
@@ -337,7 +324,7 @@ const Marketing = () => {
       setActiveQuotationForEdit(null);
     } catch (error) {
       console.error("Quotation edit failed:", error);
-      alert("Gagal menyimpan perubahan penawaran.");
+      toast.error("Gagal menyimpan perubahan penawaran.");
     }
   };
 
@@ -427,7 +414,7 @@ const Marketing = () => {
   const handleCustomerSubmit = async (e) => {
     if (e) e.preventDefault();
     if (!newCustomerData.name) {
-      alert("Nama pelanggan harus diisi.");
+      toast.error("Nama pelanggan harus diisi.");
       return;
     }
 
@@ -565,7 +552,7 @@ const Marketing = () => {
     }
 
     if (dataToExport.length === 0) {
-      alert("Tidak ada data untuk di-export pada rentang tanggal ini.");
+      toast("Tidak ada data untuk di-export pada rentang tanggal ini.");
       return;
     }
 

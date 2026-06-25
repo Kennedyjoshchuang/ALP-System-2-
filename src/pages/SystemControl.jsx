@@ -16,20 +16,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
-const alert = (message) => {
-  if (!message) return;
-  const msgLower = String(message).toLowerCase();
-  const successKeywords = ['berhasil', 'success', 'lunas', 'dispatched', 'sent', 'selesai', 'done', 'saved', 'updated', 'uploaded', 'terbitkan', 'issued', 'settled'];
-  const errorKeywords = ['gagal', 'failed', 'error', 'salah', 'incorrect', 'tidak ditemukan', 'not found', 'incomplete', 'tidak lengkap', 'invalid', 'masalah', 'kurang'];
-  
-  if (errorKeywords.some(keyword => msgLower.includes(keyword))) {
-    toast.error(message);
-  } else if (successKeywords.some(keyword => msgLower.includes(keyword))) {
-    toast.success(message);
-  } else {
-    toast(message);
-  }
-};
+;
 
 import OTPKeys from '../components/OTPKeys';
 
@@ -80,7 +67,7 @@ const SystemControl = () => {
     // Step 2: Authorize Text
     if (verifyStep === 2) {
       if (verifyText.toUpperCase() !== 'DELETE') {
-        alert(isID ? 'Teks verifikasi tidak sesuai. Silakan ketik DELETE.' : 'Verification text mismatch. Please type DELETE.');
+        toast(isID ? 'Teks verifikasi tidak sesuai. Silakan ketik DELETE.' : 'Verification text mismatch. Please type DELETE.');
         return;
       }
 
@@ -98,13 +85,13 @@ const SystemControl = () => {
       try {
         const config = await getSystemConfig();
         if (!config || otpInput !== config.otpKey) {
-          alert(isID ? 'Kunci Otorisasi Salah. Silakan periksa papan OTP di atas.' : 'Invalid Authorization Key. Please check the OTP board above.');
+          toast.error(isID ? 'Kunci Otorisasi Salah. Silakan periksa papan OTP di atas.' : 'Invalid Authorization Key. Please check the OTP board above.');
           return;
         }
         executeDeletion();
       } catch (err) {
         console.error("Verification failed:", err);
-        alert(isID ? "Kesalahan sistem selama verifikasi. Silakan coba lagi." : "System error during verification. Please try again.");
+        toast.error(isID ? "Kesalahan sistem selama verifikasi. Silakan coba lagi." : "System error during verification. Please try again.");
       }
     }
   };
@@ -113,7 +100,7 @@ const SystemControl = () => {
     const { type, id } = confirmModal;
     if (type === 'all') {
       clearAllData().then(() => {
-        alert(isID ? 'Tindakan berhasil diotorisasi dan dijalankan. Sistem akan dimuat ulang.' : 'Action successfully authorized and executed. System will refresh.');
+        toast.success(isID ? 'Tindakan berhasil diotorisasi dan dijalankan. Sistem akan dimuat ulang.' : 'Action successfully authorized and executed. System will refresh.');
         window.location.reload();
       });
     } else {
@@ -121,7 +108,7 @@ const SystemControl = () => {
       else if (type === 'jo') deleteJO(id);
       else if (type === 'invoice') deleteInvoice(id);
 
-      alert(isID ? 'Tindakan berhasil diotorisasi dan dijalankan.' : 'Action successfully authorized and executed.');
+      toast.success(isID ? 'Tindakan berhasil diotorisasi dan dijalankan.' : 'Action successfully authorized and executed.');
     }
 
     closeConfirm();

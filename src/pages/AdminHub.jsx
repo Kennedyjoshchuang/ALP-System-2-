@@ -7,20 +7,7 @@ import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
 import toast from 'react-hot-toast';
 
-const alert = (message) => {
-  if (!message) return;
-  const msgLower = String(message).toLowerCase();
-  const successKeywords = ['berhasil', 'success', 'lunas', 'dispatched', 'sent', 'selesai', 'done', 'saved', 'updated', 'uploaded', 'terbitkan', 'issued', 'settled'];
-  const errorKeywords = ['gagal', 'failed', 'error', 'salah', 'incorrect', 'tidak ditemukan', 'not found', 'incomplete', 'tidak lengkap', 'invalid', 'masalah', 'kurang'];
-  
-  if (errorKeywords.some(keyword => msgLower.includes(keyword))) {
-    toast.error(message);
-  } else if (successKeywords.some(keyword => msgLower.includes(keyword))) {
-    toast.success(message);
-  } else {
-    toast(message);
-  }
-};
+;
 
 const AdminHub = () => {
   const context = useApp();
@@ -138,7 +125,7 @@ const AdminHub = () => {
     fileName = "Purchase_Order_Records";
 
     if (dataToExport.length === 0) {
-      alert(isID ? "Tidak ada data PO untuk di-export pada rentang tanggal ini." : "No PO data to export for this date range.");
+      toast(isID ? "Tidak ada data PO untuk di-export pada rentang tanggal ini." : "No PO data to export for this date range.");
       return;
     }
 
@@ -147,8 +134,8 @@ const AdminHub = () => {
 
   const buildPOPayload = () => {
     const jo = jobOrders.find(j => String(j.id) === String(poJoId));
-    if (!jo) { alert(isID ? 'Job Order tidak ditemukan.' : 'Job Order not found.'); return null; }
-    if (!poVendor) { alert(isID ? 'Vendor tidak ditemukan.' : 'Vendor not found.'); return null; }
+    if (!jo) { toast.error(isID ? 'Job Order tidak ditemukan.' : 'Job Order not found.'); return null; }
+    if (!poVendor) { toast.error(isID ? 'Vendor tidak ditemukan.' : 'Vendor not found.'); return null; }
 
     const items = poItems
       .filter(it => it.serviceIdx !== '')
@@ -163,7 +150,7 @@ const AdminHub = () => {
         };
       });
 
-    if (items.length === 0) { alert(isID ? 'Pilih minimal satu layanan vendor.' : 'Select at least one vendor service.'); return null; }
+    if (items.length === 0) { toast(isID ? 'Pilih minimal satu layanan vendor.' : 'Select at least one vendor service.'); return null; }
 
     return {
       joId: jo.id,
@@ -227,7 +214,7 @@ const AdminHub = () => {
       resetPOForm();
     } catch (err) {
       console.error('Error saving draft PO:', err);
-      alert((isID ? 'Gagal menyimpan draft: ' : 'Failed to save draft: ') + err.message);
+      toast.error((isID ? 'Gagal menyimpan draft: ' : 'Failed to save draft: ') + err.message);
     }
   };
 
@@ -254,7 +241,7 @@ const AdminHub = () => {
       }
     } catch (err) {
       console.error('Error issuing PO directly:', err);
-      alert((isID ? 'Gagal menerbitkan Purchase Order: ' : 'Failed to issue Purchase Order: ') + err.message);
+      toast.error((isID ? 'Gagal menerbitkan Purchase Order: ' : 'Failed to issue Purchase Order: ') + err.message);
     }
   };
 
@@ -269,7 +256,7 @@ const AdminHub = () => {
     if (hasItems) {
       const selectedIndexes = Object.keys(selectedActivities).filter(idx => selectedActivities[idx]?.selected);
       if (selectedIndexes.length === 0) {
-        alert(isID ? 'Pilih setidaknya satu aktivitas!' : 'Select at least one activity!');
+        toast(isID ? 'Pilih setidaknya satu aktivitas!' : 'Select at least one activity!');
         return;
       }
 
@@ -319,7 +306,7 @@ const AdminHub = () => {
     const jo = jobOrders.find(j => j.id === joId);
     const qty = quantities[joId] || jo.quantity || 1;
     await dispatchJO(joId, parseInt(qty));
-    alert(isID ? 'Job Order berhasil dikirim ke Pelaksana!' : 'Job Order dispatched to Executor!');
+    toast.success(isID ? 'Job Order berhasil dikirim ke Pelaksana!' : 'Job Order dispatched to Executor!');
   };
 
   const handleDispatchAll = async (group) => {
@@ -339,7 +326,7 @@ const AdminHub = () => {
         const qty = quantities[jo.id] || jo.quantity || 1;
         await dispatchJO(jo.id, parseInt(qty));
       }
-      alert(isID ? 'Semua Job Order berhasil dikirim ke Pelaksana!' : 'All Job Orders dispatched to Executor!');
+      toast.success(isID ? 'Semua Job Order berhasil dikirim ke Pelaksana!' : 'All Job Orders dispatched to Executor!');
     }
   };
 

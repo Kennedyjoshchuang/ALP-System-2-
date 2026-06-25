@@ -7,20 +7,7 @@ import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
 import toast from 'react-hot-toast';
 
-const alert = (message) => {
-  if (!message) return;
-  const msgLower = String(message).toLowerCase();
-  const successKeywords = ['berhasil', 'success', 'lunas', 'dispatched', 'sent', 'selesai', 'done', 'saved', 'updated', 'uploaded', 'terbitkan', 'issued', 'settled'];
-  const errorKeywords = ['gagal', 'failed', 'error', 'salah', 'incorrect', 'tidak ditemukan', 'not found', 'incomplete', 'tidak lengkap', 'invalid', 'masalah', 'kurang'];
-  
-  if (errorKeywords.some(keyword => msgLower.includes(keyword))) {
-    toast.error(message);
-  } else if (successKeywords.some(keyword => msgLower.includes(keyword))) {
-    toast.success(message);
-  } else {
-    toast(message);
-  }
-};
+;
 
 const toDatetimeLocal = (isoString) => {
   if (!isoString) return '';
@@ -170,7 +157,7 @@ const Executor = () => {
     }));
 
     if (dataToExport.length === 0) {
-      alert(isID ? "Tidak ada data operasional untuk di-export pada rentang tanggal ini." : "No operational data to export for this date range.");
+      toast(isID ? "Tidak ada data operasional untuk di-export pada rentang tanggal ini." : "No operational data to export for this date range.");
       return;
     }
 
@@ -275,7 +262,7 @@ const Executor = () => {
       await updateJOStatus(uploadingForId, { photos: [...currentPhotos, ...newPhotoUrls] });
     } catch (err) {
       console.error("Photo upload error:", err);
-      alert(isID ? "Gagal mengunggah foto. Pastikan ukuran file tidak terlalu besar." : "Failed to upload photo. Make sure the file size is not too large.");
+      toast.error(isID ? "Gagal mengunggah foto. Pastikan ukuran file tidak terlalu besar." : "Failed to upload photo. Make sure the file size is not too large.");
     } finally {
       // Reset input value to allow re-uploading same files if needed
       e.target.value = '';
@@ -310,14 +297,14 @@ const Executor = () => {
     const hasDriver = Array.isArray(data.driverName) ? data.driverName.some(d => d && d.trim()) : (data.driverName && data.driverName.trim());
 
     if (!hasContainer || !hasVehicle || !hasDriver || !data.activityStatus) {
-      alert(isID ? 'Semua data wajib diisi: Container, Vehicle, Driver, dan Activity Status!' : 'All fields are required: Container, Vehicle, Driver, and Activity Status!');
+      toast.error(isID ? 'Semua data wajib diisi: Container, Vehicle, Driver, dan Activity Status!' : 'All fields are required: Container, Vehicle, Driver, and Activity Status!');
       return;
     }
 
     // Sync to server before completing
     await updateJOStatus(jo.id, data);
     await completeJO(jo.id);
-    alert(isID ? `Job ${jo.id} selesai dan dipindahkan ke Records!` : `Job ${jo.id} completed and moved to Records!`);
+    toast.success(isID ? `Job ${jo.id} selesai dan dipindahkan ke Records!` : `Job ${jo.id} completed and moved to Records!`);
     setUploadingForId(null);
   };
 
@@ -339,10 +326,10 @@ const Executor = () => {
 
     try {
       await updateJOStatus(jo.id, data);
-      alert(isID ? 'Perubahan berhasil disimpan!' : 'Changes saved successfully!');
+      toast.error(isID ? 'Perubahan berhasil disimpan!' : 'Changes saved successfully!');
     } catch (err) {
       console.error(err);
-      alert(isID ? 'Gagal menyimpan perubahan.' : 'Failed to save changes.');
+      toast.error(isID ? 'Gagal menyimpan perubahan.' : 'Failed to save changes.');
     }
   };
 
