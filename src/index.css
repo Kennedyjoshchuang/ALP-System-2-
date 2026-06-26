@@ -657,3 +657,61 @@ textarea:focus-visible {
   outline: 3px solid var(--secondary) !important;
   outline-offset: 2px !important;
 }
+
+/* Responsive Costs Modal Layout */
+.cost-input-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1.5fr 80px 1.2fr 36px;
+  gap: 10px;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .cost-input-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed var(--glass-border);
+  }
+  .cost-input-grid > *:nth-child(1) { grid-column: span 2; } /* Vendor select */
+  .cost-input-grid > *:nth-child(2) { grid-column: span 2; } /* Service select */
+  .cost-input-grid > *:nth-child(3) { grid-column: span 1; } /* Qty */
+  .cost-input-grid > *:nth-child(4) { grid-column: span 1; } /* Price display */
+  .cost-input-grid > *:nth-child(5) { grid-column: span 2; width: 100%; } /* Delete button */
+}
+
+.custom-fields-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--glass-border);
+  border-radius: 8px;
+}
+
+.custom-fields-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--glass-border);
+  border-radius: 8px;
+}
+
+@media (max-width: 600px) {
+  .custom-fields-grid-3,
+  .custom-fields-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.word-wrap-cell {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+

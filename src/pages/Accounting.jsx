@@ -2378,6 +2378,7 @@ const Accounting = () => {
 
 
       {/* JO Costing Modal */}
+{/* JO Costing Modal */}
       {costModal && (
         <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px' }}>
           <div className="glass-card" style={{ width:'100%',maxWidth:'700px',padding:'35px',maxHeight:'90vh',overflowY:'auto',position:'relative' }}>
@@ -2389,13 +2390,13 @@ const Accounting = () => {
             {Array.isArray(costModal.costs) && costModal.costs.length > 0 && (
               <div style={{ marginBottom:'25px' }}>
                 <div style={{ fontSize:'0.75rem',color:'var(--secondary)',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'10px' }}>{isID ? 'Biaya Tercatat' : 'Recorded Costs'}</div>
-                <div className="table-container"><div className="table-container"><table style={{ width:'100%',borderCollapse:'collapse',fontSize:'0.875rem' }}>
+                <div className="table-container"><table style={{ width:'100%',borderCollapse:'collapse',fontSize:'0.875rem' }}>
                   <thead><tr style={{ borderBottom:'1px solid var(--glass-border)',color:'var(--text-muted)' }}><th style={{padding:'8px',textAlign:'left'}}>{isID ? 'Vendor' : 'Vendor'}</th><th style={{padding:'8px',textAlign:'left'}}>{isID ? 'Layanan' : 'Service'}</th><th style={{padding:'8px',textAlign:'center'}}>Qty</th><th style={{padding:'8px',textAlign:'right'}}>Total</th><th style={{padding:'8px'}}></th></tr></thead>
                   <tbody>
                     {costModal.costs.map((c, ci) => (
                       <tr key={ci} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                        <td style={{padding:'8px',color:'var(--text-muted)'}}>{c.vendorName}</td>
-                        <td style={{padding:'8px'}}>{c.serviceDescription}</td>
+                        <td className="word-wrap-cell" style={{padding:'8px',color:'var(--text-muted)'}}>{c.vendorName}</td>
+                        <td className="word-wrap-cell" style={{padding:'8px'}}>{c.serviceDescription}</td>
                         <td style={{padding:'8px',textAlign:'center'}}>{c.qty}</td>
                         <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color:'var(--secondary)'}}>Rp {(c.total||0).toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
                         <td style={{padding:'8px'}}><button className="btn btn-sm btn-danger" onClick={() => handleDeleteCost(costModal, ci)}>{isID ? 'Hapus' : 'Delete'}</button></td>
@@ -2407,7 +2408,7 @@ const Accounting = () => {
                       <td></td>
                     </tr>
                   </tbody>
-                </table></div></div>
+                </table></div>
               </div>
             )}
 
@@ -2421,8 +2422,8 @@ const Accounting = () => {
                 const lineTotal = unitPrice * parseFloat(line.qty || 1);
                 return (
                   <div key={i} style={{ padding:'12px', background:'rgba(255,255,255,0.02)', border:'1px solid var(--glass-border)', borderRadius:'10px', marginBottom:'12px' }}>
-                    <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr 80px 1fr 36px',gap:'10px',alignItems:'center' }}>
-                       <select value={line.vendorId} onChange={e=>updateCostLine(i,'vendorId',e.target.value)} style={{ padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--secondary)',fontWeight:'600',fontSize:'0.85rem' }}>
+                    <div className="cost-input-grid">
+                       <select value={line.vendorId} onChange={e=>updateCostLine(i,'vendorId',e.target.value)} style={{ padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--secondary)',fontWeight:'600',fontSize:'0.85rem',width:'100%' }}>
                         <option value="" style={{color:'var(--text-muted)', background:'var(--bg)'}}>-- {isID ? 'Pilih Vendor' : 'Select Vendor'} --</option>
                         {vendorList.map(v=><option key={v.id} value={v.id} style={{color:'var(--text)', background:'var(--bg)'}}>{v.name}</option>)}
                         <option value="custom" style={{color:'var(--secondary)', background:'var(--bg)', fontWeight:'bold'}}>-- {isID ? 'Custom Vendor (Manual)' : 'Custom Vendor (Manual)'} --</option>
@@ -2432,27 +2433,34 @@ const Accounting = () => {
                         value={line.serviceIdx} 
                         onChange={e=>updateCostLine(i,'serviceIdx',e.target.value)} 
                         disabled={!line.vendorId || line.vendorId === 'custom'} 
-                        style={{ padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--secondary)',fontWeight:'600',fontSize:'0.85rem' }}
+                        style={{ padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--secondary)',fontWeight:'600',fontSize:'0.85rem',width:'100%' }}
                       >
                         <option value="" style={{color:'var(--text-muted)', background:'var(--bg)'}}>-- {isID ? 'Pilih Layanan' : 'Select Service'} --</option>
-                        {line.vendorId !== 'custom' && (selVendor?.services||[]).map((s,si)=><option key={si} value={si} style={{color:'var(--text)', background:'var(--bg)'}}>{s.description}</option>)}
+                        {line.vendorId !== 'custom' && (selVendor?.services||[]).map((s,si)=>{
+                          const optionTotal = parseFloat(s.price || 0) * parseFloat(line.qty || 1);
+                          return (
+                            <option key={si} value={si} style={{color:'var(--text)', background:'var(--bg)'}}>
+                              {s.description} (Rp {optionTotal.toLocaleString(isID ? 'id-ID' : 'en-US')})
+                            </option>
+                          );
+                        })}
                         {line.vendorId && line.vendorId !== 'custom' && (
                           <option value="custom" style={{color:'var(--secondary)', background:'var(--bg)', fontWeight:'bold'}}>-- {isID ? 'Custom Layanan (Manual)' : 'Custom Service (Manual)'} --</option>
                         )}
                       </select>
 
-                      <input type="number" min="1" value={line.qty} onChange={e=>updateCostLine(i,'qty',e.target.value)} placeholder="Qty" style={{ padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--text)',fontSize:'0.85rem',textAlign:'center' }}/>
+                      <input type="number" min="1" value={line.qty} onChange={e=>updateCostLine(i,'qty',e.target.value)} placeholder="Qty" style={{ padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--text)',fontSize:'0.85rem',textAlign:'center',width:'100%' }}/>
                       
-                      <div style={{ fontSize:'0.85rem',color:'var(--secondary)',fontWeight:'600',padding:'9px',background:'rgba(255,255,255,0.03)',borderRadius:'8px',border:'1px solid var(--glass-border)' }}>
+                      <div style={{ fontSize:'0.85rem',color:'var(--secondary)',fontWeight:'600',padding:'9px',background:'rgba(255,255,255,0.03)',borderRadius:'8px',border:'1px solid var(--glass-border)',width:'100%',boxSizing:'border-box',textAlign:'center' }}>
                         Rp {lineTotal.toLocaleString(isID ? 'id-ID' : 'en-US')}
                       </div>
                       
-                      <button onClick={()=>removeCostLine(i)} disabled={costLines.length===1} style={{ background:'var(--danger-bg)',color:'var(--danger)',border:'none',borderRadius:'8px',height:'36px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}><X size={14}/></button>
+                      <button onClick={()=>removeCostLine(i)} disabled={costLines.length===1} style={{ background:'var(--danger-bg)',color:'var(--danger)',border:'none',borderRadius:'8px',height:'36px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',width:'100%' }}><X size={14}/></button>
                     </div>
 
                     {/* Custom Fields Sub-row */}
                     {(line.vendorId === 'custom' || line.serviceIdx === 'custom') && (
-                      <div style={{ display:'grid', gridTemplateColumns: line.vendorId === 'custom' ? '1fr 1fr 1fr' : '1fr 1fr', gap:'10px', marginTop:'10px', padding:'10px', background:'rgba(255,255,255,0.02)', border:'1px dashed var(--glass-border)', borderRadius:'8px' }}>
+                      <div className={line.vendorId === 'custom' ? "custom-fields-grid-3" : "custom-fields-grid-2"}>
                         {line.vendorId === 'custom' && (
                           <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
                             <span style={{ fontSize:'0.65rem', color:'var(--text-muted)', fontWeight:'600', textTransform:'uppercase' }}>{isID ? 'Nama Vendor Custom' : 'Custom Vendor Name'}</span>
