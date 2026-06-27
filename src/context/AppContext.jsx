@@ -518,11 +518,19 @@ export const AppProvider = ({ children }) => {
     console.log("Starting createCustomInvoice for customer:", invoiceData.customerName);
     const newInvoiceId = invoiceData.id || `INV-CUST-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
     
+    const consolidatedJOs = Array.isArray(invoiceData.consolidatedJOs) && invoiceData.consolidatedJOs.length > 0
+      ? invoiceData.consolidatedJOs
+      : invoiceData.joId ? [invoiceData.joId] : [];
+
     const newInvoice = {
       id: newInvoiceId,
       joId: invoiceData.joId || null,
-      consolidatedJOs: invoiceData.joId ? [invoiceData.joId] : [],
+      consolidatedJOs,
       customerName: invoiceData.customerName || 'Pelanggan',
+      customerAddress: invoiceData.customerAddress || '',
+      customerPic: invoiceData.customerPic || '',
+      customerPhone: invoiceData.customerPhone || '',
+      customerEmail: invoiceData.customerEmail || '',
       amount: cleanNumber(invoiceData.amount),
       subtotal: cleanNumber(invoiceData.subtotal || invoiceData.amount),
       tax: cleanNumber(invoiceData.tax || 0),
@@ -545,9 +553,10 @@ export const AppProvider = ({ children }) => {
       setInvoices(prev => [...prev, finalInvoice]);
       setReceivables(prev => [...prev, { ...finalInvoice, balance: finalInvoice.amount }]);
       
-      if (newInvoice.joId) {
-        setJobOrders(prev => prev.map(j => 
-          j.id === newInvoice.joId ? { ...j, status: 'invoiced' } : j
+      // Mark ALL consolidated JOs as invoiced
+      if (consolidatedJOs.length > 0) {
+        setJobOrders(prev => prev.map(j =>
+          consolidatedJOs.includes(j.id) ? { ...j, status: 'invoiced' } : j
         ));
       }
       

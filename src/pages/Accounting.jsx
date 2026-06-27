@@ -162,6 +162,10 @@ const Accounting = () => {
   const [issuingInvoiceJoId, setIssuingInvoiceJoId] = useState(null);
   const [selectedBankId, setSelectedBankId] = useState('');
   const [expandedCompletedGroups, setExpandedCompletedGroups] = useState({});
+
+  // Invoice Confirmation Modal
+  const [invoiceConfirmData, setInvoiceConfirmData] = useState(null);
+  // Shape: { joId, bankAccount, consolidatedJOIds, linkedJOs, form: { id, customerName, customerAddress, customerPic, customerPhone, customerEmail, date, items, extraCharges, taxPercent, bankAccountId } }
   const [receivableProofModal, setReceivableProofModal] = useState(null); // invoice to upload proof for
   const [settleModal, setSettleModal] = useState(null); // { id, amount, ... }
   const [settleForm, setSettleForm] = useState({ paymentProof: [], taxes: [{ name: '', amount: 0 }], taxProof: [] });
@@ -992,46 +996,149 @@ const Accounting = () => {
         return;
       }
 
-      console.log("Issuing invoice for JO:", joId, "with bank:", bankAccount.bankName);
-      const newInv = await createInvoice(joId);
-      
-      if (!newInv) {
-        throw new Error("Gagal menerbitkan invoice. Pastikan data Job Order & Quotation tersedia.");
+      // Build preview data for the confirmation modal (mirrors createInvoice logic)
+      const linkedJO = jobOrders.find(j => String(j.id) === String(joId));
+      if (!linkedJO) {
+        toast.error('Job Order tidak ditemukan.');
+        return;
       }
 
-      // Find linked JO and Quotation for draft print
-      const linkedJO = jobOrders.find(j => String(j.id) === String(joId));
-      const linkedQuo = linkedJO
+      const linkedQuo = linkedJO.quotationId
         ? quotations.find(q => String(q.id) === String(linkedJO.quotationId))
         : null;
 
-      // Find all consolidated JOs
-      const consolidatedJOs = newInv.consolidatedJOs 
-        ? jobOrders.filter(j => newInv.consolidatedJOs.includes(j.id))
-        : linkedJO ? [linkedJO] : [];
+      // Collect all consolidated JOs (same quotation + customerName + done status)
+      let targetJOs = [linkedJO];
+      if (linkedJO.quotationId) {
+        targetJOs = jobOrders.filter(j =>
+          String(j.quotationId) === String(linkedJO.quotationId) &&
+          (j.status === 'done' || String(j.id) === String(joId)) &&
+          j.customerName === linkedJO.customerName
+        );
+      }
 
-      // Store data for the print page
+      // Build line items from quotation items matched to each JO description
+      const cleanNum = (val) => {
+        if (typeof val === 'number') return isNaN(val) ? 0 : val;
+        if (!val) return 0;
+        if (/^\d+(\.\d+)?$/.test(String(val))) return parseFloat(val);
+        let str = String(val).replace(/[^\d.,-]/g, '');
+        if (str.includes(',') && str.includes('.')) str = str.replace(/\./g, '').replace(/,/g, '.');
+        else if (str.includes(',')) str = str.replace(/,/g, '.');
+        const parsed = parseFloat(str);
+        return isNaN(parsed) ? 0 : parsed;
+      };
+
+      const items = targetJOs.map(targetJo => {
+        let quoItems = [];
+        const quo = targetJo.quotationId
+          ? quotations.find(q => String(q.id) === String(targetJo.quotationId))
+          : null;
+        if (quo && quo.items) {
+          try { quoItems = typeof quo.items === 'string' ? JSON.parse(quo.items) : quo.items; } catch(e) { quoItems = []; }
+        }
+        if (!Array.isArray(quoItems)) quoItems = [];
+        const targetDesc = (targetJo.instruction || targetJo.jobDescription || '').trim().toLowerCase();
+        const matchedItem = quoItems.find(i => (i.description || '').trim().toLowerCase() === targetDesc);
+        const rate = matchedItem ? cleanNum(matchedItem.rate) : cleanNum(targetJo.rate);
+        const qty = cleanNum(targetJo.issueQuantity || targetJo.quantity || 1);
+        return {
+          description: targetJo.instruction || targetJo.jobDescription || 'Freight & Logistics Services',
+          qty,
+          rate,
+        };
+      });
+
+      const newInvoiceId = `INV-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+
+      setInvoiceConfirmData({
+        joId,
+        bankAccount,
+        consolidatedJOIds: targetJOs.map(j => j.id),
+        linkedJOs: targetJOs,
+        form: {
+          id: newInvoiceId,
+          customerName: linkedJO.customerName || '',
+          customerAddress: linkedQuo?.companyAddress || linkedJO?.address || '',
+          customerPic: linkedQuo?.pic || '',
+          customerPhone: linkedQuo?.phone || '',
+          customerEmail: linkedQuo?.email || '',
+          date: new Date().toISOString().substring(0, 10),
+          items,
+          extraCharges: [],
+          taxPercent: 0,
+          bankAccountId: bankAccount.id,
+        },
+      });
+
+    } catch (err) {
+      console.error('Issue Invoice error:', err);
+      toast.error('Error saat menerbitkan invoice: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  const handleConfirmAndIssueInvoice = async () => {
+    if (!invoiceConfirmData) return;
+    const { joId, consolidatedJOIds, linkedJOs } = invoiceConfirmData;
+    const f = invoiceConfirmData.form;
+    try {
+      const bank = companyBankAccounts.find(b => b.id === f.bankAccountId) || invoiceConfirmData.bankAccount;
+
+      // Calculate totals from form
+      const allLines = [...(f.items || []), ...(f.extraCharges || [])];
+      let subtotal = 0;
+      const extra_charges = allLines.map(line => {
+        const qty = parseFloat(line.qty) || 1;
+        const rate = parseFloat(line.rate) || 0;
+        const amount = qty * rate;
+        subtotal += amount;
+        return { description: line.description, qty, rate, amount };
+      });
+      const tax = subtotal * ((parseFloat(f.taxPercent) || 0) / 100);
+      const grandTotal = subtotal + tax;
+
+      const invoiceData = {
+        id: f.id.trim() || undefined,
+        joId,
+        consolidatedJOs: consolidatedJOIds,
+        customerName: f.customerName,
+        customerAddress: f.customerAddress,
+        customerPic: f.customerPic,
+        customerPhone: f.customerPhone,
+        customerEmail: f.customerEmail,
+        date: f.date,
+        amount: grandTotal,
+        subtotal,
+        tax,
+        extra_charges,
+      };
+
+      const newInv = await createCustomInvoice(invoiceData);
+      if (!newInv) throw new Error('Gagal menerbitkan invoice.');
+
+      // Build print data
+      const linkedJO = jobOrders.find(j => String(j.id) === String(joId));
+      const linkedQuo = linkedJO?.quotationId
+        ? quotations.find(q => String(q.id) === String(linkedJO.quotationId))
+        : null;
       const printData = {
         invoice: newInv,
         jo: linkedJO || null,
-        consolidatedJOs: consolidatedJOs,
+        consolidatedJOs: linkedJOs || [],
         quotation: linkedQuo || null,
-        bankAccount: bankAccount // Pass selected bank
+        bankAccount: bank,
       };
-      
       localStorage.setItem('print_invoice_data', JSON.stringify(printData));
 
-      // Update UI state
       setActiveTab('billing');
       setIsIssuedCollapsed(false);
-      setIssuingInvoiceJoId(null); // Reset modal
-      
-      // Open print page in a new tab
+      setInvoiceConfirmData(null);
+      setIssuingInvoiceJoId(null);
       window.open('/print/invoice', '_blank');
-      
+
     } catch (err) {
-      console.error("Issue Invoice error:", err);
-      toast.error("Error saat menerbitkan invoice: " + (err.message || "Unknown error"));
+      console.error('Confirm Issue Invoice error:', err);
+      toast.error('Error: ' + (err.message || 'Gagal menerbitkan invoice.'));
     }
   };
 
@@ -6195,6 +6302,216 @@ const Accounting = () => {
           </div>
         </div>
       )}
+
+      {/* Invoice Confirmation & Edit Modal */}
+      {invoiceConfirmData && (() => {
+        const f = invoiceConfirmData.form;
+        const setF = (patch) => setInvoiceConfirmData(prev => ({ ...prev, form: { ...prev.form, ...patch } }));
+
+        const updateItem = (idx, field, val) => {
+          const next = [...f.items];
+          next[idx] = { ...next[idx], [field]: val };
+          setF({ items: next });
+        };
+        const addItem = () => setF({ items: [...f.items, { description: '', qty: 1, rate: 0 }] });
+        const removeItem = (idx) => setF({ items: f.items.filter((_, i) => i !== idx) });
+
+        const updateExtra = (idx, field, val) => {
+          const next = [...f.extraCharges];
+          next[idx] = { ...next[idx], [field]: val };
+          setF({ extraCharges: next });
+        };
+        const addExtra = () => setF({ extraCharges: [...f.extraCharges, { description: '', qty: 1, rate: 0 }] });
+        const removeExtra = (idx) => setF({ extraCharges: f.extraCharges.filter((_, i) => i !== idx) });
+
+        const subtotal = [...f.items, ...f.extraCharges].reduce((s, l) => s + (parseFloat(l.qty) || 1) * (parseFloat(l.rate) || 0), 0);
+        const taxAmt = subtotal * ((parseFloat(f.taxPercent) || 0) / 100);
+        const grandTotal = subtotal + taxAmt;
+
+        const fmtRp = (n) => `Rp ${Math.round(n).toLocaleString('id-ID')}`;
+
+        const inputStyle = { width: '100%', padding: '8px 11px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.88rem' };
+        const labelStyle = { fontSize: '0.7rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '5px', display: 'block' };
+
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 10002, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '20px', overflowY: 'auto' }}>
+            <div className="glass-card" style={{ width: '100%', maxWidth: '780px', padding: '32px', marginTop: '10px', marginBottom: '30px' }}>
+
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '18px' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '900', color: 'var(--secondary)' }}>🧾 {isID ? 'Konfirmasi & Edit Invoice' : 'Confirm & Edit Invoice'}</h3>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    {isID ? 'Periksa dan edit semua data sebelum invoice diterbitkan.' : 'Review and edit all data before the invoice is issued.'}
+                  </p>
+                </div>
+                <button onClick={() => setInvoiceConfirmData(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}>
+                  <X size={22} />
+                </button>
+              </div>
+
+              {/* Row 1: Invoice ID + Date */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                <div>
+                  <label style={labelStyle}>{isID ? 'No. Invoice' : 'Invoice No.'}</label>
+                  <input style={inputStyle} value={f.id} onChange={e => setF({ id: e.target.value })} placeholder="INV-..." />
+                </div>
+                <div>
+                  <label style={labelStyle}>{isID ? 'Tanggal Invoice' : 'Invoice Date'}</label>
+                  <input type="date" style={inputStyle} value={f.date} onChange={e => setF({ date: e.target.value })} />
+                </div>
+              </div>
+
+              {/* Customer Info Section */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', borderRadius: '10px', padding: '18px', marginBottom: '20px' }}>
+                <p style={{ ...labelStyle, fontSize: '0.72rem', color: 'var(--secondary)', marginBottom: '14px' }}>📋 {isID ? 'Info Pelanggan' : 'Customer Info'}</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={labelStyle}>{isID ? 'Nama Customer' : 'Customer Name'}</label>
+                    <input style={inputStyle} value={f.customerName} onChange={e => setF({ customerName: e.target.value })} placeholder="PT. ..." />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={labelStyle}>{isID ? 'Alamat' : 'Address'}</label>
+                    <textarea
+                      rows={2}
+                      style={{ ...inputStyle, resize: 'vertical' }}
+                      value={f.customerAddress}
+                      onChange={e => setF({ customerAddress: e.target.value })}
+                      placeholder={isID ? 'Alamat perusahaan customer...' : 'Customer company address...'}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Attn. / PIC</label>
+                    <input style={inputStyle} value={f.customerPic} onChange={e => setF({ customerPic: e.target.value })} placeholder="Nama PIC..." />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>{isID ? 'Telepon' : 'Phone'}</label>
+                    <input style={inputStyle} value={f.customerPhone} onChange={e => setF({ customerPhone: e.target.value })} placeholder="+62..." />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={labelStyle}>Email</label>
+                    <input type="email" style={inputStyle} value={f.customerEmail} onChange={e => setF({ customerEmail: e.target.value })} placeholder="finance@..." />
+                  </div>
+                </div>
+                {/* JO Ref display */}
+                <div style={{ marginTop: '12px', padding: '8px 12px', background: 'var(--secondary-bg)', borderRadius: '6px', fontSize: '0.78rem', color: 'var(--secondary)', fontWeight: '700' }}>
+                  JO Ref: {invoiceConfirmData.consolidatedJOIds.join(', ')}
+                </div>
+              </div>
+
+              {/* Line Items */}
+              <div style={{ marginBottom: '16px' }}>
+                <p style={{ ...labelStyle, fontSize: '0.72rem', color: 'var(--text)', marginBottom: '10px' }}>📦 {isID ? 'Item Layanan' : 'Service Items'}</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 140px 32px', gap: '6px', marginBottom: '6px' }}>
+                  {['Deskripsi', 'Qty', 'Harga Satuan', ''].map((h, i) => (
+                    <span key={i} style={{ fontSize: '0.65rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</span>
+                  ))}
+                </div>
+                {f.items.map((item, idx) => (
+                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 140px 32px', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
+                    <input style={inputStyle} value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)} placeholder="Deskripsi layanan..." />
+                    <input type="number" style={{ ...inputStyle, textAlign: 'center' }} value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)} min="1" />
+                    <input type="number" style={{ ...inputStyle, textAlign: 'right' }} value={item.rate} onChange={e => updateItem(idx, 'rate', e.target.value)} min="0" />
+                    <button onClick={() => removeItem(idx)} disabled={f.items.length === 1} style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: '6px', color: 'var(--danger)', cursor: f.items.length === 1 ? 'not-allowed' : 'pointer', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: f.items.length === 1 ? 0.4 : 1 }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+                <button onClick={addItem} style={{ marginTop: '4px', background: 'none', border: '1px dashed var(--border)', borderRadius: '8px', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Plus size={14} /> {isID ? 'Tambah Item' : 'Add Item'}
+                </button>
+              </div>
+
+              {/* Extra Charges */}
+              <div style={{ marginBottom: '20px' }}>
+                <p style={{ ...labelStyle, fontSize: '0.72rem', color: 'var(--text)', marginBottom: '10px' }}>➕ {isID ? 'Biaya Tambahan' : 'Extra Charges'}</p>
+                {f.extraCharges.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 140px 32px', gap: '6px', marginBottom: '6px' }}>
+                    {['Deskripsi', 'Qty', 'Harga Satuan', ''].map((h, i) => (
+                      <span key={i} style={{ fontSize: '0.65rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</span>
+                    ))}
+                  </div>
+                )}
+                {f.extraCharges.map((ec, idx) => (
+                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 140px 32px', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
+                    <input style={inputStyle} value={ec.description} onChange={e => updateExtra(idx, 'description', e.target.value)} placeholder="Biaya tambahan..." />
+                    <input type="number" style={{ ...inputStyle, textAlign: 'center' }} value={ec.qty} onChange={e => updateExtra(idx, 'qty', e.target.value)} min="1" />
+                    <input type="number" style={{ ...inputStyle, textAlign: 'right' }} value={ec.rate} onChange={e => updateExtra(idx, 'rate', e.target.value)} min="0" />
+                    <button onClick={() => removeExtra(idx)} style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: '6px', color: 'var(--danger)', cursor: 'pointer', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+                <button onClick={addExtra} style={{ marginTop: '4px', background: 'none', border: '1px dashed var(--border)', borderRadius: '8px', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Plus size={14} /> {isID ? 'Tambah Biaya Tambahan' : 'Add Extra Charge'}
+                </button>
+              </div>
+
+              {/* Totals + Tax + Bank */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+                {/* Tax */}
+                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', borderRadius: '10px', padding: '16px' }}>
+                  <label style={labelStyle}>{isID ? 'Pajak (%)' : 'Tax (%)'}</label>
+                  <input type="number" style={{ ...inputStyle, width: '100px' }} value={f.taxPercent} onChange={e => setF({ taxPercent: e.target.value })} min="0" max="100" step="0.1" />
+                  <div style={{ marginTop: '12px' }}>
+                    <label style={labelStyle}>{isID ? 'Rekening Bank' : 'Bank Account'}</label>
+                    <select
+                      value={f.bankAccountId}
+                      onChange={e => setF({ bankAccountId: e.target.value })}
+                      style={{ ...inputStyle }}
+                    >
+                      {companyBankAccounts.map(b => (
+                        <option key={b.id} value={b.id} style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+                          {b.bankName} — {b.accountNumber}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Summary */}
+                <div style={{ background: 'var(--secondary-bg)', border: '1px solid var(--secondary)', borderRadius: '10px', padding: '16px' }}>
+                  <p style={{ ...labelStyle, color: 'var(--secondary)', marginBottom: '12px' }}>{isID ? 'Ringkasan' : 'Summary'}</p>
+                  {[
+                    [isID ? 'Subtotal' : 'Subtotal', fmtRp(subtotal)],
+                    [`Pajak (${parseFloat(f.taxPercent) || 0}%)`, fmtRp(taxAmt)],
+                  ].map(([l, v]) => (
+                    <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                      <span>{l}:</span><span style={{ fontWeight: '700' }}>{v}</span>
+                    </div>
+                  ))}
+                  <div style={{ borderTop: '1px solid var(--secondary)', marginTop: '10px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: '900', fontSize: '0.9rem', color: 'var(--secondary)' }}>TOTAL:</span>
+                    <span style={{ fontWeight: '900', fontSize: '1.2rem', color: 'var(--secondary)' }}>{fmtRp(grandTotal)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', borderTop: '1px solid var(--glass-border)', paddingTop: '20px' }}>
+                <button
+                  onClick={() => {
+                    setInvoiceConfirmData(null);
+                    setIssuingInvoiceJoId(invoiceConfirmData.joId);
+                  }}
+                  className="btn"
+                  style={{ padding: '11px 22px', background: 'rgba(255,255,255,0.05)', color: 'var(--text)', fontWeight: '700' }}
+                >
+                  ← {isID ? 'Kembali' : 'Back'}
+                </button>
+                <ButtonWithLoading
+                  className="btn btn-gold"
+                  style={{ padding: '11px 28px', fontWeight: '900', fontSize: '0.95rem' }}
+                  onClick={handleConfirmAndIssueInvoice}
+                >
+                  ✓ {isID ? 'Konfirmasi & Terbitkan' : 'Confirm & Issue'}
+                </ButtonWithLoading>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Delete Invoice Verification Modal */}
       {deleteConfirmModal && (

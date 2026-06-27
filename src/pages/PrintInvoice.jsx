@@ -30,8 +30,11 @@ const PrintInvoice = () => {
 
   const grandTotal = parseFloat(invoice?.amount || invoice?.subtotal || 0);
 
-  // Address: prefer quotation companyAddress → fallback
-  const customerAddress = quotation?.companyAddress || jo?.address || 'Indonesia';
+  // Address: prefer invoice.customerAddress → quotation companyAddress → fallback
+  const customerAddress = invoice?.customerAddress || quotation?.companyAddress || jo?.address || '';
+  const customerPic = invoice?.customerPic || quotation?.pic || '';
+  const customerPhone = invoice?.customerPhone || quotation?.phone || '';
+  const customerEmail = invoice?.customerEmail || quotation?.email || '';
 
   const handleOpenAttachment = () => {
     window.open('/print/invoice-attachment', '_blank');
@@ -125,7 +128,10 @@ const PrintInvoice = () => {
           <div>
             <p style={{ margin: '0 0 6px 0', fontSize: '0.65rem', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1.5px' }}>DITAGIHKAN KEPADA:</p>
             <p style={{ margin: '0 0 4px 0', fontSize: '1.4rem', fontWeight: '900', color: '#1e293b', lineHeight: 1.1 }}>{invoice?.customerName}</p>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', fontWeight: '600' }}>{customerAddress}</p>
+            {customerAddress && <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#475569', fontWeight: '600' }}>{customerAddress}</p>}
+            {customerPic && <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: '600' }}>Attn: {customerPic}</p>}
+            {customerPhone && <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: '600' }}>Telp: {customerPhone}</p>}
+            {customerEmail && <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: '600' }}>Email: {customerEmail}</p>}
           </div>
           <div>
             <table style={{ marginLeft: 'auto', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
