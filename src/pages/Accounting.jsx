@@ -1640,8 +1640,8 @@ const Accounting = () => {
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontWeight: '900', fontSize: '1.4rem', color: '#0f172a' }}>PT. ALPHA LOGISTICS PRAKARSA</div>
                 <div style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: '600', marginTop: '5px' }}>
-                  Green Sedayu Bizpark DM 11 No. 51<br />
-                  Kalideres, Jakarta Barat<br />
+                  Ruko The Summer B1-2A, Jl. Centre Point,<br />
+                  Teluk Tering, Batam Kota, Batam<br />
                   Date: {printPO.date}
                 </div>
               </div>
@@ -1841,9 +1841,9 @@ const Accounting = () => {
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontWeight: '900', fontSize: '1.2rem', color: '#0f172a' }}>PT. ALPHA LOGISTICS PRAKARSA</div>
                       <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '5px' }}>
-                        Green Sedayu Bizpark DM 11 No. 51<br />
-                        Kalideres, Jakarta Barat<br />
-                        T: +62 21 5000 8000
+                        Ruko The Summer B1-2A, Jl. Centre Point,<br />
+                        Teluk Tering, Batam Kota, Batam<br />
+                        T: +62 813-6562-2272
                       </div>
                     </div>
                   </div>
@@ -1974,7 +1974,7 @@ const Accounting = () => {
                         <img src="/assets/logo.png" alt="Logo" style={{ width: '65px', height: '65px', objectFit: 'contain' }} />
                         <div>
                           <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', color: '#1e293b' }}>PT. ALPHA LOGISTICS PRAKARSA</h1>
-                          <p style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>Green Sedayu Bizpark DM 11 No. 51, Jakarta Barat</p>
+                          <p style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>Ruko The Summer B1-2A, Jl. Centre Point, Teluk Tering, Batam Kota, Batam</p>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
@@ -2156,7 +2156,7 @@ const Accounting = () => {
                         <img src="/assets/logo.png" alt="Logo" style={{ width: '65px', height: '65px', objectFit: 'contain' }} />
                         <div>
                           <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', color: '#1e293b' }}>PT. ALPHA LOGISTICS PRAKARSA</h1>
-                          <p style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>Green Sedayu Bizpark DM 11 No. 51, Jakarta Barat</p>
+                          <p style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>Ruko The Summer B1-2A, Jl. Centre Point, Teluk Tering, Batam Kota, Batam</p>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>

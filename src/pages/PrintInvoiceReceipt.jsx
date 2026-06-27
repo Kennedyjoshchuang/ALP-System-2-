@@ -131,7 +131,7 @@ const PrintInvoiceReceipt = () => {
             )}
           </div>
           <div style={{ textAlign: 'center', width: '200px' }}>
-            <p style={{ fontSize: '12px', marginBottom: '60px' }}>Jakarta, {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+            <p style={{ fontSize: '12px', marginBottom: '60px' }}>Batam, {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
             <div style={{ borderBottom: '1px solid #000', width: '100%' }}></div>
             <p style={{ fontSize: '12px', fontWeight: '700', marginTop: '5px' }}>CASHIER / FINANCE</p>
           </div>
@@ -168,7 +168,7 @@ const PrintInvoiceReceipt = () => {
             RP. {totalAmount.toLocaleString('id-ID')}
           </div>
           <div style={{ textAlign: 'center', width: '150px' }}>
-            <p style={{ fontSize: '10px', marginBottom: '40px' }}>Jakarta, {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+            <p style={{ fontSize: '10px', marginBottom: '40px' }}>Batam, {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
             <div style={{ borderBottom: '1px solid #000', width: '100%' }}></div>
           </div>
         </div>

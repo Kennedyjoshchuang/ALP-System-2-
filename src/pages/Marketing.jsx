@@ -1114,7 +1114,7 @@ const Marketing = () => {
                     <div>
                       <h4 style={{ margin: 0, fontWeight: '900', fontSize: '1.1rem', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>LOGISTICS & FREIGHT FORWARDING</h4>
                       <div className="text-slate" style={{ fontSize: '0.75rem', lineHeight: '1.4', marginTop: '5px', maxWidth: '300px', fontWeight: '500' }}>
-                        {selectedDraft.companyAddress || "Green Sedayu Bizpark DM 11 No. 51, Kalideres, Jakarta Barat"}
+                        {selectedDraft.companyAddress || "Ruko The Summer B1-2A, Jl. Centre Point, Teluk Tering, Batam Kota, Batam"}
                       </div>
                     </div>
                   </div>
@@ -1141,7 +1141,7 @@ const Marketing = () => {
                     <h5 className="text-slate" style={{ textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: '800', marginBottom: '18px', letterSpacing: '1.5px' }}>MARKETING PERSON</h5>
                     <h4 style={{ margin: '0 0 6px 0', fontSize: '1.8rem', fontWeight: '900', color: '#0f172a' }}>{selectedDraft.marketingName || 'PT. Alpha Logistics Prakarsa Team'}</h4>
                     <p className="text-slate" style={{ margin: 0, fontWeight: '700', fontSize: '1rem' }}>{selectedDraft.marketingEmail || 'marketing@alp.co.id'}</p>
-                    <p className="text-slate" style={{ margin: '4px 0 25px 0', fontWeight: '700', fontSize: '1rem' }}>+62 21 5000 8000</p>
+                    <p className="text-slate" style={{ margin: '4px 0 25px 0', fontWeight: '700', fontSize: '1rem' }}>+62 813-6562-2272</p>
                     <div style={{ borderTop: '1px solid #e2e8f0', display: 'inline-block', paddingTop: '12px' }}>
                       <span className="text-slate" style={{ textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: '800', letterSpacing: '1px', marginRight: '12px' }}>VALIDITY PERIOD:</span>
                       <span style={{ color: '#0f172a', fontWeight: '900', fontSize: '0.95rem' }}>{selectedDraft.validTo || '-'}</span>

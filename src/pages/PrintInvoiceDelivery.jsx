@@ -61,7 +61,7 @@ const PrintInvoiceDelivery = () => {
             <img src="/assets/logo.png" alt="Logo" style={{ width: '60px', height: '60px', objectFit: 'contain' }} />
             <div>
               <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', color: '#1e293b' }}>PT. ALPHA LOGISTICS PRAKARSA</h1>
-              <p style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>Green Sedayu Bizpark DM 11 No. 51, Kalideres, Jakarta Barat</p>
+              <p style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>Ruko The Summer B1-2A, Jl. Centre Point, Teluk Tering, Batam Kota, Batam</p>
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -115,7 +115,7 @@ const PrintInvoiceDelivery = () => {
         </div>
 
         <div style={{ marginTop: '60px', borderTop: '1px dashed #ccc', paddingTop: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.75rem' }}>
-          Jakarta, {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
+          Batam, {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
         </div>
       </div>
     </div>

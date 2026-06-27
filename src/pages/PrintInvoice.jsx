@@ -110,8 +110,8 @@ const PrintInvoice = () => {
             <img src="/assets/logo.png" alt="Logo" style={{ width: '65px', height: '65px', objectFit: 'contain' }} />
             <div>
               <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', color: '#1e293b', letterSpacing: '-0.5px' }}>PT. ALPHA LOGISTICS PRAKARSA</h1>
-              <p style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>Green Sedayu Bizpark DM 11 No. 51, Kalideres, Jakarta Barat</p>
-              <p style={{ margin: '1px 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>Telp: +62 21 5000 8000 | finance@omegatrustlogistik.co.id</p>
+              <p style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>Ruko The Summer B1-2A, Jl. Centre Point, Teluk Tering, Batam Kota, Batam</p>
+              <p style={{ margin: '1px 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>Telp: +62 813-6562-2272 | alphalogisticsprakarsa@gmail.com</p>
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
