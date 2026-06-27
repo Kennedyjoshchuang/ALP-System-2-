@@ -249,6 +249,45 @@ const AdminHub = () => {
 
   const approvedQuotes = quotations.filter(q => q.status === 'approved');
 
+  const getAvailableItems = (quote, jobOrdersList = []) => {
+    const relatedJOs = jobOrdersList.filter(jo => String(jo.quotationId) === String(quote.id));
+    const items = quote.items && quote.items.length > 0 ? quote.items : [];
+    
+    if (items.length > 0) {
+      // Match JOs with non-empty instructions to items, keeping track of original index
+      const unmatchedItems = items.map((item, idx) => ({ ...item, originalIndex: idx }));
+      const unmatchedJOs = [];
+      
+      relatedJOs.forEach(jo => {
+        const joDesc = (jo.instruction || '').trim().toLowerCase();
+        if (joDesc) {
+          const matchIndex = unmatchedItems.findIndex(item => 
+            (item.description || '').trim().toLowerCase() === joDesc
+          );
+          if (matchIndex !== -1) {
+            unmatchedItems.splice(matchIndex, 1);
+          } else {
+            unmatchedJOs.push(jo);
+          }
+        } else {
+          unmatchedJOs.push(jo);
+        }
+      });
+      
+      const finalUnmatchedItems = [...unmatchedItems];
+      unmatchedJOs.forEach(() => {
+        if (finalUnmatchedItems.length > 0) {
+          finalUnmatchedItems.shift();
+        }
+      });
+      
+      return finalUnmatchedItems;
+    } else {
+      const hasJO = relatedJOs.length > 0;
+      return hasJO ? [] : [{ description: quote.jobDescription || 'No description', rate: quote.rate, quantity: quote.quantity || 1, originalIndex: -1 }];
+    }
+  };
+
   const handleCreateJO = async (quote) => {
     if (!canWrite) return;
     const hasItems = quote.items && quote.items.length > 0;
@@ -724,16 +763,17 @@ const AdminHub = () => {
 
                       const quote = approvedQuotes.find(q => q.id === qId);
                       if (quote) {
-                        const defaultQty = quote.items && quote.items.length > 0 ? quote.items[0].quantity : (quote.quantity || 1);
+                        const availableItems = getAvailableItems(quote, jobOrders);
+                        const defaultQty = availableItems.length > 0 ? (availableItems[0].quantity || 1) : (quote.quantity || 1);
                         setIssueQuantity(parseInt(defaultQty));
                         
                         // Initialize selected activities
                         const initialSelected = {};
-                        if (quote.items && quote.items.length > 0) {
-                          quote.items.forEach((item, idx) => {
-                            initialSelected[idx] = { selected: true, quantity: parseInt(item.quantity || 1) };
-                          });
-                        }
+                        availableItems.forEach((item) => {
+                          if (item.originalIndex !== -1) {
+                            initialSelected[item.originalIndex] = { selected: true, quantity: parseInt(item.quantity || 1) };
+                          }
+                        });
                         setSelectedActivities(initialSelected);
                       } else {
                         setSelectedActivities({});
@@ -752,14 +792,21 @@ const AdminHub = () => {
                     <option value="" style={{ background: 'var(--bg)', color: 'var(--text-muted)' }}>-- {isID ? 'Pilih Penawaran yang Disetujui' : 'Choose Approved Quotation'} --</option>
                     {quotations
                       .filter(q => q.status === 'approved')
-                      .filter(q => 
-                        q.id.toLowerCase().includes(quoteSearchTerm.toLowerCase()) ||
-                        q.customerName.toLowerCase().includes(quoteSearchTerm.toLowerCase()) ||
-                        (q.items?.[0]?.description || q.jobDescription || '').toLowerCase().includes(quoteSearchTerm.toLowerCase())
-                      )
+                      .filter(q => getAvailableItems(q, jobOrders).length > 0)
+                      .filter(q => {
+                        const availableItems = getAvailableItems(q, jobOrders);
+                        const matchTerm = quoteSearchTerm.toLowerCase();
+                        const idMatch = q.id.toLowerCase().includes(matchTerm);
+                        const customerMatch = q.customerName.toLowerCase().includes(matchTerm);
+                        const descriptionMatch = availableItems.some(item => 
+                          (item.description || '').toLowerCase().includes(matchTerm)
+                        ) || (q.jobDescription || '').toLowerCase().includes(matchTerm);
+                        return idMatch || customerMatch || descriptionMatch;
+                      })
                       .map(quote => {
-                        const label = Array.isArray(quote.items) && quote.items.length > 0
-                          ? quote.items[0].description
+                        const availableItems = getAvailableItems(quote, jobOrders);
+                        const label = availableItems.length > 0
+                          ? availableItems[0].description
                           : (quote.jobDescription || 'No description');
                         return (
                           <option key={quote.id} value={quote.id} style={{ background: 'var(--bg)', color: 'var(--text)' }}>
@@ -772,6 +819,8 @@ const AdminHub = () => {
 
                 {selectedQuoteId && (() => {
                   const q = approvedQuotes.find(quote => quote.id === selectedQuoteId);
+                  if (!q) return null;
+                  const availableItems = getAvailableItems(q, jobOrders);
                   const hasItems = q.items && q.items.length > 0;
 
                   return (
@@ -784,7 +833,8 @@ const AdminHub = () => {
                             {isID ? 'Pilih Aktivitas untuk Di-issue' : 'Select Activities to Issue'}
                           </label>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                            {q.items.map((item, idx) => {
+                            {availableItems.map((item) => {
+                              const idx = item.originalIndex;
                               const isChecked = !!selectedActivities[idx]?.selected;
                               const currentQty = selectedActivities[idx]?.quantity || item.quantity || 1;
                               return (
