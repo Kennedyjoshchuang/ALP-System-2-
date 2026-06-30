@@ -999,19 +999,11 @@ const Accounting = () => {
         return;
       }
 
-<<<<<<< Updated upstream
       // Build preview data for the confirmation modal (mirrors createInvoice logic)
       const linkedJO = jobOrders.find(j => String(j.id) === String(joId));
       if (!linkedJO) {
         toast.error('Job Order tidak ditemukan.');
         return;
-=======
-      console.log("Issuing invoice for JO:", joId, "with bank:", bankAccount.bankName);
-      const newInv = await createInvoice(joId, notes);
-      
-      if (!newInv) {
-        throw new Error("Gagal menerbitkan invoice. Pastikan data Job Order & Quotation tersedia.");
->>>>>>> Stashed changes
       }
 
       const linkedQuo = linkedJO.quotationId
@@ -1079,6 +1071,7 @@ const Accounting = () => {
           extraCharges: [],
           taxPercent: 0,
           bankAccountId: bankAccount.id,
+          notes: notes || '',
         },
       });
 
@@ -1122,6 +1115,7 @@ const Accounting = () => {
         subtotal,
         tax,
         extra_charges,
+        notes: f.notes || null,
       };
 
       const newInv = await createCustomInvoice(invoiceData);
@@ -6435,6 +6429,18 @@ const Accounting = () => {
                 <div style={{ marginTop: '12px', padding: '8px 12px', background: 'var(--secondary-bg)', borderRadius: '6px', fontSize: '0.78rem', color: 'var(--secondary)', fontWeight: '700' }}>
                   JO Ref: {invoiceConfirmData.consolidatedJOIds.join(', ')}
                 </div>
+              </div>
+
+              {/* Custom Notes Section */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={labelStyle}>{isID ? 'Catatan Kustom (Opsional)' : 'Custom Notes (Optional)'}</label>
+                <textarea
+                  rows={2}
+                  style={{ ...inputStyle, resize: 'vertical' }}
+                  value={f.notes || ''}
+                  onChange={e => setF({ notes: e.target.value })}
+                  placeholder={isID ? 'Masukkan catatan tambahan untuk invoice...' : 'Enter additional notes for the invoice...'}
+                />
               </div>
 
               {/* Line Items */}
