@@ -236,6 +236,16 @@ const PrintInvoice = () => {
           </div>
         </div>
 
+        {/* Custom Notes */}
+        {invoice?.notes && (
+          <div style={{ padding: '14px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', marginBottom: '20px', textAlign: 'left', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+            <p style={{ margin: '0 0 8px 0', fontSize: '0.65rem', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1.5px' }}>Catatan / Notes</p>
+            <div style={{ fontSize: '0.85rem', color: '#1e293b', whiteSpace: 'pre-wrap', fontWeight: '600', lineHeight: '1.4' }}>
+              {invoice.notes}
+            </div>
+          </div>
+        )}
+
         {/* Bank Info */}
         <div style={{ padding: '14px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', marginBottom: '20px' }}>
           <p style={{ margin: '0 0 8px 0', fontSize: '0.65rem', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1.5px' }}>Informasi Pembayaran</p>

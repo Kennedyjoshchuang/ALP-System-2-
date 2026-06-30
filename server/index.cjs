@@ -514,7 +514,7 @@ app.get('/api/invoices', async (req, res) => {
 });
 
 app.post('/api/invoices', async (req, res) => {
-  const { id, joId, customerName, amount, subtotal, tax, extra_charges, date, status } = req.body;
+  const { id, joId, customerName, amount, subtotal, tax, extra_charges, date, status, notes } = req.body;
   
   try {
     // 1. Create Invoice — try with all columns, fallback if schema is old
@@ -525,6 +525,7 @@ app.post('/api/invoices', async (req, res) => {
       tax: parseFloat(tax) || 0,
       extra_charges: extra_charges || [],
       date, status,
+      notes: notes || null,
       signedReceiptPhoto: req.body.signedReceiptPhoto || null,
       signedInvoicePhoto: req.body.signedInvoicePhoto || null,
       deliveryStatus: req.body.deliveryStatus || 'not_sent'
@@ -541,7 +542,7 @@ app.post('/api/invoices', async (req, res) => {
       invErr.code === 'PGRST204'
     )) {
       console.warn(`[POST /invoices] Schema mismatch for ${id} (Code: ${invErr.code}). Retrying without tracking columns...`);
-      const { signedReceiptPhoto, signedInvoicePhoto, deliveryStatus, ...legacyData } = invoiceData;
+      const { signedReceiptPhoto, signedInvoicePhoto, deliveryStatus, notes: _, ...legacyData } = invoiceData;
       console.log(`[POST /invoices] Retrying with keys: ${Object.keys(legacyData).join(', ')}`);
       const { error: retryErr } = await supabase.from('invoices').insert(legacyData);
       invErr = retryErr;

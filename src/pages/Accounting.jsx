@@ -86,7 +86,8 @@ const Accounting = () => {
     customerName: '',
     date: new Date().toISOString().substring(0, 10),
     taxPercent: 0,
-    items: [{ description: '', qty: 1, rate: 0 }]
+    items: [{ description: '', qty: 1, rate: 0 }],
+    notes: ''
   });
 
   // Salary States
@@ -161,6 +162,7 @@ const Accounting = () => {
   // Invoice Bank Selection
   const [issuingInvoiceJoId, setIssuingInvoiceJoId] = useState(null);
   const [selectedBankId, setSelectedBankId] = useState('');
+  const [invoiceNotes, setInvoiceNotes] = useState('');
   const [expandedCompletedGroups, setExpandedCompletedGroups] = useState({});
 
   // Invoice Confirmation Modal
@@ -986,21 +988,30 @@ const Accounting = () => {
       return id.toLowerCase().includes(term) || name.toLowerCase().includes(term);
     });
   
-  const handleIssueInvoice = async (joId, bankAccount) => {
+  const handleIssueInvoice = async (joId, bankAccount, notes) => {
     try {
       if (!bankAccount) {
         setIssuingInvoiceJoId(joId);
+        setInvoiceNotes('');
         if (companyBankAccounts.length > 0) {
           setSelectedBankId(companyBankAccounts[0].id);
         }
         return;
       }
 
+<<<<<<< Updated upstream
       // Build preview data for the confirmation modal (mirrors createInvoice logic)
       const linkedJO = jobOrders.find(j => String(j.id) === String(joId));
       if (!linkedJO) {
         toast.error('Job Order tidak ditemukan.');
         return;
+=======
+      console.log("Issuing invoice for JO:", joId, "with bank:", bankAccount.bankName);
+      const newInv = await createInvoice(joId, notes);
+      
+      if (!newInv) {
+        throw new Error("Gagal menerbitkan invoice. Pastikan data Job Order & Quotation tersedia.");
+>>>>>>> Stashed changes
       }
 
       const linkedQuo = linkedJO.quotationId
@@ -1145,7 +1156,7 @@ const Accounting = () => {
   const handleCreateCustomInvoice = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     try {
-      const { id, joId, customerName, date, taxPercent, items } = customInvoiceForm;
+      const { id, joId, customerName, date, taxPercent, items, notes } = customInvoiceForm;
 
       if (!customerName.trim()) {
         toast.error(isID ? "Nama customer harus diisi" : "Customer name is required");
@@ -1194,7 +1205,8 @@ const Accounting = () => {
         amount: grandTotal,
         subtotal,
         tax,
-        extra_charges
+        extra_charges,
+        notes: notes || null
       };
 
       console.log("Creating custom invoice:", invoiceData);
@@ -1207,7 +1219,8 @@ const Accounting = () => {
         customerName: '',
         date: new Date().toISOString().substring(0, 10),
         taxPercent: 0,
-        items: [{ description: '', qty: 1, rate: 0 }]
+        items: [{ description: '', qty: 1, rate: 0 }],
+        notes: ''
       });
       setShowCustomInvoiceModal(false);
       toast.error(isID ? "Invoice kustom berhasil dibuat!" : "Custom invoice created successfully!");
@@ -2763,7 +2776,8 @@ const Accounting = () => {
                 customerName: '',
                 date: dateVal,
                 taxPercent: 0,
-                items: [{ description: '', qty: 1, rate: 0 }]
+                items: [{ description: '', qty: 1, rate: 0 }],
+                notes: ''
               });
               setShowCustomInvoiceModal(true);
             }}
@@ -4733,6 +4747,18 @@ const Accounting = () => {
                   />
                 </div>
               </div>
+              
+              <div style={{ marginBottom:'20px' }}>
+                <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>
+                  {isID ? 'Catatan Kustom (Opsional)' : 'Custom Notes (Optional)'}
+                </label>
+                <textarea 
+                  value={customInvoiceForm.notes} 
+                  onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, notes: e.target.value })}
+                  placeholder={isID ? "Masukkan catatan tambahan untuk invoice..." : "Enter additional notes for the invoice..."}
+                  style={{ width:'100%', minHeight:'70px', padding:'10px 12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontSize:'0.9rem', resize:'vertical' }}
+                />
+              </div>
 
               {/* Items Section */}
               <div style={{ marginTop:'30px', marginBottom:'20px' }}>
@@ -6275,6 +6301,18 @@ const Accounting = () => {
               )}
             </div>
 
+            <div style={{ marginBottom:'30px', textAlign:'left' }}>
+              <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>
+                {isID ? 'Catatan Kustom (Opsional)' : 'Custom Notes (Optional)'}
+              </label>
+              <textarea 
+                value={invoiceNotes}
+                onChange={(e) => setInvoiceNotes(e.target.value)}
+                placeholder={isID ? "Masukkan catatan tambahan untuk invoice..." : "Enter additional notes for the invoice..."}
+                style={{ width:'100%', minHeight:'80px', padding:'12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'10px', color:'var(--text)', fontSize:'0.9rem', resize:'vertical' }}
+              />
+            </div>
+
             <div style={{ display:'flex', gap:'12px', justifyContent:'center' }}>
               <button 
                 onClick={() => setIssuingInvoiceJoId(null)} 
@@ -6287,7 +6325,7 @@ const Accounting = () => {
                 onClick={() => {
                   const bank = companyBankAccounts.find(b => b.id === selectedBankId);
                   if (bank) {
-                    handleIssueInvoice(issuingInvoiceJoId, bank);
+                    handleIssueInvoice(issuingInvoiceJoId, bank, invoiceNotes);
                   } else {
                     toast.error(isID ? "Silakan pilih rekening bank yang valid." : "Please select a valid bank account.");
                   }
