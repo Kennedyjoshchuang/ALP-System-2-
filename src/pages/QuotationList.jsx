@@ -164,7 +164,7 @@ const QuotationList = () => {
                     <h5 style={{ textTransform: 'uppercase', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '800', marginBottom: '15px', letterSpacing: '1px' }}>Marketing Person</h5>
                     <h4 style={{ margin: '0 0 5px 0', fontSize: '1.6rem', fontWeight: '900', color: '#0f172a' }}>{selectedDraft.marketingName || 'Omega Trust Team'}</h4>
                     <p style={{ margin: 0, color: '#475569', fontWeight: '700', fontSize: '1rem' }}>{selectedDraft.marketingEmail || 'marketing@omegatrust.com'}</p>
-                    <p style={{ margin: '3px 0 20px 0', color: '#475569', fontWeight: '700', fontSize: '1rem' }}>+62 813-6562-2272</p>
+                    <p style={{ margin: '3px 0 20px 0', color: '#475569', fontWeight: '700', fontSize: '1rem' }}>{selectedDraft.marketingPhone || '+62 813-6562-2272'}</p>
                     <div style={{ borderTop: '1px solid #e2e8f0', display: 'inline-block', paddingTop: '10px' }}>
                       <span style={{ textTransform: 'uppercase', color: '#94a3b8', fontSize: '0.75rem', fontWeight: '800', letterSpacing: '1px', marginRight: '10px' }}>Validity Period:</span>
                       <span style={{ color: '#0f172a', fontWeight: '900' }}>{selectedDraft.validTo || '-'}</span>

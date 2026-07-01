@@ -37,6 +37,9 @@ const Marketing = () => {
   ]);
   const [quoteValidFrom, setQuoteValidFrom] = useState('');
   const [quoteValidTo, setQuoteValidTo] = useState('');
+  const [quoteMarketingName, setQuoteMarketingName] = useState('');
+  const [quoteMarketingPhone, setQuoteMarketingPhone] = useState('');
+  const [quoteMarketingEmail, setQuoteMarketingEmail] = useState('');
   const [prospectData, setProspectData] = useState({
     name: '', address: '', phone: '', email: '', pic: '', notes: '', description: '', marketingName: '', marketingPhone: '', marketingEmail: '', companyAddress: ''
   });
@@ -58,12 +61,18 @@ const Marketing = () => {
   const [editQuoteItems, setEditQuoteItems] = useState([{ description: '', rate: '', quantity: '1', unit: '' }]);
   const [editQuoteGeneralNotes, setEditQuoteGeneralNotes] = useState('');
   const [editQuoteCompanyAddress, setEditQuoteCompanyAddress] = useState('');
+  const [editQuoteMarketingName, setEditQuoteMarketingName] = useState('');
+  const [editQuoteMarketingPhone, setEditQuoteMarketingPhone] = useState('');
+  const [editQuoteMarketingEmail, setEditQuoteMarketingEmail] = useState('');
 
   // Pre-fill PIC and Description when modal opens
   React.useEffect(() => {
     if (activeProspectForQuote) {
       setQuotePic(activeProspectForQuote.pic || '');
       setQuoteGeneralNotes(activeProspectForQuote.notes || '');
+      setQuoteMarketingName(activeProspectForQuote.marketingName || '');
+      setQuoteMarketingPhone(activeProspectForQuote.marketingPhone || '');
+      setQuoteMarketingEmail(activeProspectForQuote.marketingEmail || '');
       // Use prospect's job description as default first item if empty
       if (activeProspectForQuote.description && quoteItems.length === 1 && !quoteItems[0].description) {
         setQuoteItems([{ description: activeProspectForQuote.description, rate: '', quantity: '1', unit: '' }]);
@@ -132,7 +141,7 @@ const Marketing = () => {
     setQuoteItems(newItems);
   };
 
-  const handleOpenEditModal = (prospect) => {
+  const handleOpenEditProspectModal = (prospect) => {
     setActiveProspectForEdit(prospect);
     setEditProspectData({
       name: prospect.name || '',
@@ -238,9 +247,9 @@ const Marketing = () => {
         total: totalAmount,
         rate: totalAmount,
         quantity: 1,
-        marketingName: activeProspectForQuote.marketingName,
-        marketingPhone: activeProspectForQuote.marketingPhone,
-        marketingEmail: activeProspectForQuote.marketingEmail,
+        marketingName: quoteMarketingName,
+        marketingPhone: quoteMarketingPhone,
+        marketingEmail: quoteMarketingEmail,
         validFrom: quoteValidFrom,
         validTo: quoteValidTo,
         companyAddress: activeProspectForQuote.companyAddress
@@ -257,8 +266,8 @@ const Marketing = () => {
         validTo: quoteValidTo,
         date: new Date(),
         rate: totalAmount,
-        marketingName: activeProspectForQuote.marketingName,
-        marketingEmail: activeProspectForQuote.marketingEmail,
+        marketingName: quoteMarketingName,
+        marketingEmail: quoteMarketingEmail,
       };
       localStorage.setItem('print_quotation_data', JSON.stringify(printData));
       window.open('/print/quotation', '_blank');
@@ -268,6 +277,9 @@ const Marketing = () => {
       setQuotePic('');
       setQuoteValidFrom('');
       setQuoteValidTo('');
+      setQuoteMarketingName('');
+      setQuoteMarketingPhone('');
+      setQuoteMarketingEmail('');
       setQuoteItems([{ description: '', rate: '', quantity: '1', unit: '' }]);
     } catch (error) {
       console.error("Quotation creation failed:", error);
@@ -288,6 +300,9 @@ const Marketing = () => {
     })) : [{ description: '', rate: '', quantity: '1', unit: '' }]);
     setEditQuoteGeneralNotes(quote.generalNotes || '');
     setEditQuoteCompanyAddress(quote.companyAddress || '');
+    setEditQuoteMarketingName(quote.marketingName || '');
+    setEditQuoteMarketingPhone(quote.marketingPhone || '');
+    setEditQuoteMarketingEmail(quote.marketingEmail || '');
   };
 
   const handleSaveQuotationEdit = async (e) => {
@@ -319,7 +334,10 @@ const Marketing = () => {
         rate: totalAmount,
         validFrom: editQuoteValidFrom,
         validTo: editQuoteValidTo,
-        companyAddress: editQuoteCompanyAddress
+        companyAddress: editQuoteCompanyAddress,
+        marketingName: editQuoteMarketingName,
+        marketingPhone: editQuoteMarketingPhone,
+        marketingEmail: editQuoteMarketingEmail
       });
       setActiveQuotationForEdit(null);
     } catch (error) {
@@ -672,6 +690,50 @@ const Marketing = () => {
                   </div>
                 </div>
 
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', marginBottom: '25px' }}>
+                  <div className="input-group">
+                    <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>Nama Marketing</label>
+                    <select 
+                      required 
+                      value={quoteMarketingName} 
+                      onChange={e => {
+                        const emp = employees.find(emp => emp.name === e.target.value);
+                        setQuoteMarketingName(e.target.value);
+                        setQuoteMarketingPhone(emp?.phone || '');
+                        setQuoteMarketingEmail(emp?.email || '');
+                      }}
+                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width: '100%', fontWeight: '600' }}
+                    >
+                      <option value="" style={{ background: 'var(--bg)', color: 'var(--text)' }}>-- Pilih Marketing --</option>
+                      {employees.filter(e => e.position?.toLowerCase().includes('marketing')).map(e => (
+                        <option key={e.id} value={e.name} style={{ background: 'var(--bg)', color: 'var(--text)' }}>{e.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="input-group">
+                    <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>Nomor Telpon Marketing</label>
+                    <input 
+                      required 
+                      type="text" 
+                      value={quoteMarketingPhone} 
+                      onChange={e => setQuoteMarketingPhone(e.target.value)} 
+                      placeholder="+62 812..." 
+                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }} 
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>Email Marketing</label>
+                    <input 
+                      required 
+                      type="email" 
+                      value={quoteMarketingEmail} 
+                      onChange={e => setQuoteMarketingEmail(e.target.value)} 
+                      placeholder="marketing@alpfreight.co.id" 
+                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }} 
+                    />
+                  </div>
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 100px 50px', minWidth: "700px", gap: '15px', marginBottom: '10px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                   <div>{t('activity')}</div>
                   <div>{t('ratePerTrip')}</div>
@@ -769,6 +831,50 @@ const Marketing = () => {
                   </div>
                 </div>
 
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', marginBottom: '25px' }}>
+                  <div className="input-group">
+                    <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>Nama Marketing</label>
+                    <select 
+                      required 
+                      value={editQuoteMarketingName} 
+                      onChange={e => {
+                        const emp = employees.find(emp => emp.name === e.target.value);
+                        setEditQuoteMarketingName(e.target.value);
+                        setEditQuoteMarketingPhone(emp?.phone || '');
+                        setEditQuoteMarketingEmail(emp?.email || '');
+                      }}
+                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width: '100%', fontWeight: '600' }}
+                    >
+                      <option value="" style={{ background: 'var(--bg)', color: 'var(--text)' }}>-- Pilih Marketing --</option>
+                      {employees.filter(e => e.position?.toLowerCase().includes('marketing')).map(e => (
+                        <option key={e.id} value={e.name} style={{ background: 'var(--bg)', color: 'var(--text)' }}>{e.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="input-group">
+                    <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>Nomor Telpon Marketing</label>
+                    <input 
+                      required 
+                      type="text" 
+                      value={editQuoteMarketingPhone} 
+                      onChange={e => setEditQuoteMarketingPhone(e.target.value)} 
+                      placeholder="+62 812..." 
+                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }} 
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label style={{ color: 'var(--secondary)', fontWeight: '600' }}>Email Marketing</label>
+                    <input 
+                      required 
+                      type="email" 
+                      value={editQuoteMarketingEmail} 
+                      onChange={e => setEditQuoteMarketingEmail(e.target.value)} 
+                      placeholder="marketing@alpfreight.co.id" 
+                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }} 
+                    />
+                  </div>
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 100px 50px', minWidth: "700px", gap: '15px', marginBottom: '10px', fontWeight: '600', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                   <div>{t('activity') || 'Deskripsi Pekerjaan'}</div>
                   <div>{t('ratePerTrip') || 'Tarif'}</div>
@@ -799,7 +905,7 @@ const Marketing = () => {
                     value={editQuoteCompanyAddress}
                     onChange={e => setEditQuoteCompanyAddress(e.target.value)}
                     placeholder="Masukkan alamat cabang ALP untuk penawaran ini..."
-                    style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%', border: '2px solid var(--secondary)' }}
+                    style={{ background: 'var(--input-bg)', border: '2px solid var(--secondary)', borderRadius: '12px', color: 'var(--text)', padding: '12px', width:'100%' }}
                   />
                 </div>
 
@@ -1141,7 +1247,7 @@ const Marketing = () => {
                     <h5 className="text-slate" style={{ textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: '800', marginBottom: '18px', letterSpacing: '1.5px' }}>MARKETING PERSON</h5>
                     <h4 style={{ margin: '0 0 6px 0', fontSize: '1.8rem', fontWeight: '900', color: '#0f172a' }}>{selectedDraft.marketingName || 'PT. Alpha Logistics Prakarsa Team'}</h4>
                     <p className="text-slate" style={{ margin: 0, fontWeight: '700', fontSize: '1rem' }}>{selectedDraft.marketingEmail || 'marketing@alp.co.id'}</p>
-                    <p className="text-slate" style={{ margin: '4px 0 25px 0', fontWeight: '700', fontSize: '1rem' }}>+62 813-6562-2272</p>
+                    <p className="text-slate" style={{ margin: '4px 0 25px 0', fontWeight: '700', fontSize: '1rem' }}>{selectedDraft.marketingPhone || '+62 813-6562-2272'}</p>
                     <div style={{ borderTop: '1px solid #e2e8f0', display: 'inline-block', paddingTop: '12px' }}>
                       <span className="text-slate" style={{ textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: '800', letterSpacing: '1px', marginRight: '12px' }}>VALIDITY PERIOD:</span>
                       <span style={{ color: '#0f172a', fontWeight: '900', fontSize: '0.95rem' }}>{selectedDraft.validTo || '-'}</span>
