@@ -48,6 +48,53 @@ const Accounting = () => {
     return new Date(dateStr).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
+  const renderPositionTags = (positionStr, customStyle = {}) => {
+    if (!positionStr) return <span style={{ color: 'var(--text-muted)' }}>-</span>;
+    const parts = positionStr.split(',').map(p => p.trim()).filter(Boolean);
+    
+    const roleColors = {
+      'marketing': { bg: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', text: 'var(--green-vibrant)' },
+      'admin office': { bg: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', text: 'var(--blue-vibrant)' },
+      'procurement': { bg: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', text: '#a78bfa' },
+      'executor': { bg: 'rgba(236, 72, 153, 0.1)', border: '1px solid rgba(236, 72, 153, 0.3)', text: '#f472b6' },
+      'accounting': { bg: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', text: 'var(--gold-vibrant)' },
+      'hrd': { bg: 'rgba(20, 184, 166, 0.1)', border: '1px solid rgba(20, 184, 166, 0.3)', text: '#2dd4bf' },
+      'system control': { bg: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', text: 'var(--red-vibrant)' }
+    };
+
+    return (
+      <div style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '4px', ...customStyle }}>
+        {parts.map((part, index) => {
+          const styleConf = roleColors[part.toLowerCase()] || { 
+            bg: 'rgba(255, 255, 255, 0.05)', 
+            border: '1px solid rgba(255, 255, 255, 0.1)', 
+            text: 'var(--text-muted)' 
+          };
+          return (
+            <span 
+              key={index} 
+              style={{ 
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '2px 8px', 
+                borderRadius: '4px', 
+                fontSize: '0.7rem', 
+                fontWeight: '700', 
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                background: styleConf.bg,
+                border: styleConf.border,
+                color: styleConf.text
+              }}
+            >
+              {part}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
   const [activeTab, setActiveTab] = useState('billing'); // 'billing', 'piutang', or 'costing'
   const [receivableSubTab, setReceivableSubTab] = useState('outstanding');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -3605,7 +3652,10 @@ const Accounting = () => {
                   <tr key={s.id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
                     <td style={{ padding: '15px' }}>
                       <div style={{ fontWeight: '700', color: 'var(--text)' }}>{s.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.position} | NIK: {s.nik}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                        {renderPositionTags(s.position)}
+                        <span>| NIK: {s.nik}</span>
+                      </div>
                     </td>
                     <td style={{ padding: '15px' }}>
                       <div style={{ fontSize: '0.85rem' }}>{s.bankName}</div>
@@ -3869,8 +3919,15 @@ const Accounting = () => {
                         </span>
                       </div>
                       {t.employeeName && t.employeeName !== 'Umum' && (
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                          {isID ? 'Karyawan' : 'Employee'}: {t.employeeName} ({t.position})
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+                          <span>{isID ? 'Karyawan' : 'Employee'}: {t.employeeName}</span>
+                          {t.position && (
+                            <>
+                              <span>(</span>
+                              {renderPositionTags(t.position)}
+                              <span>)</span>
+                            </>
+                          )}
                         </div>
                       )}
                     </td>
@@ -4910,7 +4967,9 @@ const Accounting = () => {
               </div>
               <div>
                 <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Jabatan' : 'Position'}</label>
-                <input type="text" readOnly value={salaryForm.position} style={{ width:'100%', padding:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text-muted)' }} />
+                <div style={{ width:'100%', padding:'10px 15px', background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)', borderRadius:'8px', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
+                  {renderPositionTags(salaryForm.position)}
+                </div>
               </div>
             </div>
 
@@ -5315,8 +5374,9 @@ const Accounting = () => {
                   <User size={16} /> 
                   <span>{isID ? 'Detail Karyawan & Rekening Penerima' : 'Employee Details & Recipient Account'}</span>
                   {otherExpenseForm.employeeName && otherExpenseForm.employeeName !== 'Umum' ? (
-                    <span style={{ fontSize: '0.75rem', background: 'rgba(212,175,55,0.15)', color: 'var(--secondary)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--secondary-border)', fontWeight: '700' }}>
-                      {isID ? 'Terpilih' : 'Selected'}: {otherExpenseForm.employeeName} ({otherExpenseForm.position || (isID ? 'Karyawan' : 'Employee')})
+                    <span style={{ fontSize: '0.75rem', background: 'rgba(212,175,55,0.15)', color: 'var(--secondary)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--secondary-border)', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      {isID ? 'Terpilih' : 'Selected'}: {otherExpenseForm.employeeName} 
+                      {otherExpenseForm.position && <>({renderPositionTags(otherExpenseForm.position)})</>}
                     </span>
                   ) : (
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -5402,7 +5462,9 @@ const Accounting = () => {
                     </div>
                     <div>
                       <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Jabatan' : 'Position'}</label>
-                      <input type="text" readOnly value={otherExpenseForm.position || ''} style={{ width:'100%', padding:'10px', background:'rgba(255,255,255,0.05)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text-muted)' }} />
+                      <div style={{ width:'100%', padding:'10px 15px', background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)', borderRadius:'8px', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
+                        {renderPositionTags(otherExpenseForm.position)}
+                      </div>
                     </div>
                   </div>
 
@@ -5520,7 +5582,13 @@ const Accounting = () => {
                <div>
                  <div style={{ fontSize:'0.75rem', color:'#888', textTransform:'uppercase', marginBottom:'5px' }}>{isID ? 'Informasi Karyawan:' : 'Employee Information:'}</div>
                  <div style={{ fontWeight:'800', fontSize:'1.2rem' }}>{salarySlip.name}</div>
-                 <div style={{ fontSize:'1rem', color:'#333' }}>{salarySlip.position}</div>
+                 <div style={{ fontSize:'1rem', color:'#333', display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '4px' }}>
+                    {salarySlip.position ? salarySlip.position.split(',').map((p, idx) => (
+                      <span key={idx} style={{ background: '#e2e8f0', color: '#1e293b', padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: '600' }}>
+                        {p.trim()}
+                      </span>
+                    )) : '-'}
+                  </div>
                  <div style={{ marginTop:'10px', fontSize:'0.85rem' }}>NIK: {salarySlip.nik || '-'}</div>
                  <div style={{ fontSize:'0.85rem' }}>NPWP: {salarySlip.npwp || '-'}</div>
                </div>

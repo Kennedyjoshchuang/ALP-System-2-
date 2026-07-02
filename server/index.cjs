@@ -424,6 +424,7 @@ app.delete('/api/quotations/:id', async (req, res) => {
     await supabase.from('prospect_drafts').delete().eq('prospectId', id);
     const { error } = await supabase.from('quotations').delete().eq('id', id);
     if (error) return handleError(res, error, 'DELETE quotation');
+    clearJobOrdersCache();
     res.sendStatus(204);
   } catch (error) {
     console.error('Failed to delete quotation cascade:', error);
@@ -432,10 +433,67 @@ app.delete('/api/quotations/:id', async (req, res) => {
 });
 
 // --- JOB ORDERS ---
+let jobOrdersCache = null;
+const clearJobOrdersCache = () => {
+  jobOrdersCache = null;
+  console.log('[CACHE] Job Orders cache cleared.');
+};
+
 app.get('/api/job-orders', async (req, res) => {
+  if (jobOrdersCache) {
+    console.log('[CACHE] Serving job orders from cache');
+    return res.json(jobOrdersCache);
+  }
+  
   const { data, error } = await supabase.from('job_orders').select('*');
   if (error) return handleError(res, error, 'GET job_orders');
-  res.json(data);
+  
+  // Optimize response size by returning URL placeholders for base64 photo data
+  const optimizedData = (data || []).map(jo => {
+    if (jo.photos && Array.isArray(jo.photos)) {
+      return {
+        ...jo,
+        photos: jo.photos.map((_, idx) => `/api/job-orders/${jo.id}/photos/${idx}`)
+      };
+    }
+    return jo;
+  });
+  
+  jobOrdersCache = optimizedData;
+  console.log('[CACHE] Job Orders cached. Count:', optimizedData.length);
+  res.json(optimizedData);
+});
+
+// New endpoint: Serve operational photos on demand as binary images
+app.get('/api/job-orders/:id/photos/:index', async (req, res) => {
+  try {
+    const { id, index } = req.params;
+    const { data, error } = await supabase.from('job_orders').select('photos').eq('id', id).single();
+    if (error || !data || !data.photos) {
+      return res.status(404).send('Photo not found');
+    }
+    const photos = data.photos;
+    const photoStr = photos[parseInt(index, 10)];
+    if (!photoStr) {
+      return res.status(404).send('Photo not found');
+    }
+    
+    // Handle base64 DataURL format: data:image/jpeg;base64,...
+    const match = photoStr.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      const contentType = match[1];
+      const base64Data = match[2];
+      const buffer = Buffer.from(base64Data, 'base64');
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+      return res.send(buffer);
+    }
+    
+    return res.status(400).send('Invalid photo format');
+  } catch (err) {
+    console.error('Fetch photo error:', err);
+    res.status(500).send('Internal server error');
+  }
 });
 
 app.post('/api/job-orders', async (req, res) => {
@@ -451,6 +509,7 @@ app.post('/api/job-orders', async (req, res) => {
       containerNo: [], vehicleNo: [], driverName: []
     });
     if (error) return handleError(res, error, 'POST job_orders');
+    clearJobOrdersCache();
     res.status(201).json({ id });
   } catch (err) {
     console.error('Create JO Error:', err);
@@ -486,6 +545,7 @@ app.post('/api/job-orders/bulk', async (req, res) => {
         jobDescription
       });
     }
+    clearJobOrdersCache();
     res.status(201).json(insertedJOs);
   } catch (err) {
     console.error('Bulk Create JO Error:', err);
@@ -494,15 +554,49 @@ app.post('/api/job-orders/bulk', async (req, res) => {
 });
 
 app.put('/api/job-orders/:id', async (req, res) => {
-  const updates = req.body;
-  const { error } = await supabase.from('job_orders').update(updates).eq('id', req.params.id);
-  if (error) return handleError(res, error, 'PUT job_orders');
-  res.sendStatus(200);
+  try {
+    const updates = req.body;
+    
+    // Resolve incoming URL placeholders back to original base64 strings
+    if (updates.photos && Array.isArray(updates.photos)) {
+      const { data: existing, error: fetchErr } = await supabase
+        .from('job_orders')
+        .select('photos')
+        .eq('id', req.params.id)
+        .single();
+      
+      if (!fetchErr && existing && existing.photos) {
+        const resolvedPhotos = [];
+        for (const photo of updates.photos) {
+          const match = typeof photo === 'string' && photo.match(/\/api\/job-orders\/([^/]+)\/photos\/(\d+)/);
+          if (match) {
+            const idx = parseInt(match[2], 10);
+            const origPhoto = existing.photos[idx];
+            if (origPhoto) {
+              resolvedPhotos.push(origPhoto);
+            }
+          } else {
+            resolvedPhotos.push(photo);
+          }
+        }
+        updates.photos = resolvedPhotos;
+      }
+    }
+    
+    const { error } = await supabase.from('job_orders').update(updates).eq('id', req.params.id);
+    if (error) return handleError(res, error, 'PUT job_orders');
+    clearJobOrdersCache();
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Update JO Error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.delete('/api/job-orders/:id', async (req, res) => {
   const { error } = await supabase.from('job_orders').delete().eq('id', req.params.id);
   if (error) return handleError(res, error, 'DELETE job_orders');
+  clearJobOrdersCache();
   res.sendStatus(204);
 });
 
@@ -598,6 +692,8 @@ app.post('/api/invoices', async (req, res) => {
       const { error: joErr } = await supabase.from('job_orders').update({ status: 'invoiced' }).eq('id', joId);
       if (joErr) {
         console.error(`[POST /invoices] JO Update error for ${joId}:`, joErr.message);
+      } else {
+        clearJobOrdersCache();
       }
     }
 
@@ -866,6 +962,7 @@ app.post('/api/system/clear', async (req, res) => {
   await supabase.from('customers').delete().neq('id', '');
   await supabase.from('employees').delete().neq('id', '');
   await supabase.from('company_bank_accounts').delete().neq('id', '');
+  clearJobOrdersCache();
   res.sendStatus(200);
 });
 

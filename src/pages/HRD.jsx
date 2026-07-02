@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/ConfirmContext';
 import toast from 'react-hot-toast';
@@ -54,11 +54,106 @@ const HRD = () => {
     bankName: ''
   });
 
+  const [selectedRoles, setSelectedRoles] = useState([]);
+  const [customPosition, setCustomPosition] = useState('');
+
+  const standardRoles = [
+    { key: 'Marketing', label: isID ? 'Marketing (Pemasaran)' : 'Marketing' },
+    { key: 'Admin Office', label: isID ? 'Admin Office' : 'Admin Office' },
+    { key: 'Procurement', label: isID ? 'Procurement (Pengadaan)' : 'Procurement' },
+    { key: 'Executor', label: isID ? 'Executor (Pelaksana)' : 'Executor' },
+    { key: 'Accounting', label: isID ? 'Accounting (Akuntansi)' : 'Accounting' },
+    { key: 'HRD', label: isID ? 'HRD' : 'HRD' },
+    { key: 'System Control', label: isID ? 'System Control (Admin Sistem)' : 'System Control' }
+  ];
+
+  useEffect(() => {
+    if (isAddModalOpen) {
+      const rawPosition = selectedEmployee?.position || '';
+      const parts = rawPosition.split(',').map(p => p.trim()).filter(Boolean);
+      const checked = [];
+      const customParts = [];
+      
+      parts.forEach(part => {
+        const matchedRole = standardRoles.find(r => r.key.toLowerCase() === part.toLowerCase());
+        if (matchedRole) {
+          checked.push(matchedRole.key);
+        } else {
+          customParts.push(part);
+        }
+      });
+      
+      setSelectedRoles(checked);
+      setCustomPosition(customParts.join(', '));
+    }
+  }, [isAddModalOpen, selectedEmployee]);
+
   const [accountData, setAccountData] = useState({
     username: '',
     password: '',
     permissions: {}
   });
+
+  const renderPositionTags = (positionStr) => {
+    if (!positionStr) return <span style={{ color: 'var(--text-muted)' }}>-</span>;
+    const parts = positionStr.split(',').map(p => p.trim()).filter(Boolean);
+    
+    const roleColors = {
+      'marketing': { bg: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', text: 'var(--green-vibrant)' },
+      'admin office': { bg: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', text: 'var(--blue-vibrant)' },
+      'procurement': { bg: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', text: '#a78bfa' },
+      'executor': { bg: 'rgba(236, 72, 153, 0.1)', border: '1px solid rgba(236, 72, 153, 0.3)', text: '#f472b6' },
+      'accounting': { bg: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', text: 'var(--gold-vibrant)' },
+      'hrd': { bg: 'rgba(20, 184, 166, 0.1)', border: '1px solid rgba(20, 184, 166, 0.3)', text: '#2dd4bf' },
+      'system control': { bg: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', text: 'var(--red-vibrant)' }
+    };
+
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+        {parts.map((part, index) => {
+          const styleConf = roleColors[part.toLowerCase()] || { 
+            bg: 'rgba(255, 255, 255, 0.05)', 
+            border: '1px solid rgba(255, 255, 255, 0.1)', 
+            text: 'var(--text-muted)' 
+          };
+          return (
+            <span 
+              key={index} 
+              style={{ 
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '4px 10px', 
+                borderRadius: '6px', 
+                fontSize: '0.75rem', 
+                fontWeight: '700', 
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                background: styleConf.bg,
+                border: styleConf.border,
+                color: styleConf.text
+              }}
+            >
+              {part}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const getPermissionsFromPosition = (positionStr) => {
+    const perms = {};
+    if (!positionStr) return perms;
+    const parts = positionStr.split(',').map(p => p.trim().toLowerCase());
+    if (parts.includes('marketing')) perms.marketing = 'write';
+    if (parts.includes('admin office')) perms.admin = 'write';
+    if (parts.includes('procurement')) perms.procurement = 'write';
+    if (parts.includes('executor')) perms.executor = 'write';
+    if (parts.includes('accounting')) perms.accounting = 'write';
+    if (parts.includes('hrd')) perms.hrd = 'write';
+    if (parts.includes('system control')) perms.systemControl = 'write';
+    return perms;
+  };
 
   const filteredEmployees = (employees || []).filter(emp => 
     emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -71,12 +166,69 @@ const HRD = () => {
     setIsSubmitting(true);
     setSubmitError('');
     try {
+      if (selectedRoles.length === 0 && !customPosition.trim()) {
+        throw new Error(isID ? 'Pilih minimal satu jabatan atau isi jabatan kustom.' : 'Please select at least one role or enter a custom position.');
+      }
+
+      const finalParts = [...selectedRoles];
+      if (customPosition.trim()) {
+        finalParts.push(customPosition.trim());
+      }
+      const finalPosition = finalParts.join(', ');
+      const payload = { ...formData, position: finalPosition };
+
       const isEditing = !!selectedEmployee;
       if (isEditing) {
-        await updateEmployee(selectedEmployee.id, formData);
+        await updateEmployee(selectedEmployee.id, payload);
+        
+        // Sync account permissions if system access account exists
+        const account = getAccount(selectedEmployee.id);
+        if (account) {
+          let perms = {};
+          if (account.role && account.role.startsWith('{')) {
+            try { perms = JSON.parse(account.role); } catch(e) {}
+          } else {
+            const rm = account.role;
+            if (rm === 'marketing') perms = { marketing: 'write' };
+            else if (rm === 'accounting') perms = { accounting: 'write' };
+            else if (rm === 'executor') perms = { executor: 'write' };
+            else if (rm === 'admin') perms = { admin: 'write', procurement: 'write' };
+            else if (rm === 'hrd') perms = { hrd: 'write' };
+          }
+          
+          const permToRoleMap = {
+            marketing: 'Marketing',
+            admin: 'Admin Office',
+            procurement: 'Procurement',
+            executor: 'Executor',
+            accounting: 'Accounting',
+            hrd: 'HRD',
+            systemControl: 'System Control'
+          };
+          
+          const newPerms = { ...perms };
+          Object.entries(permToRoleMap).forEach(([permKey, roleName]) => {
+            if (selectedRoles.includes(roleName)) {
+              if (!newPerms[permKey] || newPerms[permKey] === 'none') {
+                newPerms[permKey] = 'write';
+              }
+            } else {
+              delete newPerms[permKey];
+            }
+          });
+          
+          const finalRoleStr = JSON.stringify(newPerms);
+          if (finalRoleStr !== account.role) {
+            await updateEmployeeAccount(selectedEmployee.id, {
+              username: account.username,
+              role: finalRoleStr
+            });
+          }
+        }
+        
         toast.success(isID ? 'Data karyawan berhasil diperbarui!' : 'Employee data successfully updated!');
       } else {
-        await addEmployee(formData);
+        await addEmployee(payload);
         toast.success(isID ? 'Karyawan baru berhasil ditambahkan!' : 'New employee successfully added!');
       }
       setIsAddModalOpen(false);
@@ -116,6 +268,34 @@ const HRD = () => {
         });
         toast.success(isID ? 'Akses sistem berhasil diberikan!' : 'System access successfully granted!');
       }
+
+      // Sync position tags with granted permissions
+      const activePermissions = Object.keys(accountData.permissions).filter(
+        key => accountData.permissions[key] && accountData.permissions[key] !== 'none'
+      );
+      const permToRoleMap = {
+        marketing: 'Marketing',
+        admin: 'Admin Office',
+        procurement: 'Procurement',
+        executor: 'Executor',
+        accounting: 'Accounting',
+        hrd: 'HRD',
+        systemControl: 'System Control'
+      };
+      const activeRoles = activePermissions.map(k => permToRoleMap[k]).filter(Boolean);
+      const currentParts = (selectedEmployee.position || '').split(',').map(p => p.trim()).filter(Boolean);
+      const standardRoleValues = Object.values(permToRoleMap);
+      const customParts = currentParts.filter(part => !standardRoleValues.some(sr => sr.toLowerCase() === part.toLowerCase()));
+      const finalParts = [...activeRoles, ...customParts];
+      const finalPosition = finalParts.join(', ');
+
+      if (finalPosition !== selectedEmployee.position) {
+        await updateEmployee(selectedEmployee.id, {
+          ...selectedEmployee,
+          position: finalPosition
+        });
+      }
+
       setIsAccountModalOpen(false);
       setIsEditAccount(false);
       setSelectedEmployee(null);
@@ -195,7 +375,7 @@ const HRD = () => {
                   >
                     <td style={{ padding: '20px' }}>
                       <div style={{ fontWeight: '600', fontSize: '1rem', color: 'var(--text)' }}>{emp.name}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--secondary)', textTransform: 'uppercase', letterSpacing: '1px', marginTop: '4px' }}>{emp.position || '-'}</div>
+                      {renderPositionTags(emp.position)}
                     </td>
                     <td style={{ padding: '20px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', marginBottom: '4px' }}>
@@ -282,7 +462,8 @@ const HRD = () => {
                             onClick={() => {
                               setSelectedEmployee(emp);
                               setIsEditAccount(false);
-                              setAccountData({ username: '', password: '', permissions: {} });
+                              const initialPerms = getPermissionsFromPosition(emp.position);
+                              setAccountData({ username: '', password: '', permissions: initialPerms });
                               setIsAccountModalOpen(true);
                             }}
                             className="btn-text" 
@@ -363,9 +544,60 @@ const HRD = () => {
                   <label>Nama Lengkap</label>
                   <input required type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Masukkan nama lengkap" />
                 </div>
-                <div className="input-group">
-                  <label>Jabatan</label>
-                  <input required type="text" value={formData.position} onChange={e => setFormData({ ...formData, position: e.target.value })} placeholder="Contoh: Marketing, Accounting, dll" />
+                <div className="input-group" style={{ gridColumn: 'span 2', marginTop: '10px' }}>
+                  <label style={{ fontWeight: '700', marginBottom: '10px', display: 'block' }}>
+                    {isID ? 'Jabatan / Peran Karyawan' : 'Employee Position / Roles'}
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '10px', marginBottom: '15px' }}>
+                    {standardRoles.map(role => {
+                      const isChecked = selectedRoles.includes(role.key);
+                      return (
+                        <label 
+                          key={role.key} 
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '10px', 
+                            padding: '10px 15px', 
+                            background: isChecked ? 'rgba(212, 175, 55, 0.1)' : 'rgba(255,255,255,0.02)', 
+                            border: isChecked ? '1px solid var(--secondary)' : '1px solid var(--border)', 
+                            borderRadius: '8px', 
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            fontWeight: isChecked ? '600' : 'normal',
+                            color: isChecked ? 'var(--secondary)' : 'var(--text-muted)',
+                            transition: 'all 0.2s ease',
+                            userSelect: 'none'
+                          }}
+                        >
+                          <input 
+                            type="checkbox" 
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedRoles(prev => [...prev, role.key]);
+                              } else {
+                                setSelectedRoles(prev => prev.filter(r => r !== role.key));
+                              }
+                            }}
+                            style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                          />
+                          {role.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div className="input-group">
+                    <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      {isID ? 'Jabatan Tambahan / Kustom (Opsional)' : 'Additional / Custom Position (Optional)'}
+                    </label>
+                    <input 
+                      type="text" 
+                      value={customPosition} 
+                      onChange={e => setCustomPosition(e.target.value)} 
+                      placeholder={isID ? "Contoh: Driver, Manager, Magang..." : "e.g., Driver, Manager, Intern..."} 
+                    />
+                  </div>
                 </div>
                 <div className="input-group">
                   <label>NIK</label>
