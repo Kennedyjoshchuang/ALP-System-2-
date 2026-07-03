@@ -807,14 +807,14 @@ const Executor = () => {
                                         {jo.photos?.map((photo, idx) => (
                                           <div key={idx} style={{ position: 'relative', width: '70px', height: '70px' }}>
                                             <img src={photo} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} />
-                                            {activeTab === 'active' && canWrite && (
+                                            {canWrite && (
                                               <button onClick={() => removePhoto(jo.id, idx)} style={{ position: 'absolute', top: -5, right: -5, background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>×</button>
                                             )}
                                           </div>
                                         ))}
-                                        {activeTab === 'active' && canWrite && (
+                                        {canWrite && (
                                           <div 
-                                            onClick={() => fileInputRef.current.click()}
+                                            onClick={() => { setUploadingForId(jo.id); fileInputRef.current.click(); }}
                                             style={{ width: '70px', height: '70px', border: '2px dashed var(--glass-border)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}
                                           >
                                             <Plus size={20} />
