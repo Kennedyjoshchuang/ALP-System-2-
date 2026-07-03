@@ -1,9 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
+import DigitalSignatureController from '../components/DigitalSignatureController';
 
 const PrintQuotation = () => {
   const [data, setData] = useState(null);
   const { t } = useApp() || { t: (k) => k };
+  const [sigConfig, setSigConfig] = useState({
+    type: 'none',
+    showStamp: true,
+    text: 'Finance Dept',
+    font: 'Playball',
+    drawData: '',
+    uploadData: '',
+    sigColor: '#1e3a8a'
+  });
 
   useEffect(() => {
     const savedData = localStorage.getItem('print_quotation_data');
@@ -91,10 +101,11 @@ const PrintQuotation = () => {
       {/* Print toolbar - hidden when printing */}
       <div className="no-print" style={{
         position: 'sticky', top: 0, zIndex: 100,
-        display: 'flex', justifyContent: 'flex-end', gap: '15px',
+        display: 'flex', justifyContent: 'flex-end', gap: '15px', alignItems: 'center',
         padding: '15px 30px', background: 'rgba(15,23,42,0.95)',
         backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(255,255,255,0.1)'
       }}>
+        <DigitalSignatureController onConfigChange={setSigConfig} />
         <button onClick={() => window.close()} style={{ height: '40px', padding: '0 20px', fontSize: '0.9rem', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
           Close
         </button>
@@ -224,23 +235,64 @@ const PrintQuotation = () => {
           <p style={{ margin: '0 0 10px 0', fontSize: '0.92rem', fontWeight: '600', color: '#1e293b' }}>Kind regards,</p>
           
           <div style={{ position: 'relative', display: 'inline-block', minWidth: '220px' }}>
-            {/* The signature image is the OTL logo itself which already contains the signature scribble */}
-            <img 
-              src="/assets/logo.png" 
-              alt="Signature" 
-              style={{ 
-                width: '85px', 
-                height: '85px', 
-                objectFit: 'contain',
-                display: 'block',
-                marginBottom: '10px'
-              }} 
-            />
-            
+            {/* Fixed-height signature zone so layout never collapses when stamp is hidden */}
+            <div style={{ position: 'relative', width: '85px', height: '95px' }}>
+              {/* Stamp Logo / Default Signature scribble */}
+              {(sigConfig.showStamp || sigConfig.type === 'none') && (
+                <img
+                  src="/assets/logo.png"
+                  alt="Signature Background"
+                  style={{
+                    width: '85px',
+                    height: '85px',
+                    objectFit: 'contain',
+                    display: 'block',
+                    opacity: sigConfig.type === 'none' ? 1.0 : 0.35,
+                    mixBlendMode: 'multiply',
+                    userSelect: 'none',
+                    pointerEvents: 'none'
+                  }}
+                />
+              )}
+
+              {/* Custom overlay signature */}
+              {sigConfig.type === 'draw' && sigConfig.drawData && (
+                <img
+                  src={sigConfig.drawData}
+                  alt="Signature"
+                  style={{ position: 'absolute', top: 0, left: 0, width: '85px', height: '85px', objectFit: 'contain', zIndex: 2 }}
+                />
+              )}
+              {sigConfig.type === 'type' && sigConfig.text && (
+                <div style={{
+                  position: 'absolute',
+                  top: '20px',
+                  left: '5px',
+                  fontFamily: sigConfig.font,
+                  fontSize: '1.8rem',
+                  color: sigConfig.sigColor,
+                  transform: 'rotate(-4deg)',
+                  whiteSpace: 'nowrap',
+                  zIndex: 2,
+                  userSelect: 'none',
+                  pointerEvents: 'none'
+                }}>
+                  {sigConfig.text}
+                </div>
+              )}
+              {sigConfig.type === 'upload' && sigConfig.uploadData && (
+                <img
+                  src={sigConfig.uploadData}
+                  alt="Uploaded Signature"
+                  style={{ position: 'absolute', top: 0, left: 0, width: '85px', height: '85px', objectFit: 'contain', zIndex: 2 }}
+                />
+              )}
+            </div>
+
             <div style={{ position: 'relative', zIndex: 2 }}>
-              <div style={{ 
-                fontWeight: '800', 
-                fontSize: '0.98rem', 
+              <div style={{
+                fontWeight: '800',
+                fontSize: '0.98rem',
                 color: '#0f172a',
                 borderBottom: '1.5px solid #0f172a',
                 display: 'inline-block',
@@ -249,12 +301,12 @@ const PrintQuotation = () => {
               }}>
                 {data.marketingName || 'Heri'}
               </div>
-              <div style={{ 
-                fontSize: '0.85rem', 
-                fontWeight: '700', 
-                color: '#475569', 
-                textTransform: 'uppercase', 
-                letterSpacing: '0.5px' 
+              <div style={{
+                fontSize: '0.85rem',
+                fontWeight: '700',
+                color: '#475569',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
               }}>
                 PT. Alpha Logistics Prakarsa
               </div>

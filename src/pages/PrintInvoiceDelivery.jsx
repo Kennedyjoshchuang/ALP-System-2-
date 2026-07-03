@@ -1,7 +1,17 @@
 import React, { useEffect, useState } from 'react';
+import DigitalSignatureController from '../components/DigitalSignatureController';
 
 const PrintInvoiceDelivery = () => {
   const [data, setData] = useState(null);
+  const [sigConfig, setSigConfig] = useState({
+    type: 'none',
+    showStamp: true,
+    text: 'Finance Dept',
+    font: 'Playball',
+    drawData: '',
+    uploadData: '',
+    sigColor: '#1e3a8a'
+  });
 
   useEffect(() => {
     const saved = localStorage.getItem('print_invoice_data');
@@ -46,7 +56,8 @@ const PrintInvoiceDelivery = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontWeight: '800', fontSize: '0.95rem', color: '#1e293b' }}>Surat Tanda Terima Invoice — {invoice?.id}</span>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <DigitalSignatureController onConfigChange={setSigConfig} />
           <button onClick={() => window.close()} style={{ padding: '8px 18px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '0.85rem' }}>Tutup</button>
           <button onClick={() => window.print()} style={{ padding: '8px 20px', background: '#1e293b', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '0.85rem' }}>🖨 Print / Simpan PDF</button>
         </div>
@@ -102,8 +113,68 @@ const PrintInvoiceDelivery = () => {
 
         {/* Signature Area */}
         <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', gap: '60px' }}>
-          <div style={{ textAlign: 'center', flex: 1 }}>
-            <p style={{ fontSize: '0.9rem', fontWeight: '700', marginBottom: '80px' }}>PENGIRIM / KURIR,</p>
+          <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <p style={{ fontSize: '0.9rem', fontWeight: '700', margin: '0 0 5px 0' }}>PENGIRIM / KURIR,</p>
+
+            {/* Interactive Signature overlay area */}
+            <div style={{
+              position: 'relative',
+              width: '150px',
+              height: '70px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '5px 0'
+            }}>
+              {/* Background Stamp Logo */}
+              {sigConfig.showStamp && (
+                <img
+                  src="/assets/logo.png"
+                  alt="ALP Stamp"
+                  style={{
+                    width: '70px',
+                    height: '70px',
+                    objectFit: 'contain',
+                    opacity: 0.35,
+                    mixBlendMode: 'multiply',
+                    userSelect: 'none',
+                    pointerEvents: 'none'
+                  }}
+                />
+              )}
+
+              {/* Digital Signature Overlay */}
+              {sigConfig.type === 'draw' && sigConfig.drawData && (
+                <img
+                  src={sigConfig.drawData}
+                  alt="Signature"
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain', zIndex: 2 }}
+                />
+              )}
+              {sigConfig.type === 'type' && sigConfig.text && (
+                <div style={{
+                  position: 'absolute',
+                  fontFamily: sigConfig.font,
+                  fontSize: '1.8rem',
+                  color: sigConfig.sigColor,
+                  transform: 'rotate(-4deg)',
+                  whiteSpace: 'nowrap',
+                  zIndex: 2,
+                  userSelect: 'none',
+                  pointerEvents: 'none'
+                }}>
+                  {sigConfig.text}
+                </div>
+              )}
+              {sigConfig.type === 'upload' && sigConfig.uploadData && (
+                <img
+                  src={sigConfig.uploadData}
+                  alt="Uploaded Signature"
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain', zIndex: 2 }}
+                />
+              )}
+            </div>
+
             <div style={{ borderBottom: '2px solid #1e293b', width: '100%', marginBottom: '5px' }}></div>
             <p style={{ margin: 0, fontWeight: '800', fontSize: '0.9rem' }}>PT. ALPHA LOGISTICS PRAKARSA</p>
           </div>

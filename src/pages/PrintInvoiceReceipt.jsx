@@ -1,7 +1,17 @@
 import React, { useEffect, useState } from 'react';
+import DigitalSignatureController from '../components/DigitalSignatureController';
 
 const PrintInvoiceReceipt = () => {
   const [data, setData] = useState(null);
+  const [sigConfig, setSigConfig] = useState({
+    type: 'none',
+    showStamp: true,
+    text: 'Finance Dept',
+    font: 'Playball',
+    drawData: '',
+    uploadData: '',
+    sigColor: '#1e3a8a'
+  });
 
   useEffect(() => {
     const savedData = localStorage.getItem('print_invoice_data');
@@ -80,7 +90,8 @@ const PrintInvoiceReceipt = () => {
         }
       `}</style>
 
-      <div className="no-print" style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+      <div className="no-print" style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <DigitalSignatureController onConfigChange={setSigConfig} />
         <button onClick={() => window.print()} style={{ padding: '10px 20px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>Print Receipt</button>
         <button onClick={() => window.close()} style={{ padding: '10px 20px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '5px', cursor: 'pointer' }}>Close</button>
       </div>
@@ -130,10 +141,70 @@ const PrintInvoiceReceipt = () => {
               </div>
             )}
           </div>
-          <div style={{ textAlign: 'center', width: '200px' }}>
-            <p style={{ fontSize: '12px', marginBottom: '60px' }}>Batam, {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
-            <div style={{ borderBottom: '1px solid #000', width: '100%' }}></div>
-            <p style={{ fontSize: '12px', fontWeight: '700', marginTop: '5px' }}>CASHIER / FINANCE</p>
+          <div style={{ textAlign: 'center', width: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <p style={{ fontSize: '12px', margin: '0 0 5px 0' }}>Batam, {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+
+            {/* Interactive Signature overlay area */}
+            <div style={{
+              position: 'relative',
+              width: '180px',
+              height: '70px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '5px 0'
+            }}>
+              {/* Background Stamp Logo */}
+              {sigConfig.showStamp && (
+                <img
+                  src="/assets/logo.png"
+                  alt="ALP Stamp"
+                  style={{
+                    width: '70px',
+                    height: '70px',
+                    objectFit: 'contain',
+                    opacity: 0.35,
+                    mixBlendMode: 'multiply',
+                    userSelect: 'none',
+                    pointerEvents: 'none'
+                  }}
+                />
+              )}
+
+              {/* Digital Signature Overlay */}
+              {sigConfig.type === 'draw' && sigConfig.drawData && (
+                <img
+                  src={sigConfig.drawData}
+                  alt="Signature"
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain', zIndex: 2 }}
+                />
+              )}
+              {sigConfig.type === 'type' && sigConfig.text && (
+                <div style={{
+                  position: 'absolute',
+                  fontFamily: sigConfig.font,
+                  fontSize: '1.8rem',
+                  color: sigConfig.sigColor,
+                  transform: 'rotate(-4deg)',
+                  whiteSpace: 'nowrap',
+                  zIndex: 2,
+                  userSelect: 'none',
+                  pointerEvents: 'none'
+                }}>
+                  {sigConfig.text}
+                </div>
+              )}
+              {sigConfig.type === 'upload' && sigConfig.uploadData && (
+                <img
+                  src={sigConfig.uploadData}
+                  alt="Uploaded Signature"
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain', zIndex: 2 }}
+                />
+              )}
+            </div>
+
+            <div style={{ borderBottom: '1px solid #000', width: '100%', marginBottom: '5px' }}></div>
+            <p style={{ fontSize: '12px', fontWeight: '700', margin: 0 }}>CASHIER / FINANCE</p>
           </div>
         </div>
       </div>
@@ -167,8 +238,68 @@ const PrintInvoiceReceipt = () => {
           <div className="amount-box" style={{ fontSize: '16px', padding: '10px 15px' }}>
             RP. {totalAmount.toLocaleString('id-ID')}
           </div>
-          <div style={{ textAlign: 'center', width: '150px' }}>
-            <p style={{ fontSize: '10px', marginBottom: '40px' }}>Batam, {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+          <div style={{ textAlign: 'center', width: '150px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <p style={{ fontSize: '10px', margin: '0 0 3px 0' }}>Batam, {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+
+            {/* Interactive Signature overlay area */}
+            <div style={{
+              position: 'relative',
+              width: '130px',
+              height: '50px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '3px 0'
+            }}>
+              {/* Background Stamp Logo */}
+              {sigConfig.showStamp && (
+                <img
+                  src="/assets/logo.png"
+                  alt="ALP Stamp"
+                  style={{
+                    width: '50px',
+                    height: '50px',
+                    objectFit: 'contain',
+                    opacity: 0.35,
+                    mixBlendMode: 'multiply',
+                    userSelect: 'none',
+                    pointerEvents: 'none'
+                  }}
+                />
+              )}
+
+              {/* Digital Signature Overlay */}
+              {sigConfig.type === 'draw' && sigConfig.drawData && (
+                <img
+                  src={sigConfig.drawData}
+                  alt="Signature"
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain', zIndex: 2 }}
+                />
+              )}
+              {sigConfig.type === 'type' && sigConfig.text && (
+                <div style={{
+                  position: 'absolute',
+                  fontFamily: sigConfig.font,
+                  fontSize: '1.4rem',
+                  color: sigConfig.sigColor,
+                  transform: 'rotate(-4deg)',
+                  whiteSpace: 'nowrap',
+                  zIndex: 2,
+                  userSelect: 'none',
+                  pointerEvents: 'none'
+                }}>
+                  {sigConfig.text}
+                </div>
+              )}
+              {sigConfig.type === 'upload' && sigConfig.uploadData && (
+                <img
+                  src={sigConfig.uploadData}
+                  alt="Uploaded Signature"
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain', zIndex: 2 }}
+                />
+              )}
+            </div>
+
             <div style={{ borderBottom: '1px solid #000', width: '100%' }}></div>
           </div>
         </div>

@@ -1,7 +1,17 @@
 import React, { useEffect, useState } from 'react';
+import DigitalSignatureController from '../components/DigitalSignatureController';
 
 const PrintInvoice = () => {
   const [data, setData] = useState(null);
+  const [sigConfig, setSigConfig] = useState({
+    type: 'none',
+    showStamp: true,
+    text: 'Finance Dept',
+    font: 'Playball',
+    drawData: '',
+    uploadData: '',
+    sigColor: '#1e3a8a'
+  });
 
   useEffect(() => {
     const saved = localStorage.getItem('print_invoice_data');
@@ -74,7 +84,8 @@ const PrintInvoice = () => {
           <span style={{ background: '#dcfce7', color: '#166534', fontSize: '0.7rem', fontWeight: '800', padding: '3px 12px', borderRadius: '20px', textTransform: 'uppercase' }}>Diterbitkan</span>
         </div>
         
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <DigitalSignatureController onConfigChange={setSigConfig} />
           {(photos.length > 0 || invoice?.signedInvoicePhoto || invoice?.signedReceiptPhoto) && (
             <button
               onClick={() => window.open('/print/invoice-attachment', '_blank')}
@@ -300,8 +311,68 @@ const PrintInvoice = () => {
             <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '0 0 3px 0', fontWeight: '600' }}>* Pembayaran harap dilakukan dalam 14 hari kerja sejak tanggal invoice.</p>
             <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: 0, fontWeight: '600' }}>* Dokumen ini sah tanpa tanda tangan basah.</p>
           </div>
-          <div style={{ textAlign: 'center', minWidth: '220px' }}>
-            <p style={{ margin: '0 0 65px 0', fontSize: '0.78rem', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '1px' }}>Hormat Kami,</p>
+          <div style={{ textAlign: 'center', minWidth: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <p style={{ margin: '0 0 5px 0', fontSize: '0.78rem', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '1px' }}>Hormat Kami,</p>
+
+            {/* Interactive Signature overlay area */}
+            <div style={{
+              position: 'relative',
+              width: '180px',
+              height: '80px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '5px 0'
+            }}>
+              {/* Background Stamp Logo */}
+              {sigConfig.showStamp && (
+                <img
+                  src="/assets/logo.png"
+                  alt="ALP Stamp"
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    objectFit: 'contain',
+                    opacity: 0.35,
+                    mixBlendMode: 'multiply',
+                    userSelect: 'none',
+                    pointerEvents: 'none'
+                  }}
+                />
+              )}
+
+              {/* Digital Signature Overlay */}
+              {sigConfig.type === 'draw' && sigConfig.drawData && (
+                <img
+                  src={sigConfig.drawData}
+                  alt="Signature"
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain', zIndex: 2 }}
+                />
+              )}
+              {sigConfig.type === 'type' && sigConfig.text && (
+                <div style={{
+                  position: 'absolute',
+                  fontFamily: sigConfig.font,
+                  fontSize: '2rem',
+                  color: sigConfig.sigColor,
+                  transform: 'rotate(-4deg)',
+                  whiteSpace: 'nowrap',
+                  zIndex: 2,
+                  userSelect: 'none',
+                  pointerEvents: 'none'
+                }}>
+                  {sigConfig.text}
+                </div>
+              )}
+              {sigConfig.type === 'upload' && sigConfig.uploadData && (
+                <img
+                  src={sigConfig.uploadData}
+                  alt="Uploaded Signature"
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain', zIndex: 2 }}
+                />
+              )}
+            </div>
+
             <div style={{ borderBottom: '2px solid #1e293b', width: '100%', marginBottom: '10px' }}></div>
             <p style={{ margin: 0, fontWeight: '900', fontSize: '1rem', color: '#1e293b' }}>PT. Alpha Logistics Prakarsa</p>
             <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Finance Department</p>
