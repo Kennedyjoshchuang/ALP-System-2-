@@ -96,6 +96,8 @@ const Accounting = () => {
   };
 
   const [activeTab, setActiveTab] = useState('billing'); // 'billing', 'piutang', or 'costing'
+  const [expandedReportMonths, setExpandedReportMonths] = useState({});
+  const [expandedOtherTxMonths, setExpandedOtherTxMonths] = useState({});
   const [receivableSubTab, setReceivableSubTab] = useState('outstanding');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [costModal, setCostModal] = useState(null); // holds the JO being costed
@@ -3888,144 +3890,254 @@ const Accounting = () => {
               </div>
             </div>
 
-            <div className="table-container"><div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ textAlign: 'left', borderBottom: '2px solid #ec4899' }}>
-                  <th style={{ padding: '15px' }}>{isID ? 'Deskripsi / Transaksi' : 'Description / Transaction'}</th>
-                  <th style={{ padding: '15px' }}>{isID ? 'Kategori' : 'Category'}</th>
-                  <th style={{ padding: '15px' }}>{isID ? 'Rekening / Penerima' : 'Account / Recipient'}</th>
-                  <th style={{ padding: '15px' }}>{isID ? 'Tanggal' : 'Date'}</th>
-                  <th style={{ padding: '15px', textAlign: 'right' }}>{isID ? 'Nominal' : 'Amount'}</th>
-                  <th style={{ padding: '15px', textAlign: 'right' }}>{isID ? 'Potongan Pajak' : 'Tax Deduction'}</th>
-                  <th style={{ padding: '15px', textAlign: 'right' }}>Total</th>
-                  <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Bukti' : 'Proof'}</th>
-                  <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Aksi' : 'Action'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOtherTransactions.map(t => (
-                  <tr key={t.id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                    <td style={{ padding: '15px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{
-                          fontSize: '0.65rem', padding: '2px 6px', borderRadius: '12px',
-                          background: t.type === 'income' ? 'rgba(16,185,129,0.15)' : 'rgba(236,72,153,0.15)',
-                          color: t.type === 'income' ? 'var(--success)' : '#ec4899', fontWeight: '800', textTransform: 'uppercase'
-                        }}>
-                          {isID ? (t.type === 'income' ? 'MASUK' : 'KELUAR') : (t.type === 'income' ? 'INCOME' : 'EXPENSE')}
-                        </span>
-                        <span style={{ fontWeight: '700', color: 'var(--text)' }}>
-                          {t.description || (isID ? 'Tanpa Deskripsi' : 'No Description')}
-                        </span>
-                      </div>
-                      {t.employeeName && t.employeeName !== 'Umum' && (
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
-                          <span>{isID ? 'Karyawan' : 'Employee'}: {t.employeeName}</span>
-                          {t.position && (
-                            <>
-                              <span>(</span>
-                              {renderPositionTags(t.position)}
-                              <span>)</span>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '15px' }}>
-                      <span style={{
-                        fontSize: '0.75rem', padding: '4px 10px', borderRadius: '6px',
-                        background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--glass-border)',
-                        fontWeight: '600', display: 'inline-block'
-                      }}>
-                        {t.category || (isID ? 'Lain-lain' : 'Others')}
-                      </span>
-                      {t.subcategory && (
-                        <div style={{ fontSize: '0.7rem', color: 'var(--secondary)', marginTop: '4px', paddingLeft: '4px', fontWeight: '500' }}>
-                          ↳ {t.subcategory}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '15px' }}>
-                      {/* Recipient Account (Employee/Vendor/Manual input) */}
-                      {t.bankName && t.bankName !== '-' ? (
-                        <div style={{ marginBottom: '6px' }}>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', fontWeight: 'bold' }}>
-                            {isID ? 'Penerima:' : 'Recipient:'}
-                          </span>
-                          <div style={{ fontSize: '0.85rem' }}>{t.bankName}</div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--secondary)', fontWeight: '600' }}>{t.bankAccount}</div>
-                        </div>
-                      ) : null}
+            {(() => {
+              const transactionsByMonth = {};
+              filteredOtherTransactions.forEach(t => {
+                const dateStr = t.expenseDate || t.date;
+                const dateObj = new Date(dateStr);
+                let mKey = 'Unknown';
+                if (!isNaN(dateObj.getTime())) {
+                  mKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+                }
+                if (!transactionsByMonth[mKey]) {
+                  transactionsByMonth[mKey] = {
+                    key: mKey,
+                    income: 0,
+                    expense: 0,
+                    items: []
+                  };
+                }
+                const totalAmount = parseFloat(t.totalAfterTax || t.amount || 0);
+                if (t.type === 'income') {
+                  transactionsByMonth[mKey].income += totalAmount;
+                } else {
+                  transactionsByMonth[mKey].expense += totalAmount;
+                }
+                transactionsByMonth[mKey].items.push(t);
+              });
 
-                      {/* Company Account (Source/Target) */}
-                      {(() => {
-                        if (t.companyBankAccountId === 'CUSTOM' && t.customSourceTarget) {
-                          return (
-                            <div>
-                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', fontWeight: 'bold' }}>
-                                {t.type === 'income' 
-                                  ? (isID ? 'Target:' : 'Target:') 
-                                  : (isID ? 'Sumber:' : 'Source:')}
+              const sortedMonths = Object.keys(transactionsByMonth).sort((a, b) => b.localeCompare(a));
+
+              if (filteredOtherTransactions.length === 0) {
+                return (
+                  <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-muted)' }}>
+                    <Briefcase size={48} style={{ opacity: 0.2, marginBottom: '15px', display: 'block', margin: '0 auto 15px' }} />
+                    <p style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '6px' }}>{isID ? 'Belum ada transaksi pendapatan atau pengeluaran lain.' : 'No other income or expense transactions yet.'}</p>
+                    <p style={{ fontSize: '0.85rem' }}>{isID ? 'Tambahkan transaksi baru menggunakan tombol di atas.' : 'Add new transactions using the buttons above.'}</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  {sortedMonths.map(mKey => {
+                    const monthData = transactionsByMonth[mKey];
+                    const isExpanded = !!expandedOtherTxMonths[mKey];
+                    
+                    const monthName = (() => {
+                      if (mKey === 'Unknown') return isID ? 'Tidak Diketahui' : 'Unknown';
+                      const [year, month] = mKey.split('-');
+                      const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+                      return date.toLocaleDateString(isID ? 'id-ID' : 'en-US', { month: 'long', year: 'numeric' });
+                    })();
+
+                    const netBalance = monthData.income - monthData.expense;
+
+                    return (
+                      <div key={mKey} className="glass-card" style={{ border: '1px solid var(--glass-border)', borderRadius: '12px', overflow: 'hidden', background: 'rgba(255,255,255,0.01)' }}>
+                        {/* Monthly Summary Header */}
+                        <div 
+                          onClick={() => setExpandedOtherTxMonths(prev => ({ ...prev, [mKey]: !isExpanded }))}
+                          style={{ 
+                            padding: '15px 20px', 
+                            display: 'flex', 
+                            flexWrap: 'wrap', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center', 
+                            cursor: 'pointer', 
+                            background: isExpanded ? 'rgba(255,255,255,0.03)' : 'transparent',
+                            transition: 'background 0.2s',
+                            gap: '15px'
+                          }}
+                          className="table-row-hover"
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', color: '#ec4899' }}>
+                              {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                            </span>
+                            <span style={{ fontWeight: '800', fontSize: '1rem', color: 'var(--secondary)' }}>{monthName}</span>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '10px' }}>
+                              ({monthData.items.length} {isID ? 'transaksi' : 'transactions'})
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', fontSize: '0.85rem' }}>
+                            {monthData.income > 0 && (
+                              <div>
+                                <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isID ? 'Pemasukan:' : 'Income:'}</span>
+                                <span style={{ fontWeight: '700', color: 'var(--success)' }}>+Rp {monthData.income.toLocaleString()}</span>
+                              </div>
+                            )}
+                            {monthData.expense > 0 && (
+                              <div>
+                                <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isID ? 'Pengeluaran:' : 'Expense:'}</span>
+                                <span style={{ fontWeight: '700', color: '#ec4899' }}>-Rp {monthData.expense.toLocaleString()}</span>
+                              </div>
+                            )}
+                            <div style={{ borderLeft: '1px solid var(--glass-border)', paddingLeft: '20px' }}>
+                              <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>Net:</span>
+                              <span style={{ fontWeight: '800', color: netBalance >= 0 ? 'var(--success)' : '#ec4899' }}>
+                                {netBalance >= 0 ? '+' : '-'}Rp {Math.abs(netBalance).toLocaleString()}
                               </span>
-                              <div style={{ fontSize: '0.85rem', color: 'var(--text)' }}>{t.customSourceTarget}</div>
                             </div>
-                          );
-                        }
-                        const companyBank = companyBankAccounts.find(b => b.id === t.companyBankAccountId);
-                        if (companyBank) {
-                          return (
-                            <div>
-                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', fontWeight: 'bold' }}>
-                                {t.type === 'income' 
-                                  ? (isID ? 'Target (Rek. Perusahaan):' : 'Target (Company Acc):') 
-                                  : (isID ? 'Sumber (Rek. Perusahaan):' : 'Source (Company Acc):')}
-                              </span>
-                              <div style={{ fontSize: '0.85rem', color: 'var(--text)' }}>{companyBank.bankName}</div>
-                              <div style={{ fontSize: '0.8rem', color: 'var(--success)', fontWeight: '600' }}>{companyBank.accountNumber}</div>
+                          </div>
+                        </div>
+
+                        {/* Monthly Transactions Table */}
+                        {isExpanded && (
+                          <div style={{ padding: '20px', borderTop: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.1)', overflowX: 'auto' }}>
+                            <div className="table-container">
+                              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                  <tr style={{ textAlign: 'left', borderBottom: '2px solid #ec4899' }}>
+                                    <th style={{ padding: '15px' }}>{isID ? 'Deskripsi / Transaksi' : 'Description / Transaction'}</th>
+                                    <th style={{ padding: '15px' }}>{isID ? 'Kategori' : 'Category'}</th>
+                                    <th style={{ padding: '15px' }}>{isID ? 'Rekening / Penerima' : 'Account / Recipient'}</th>
+                                    <th style={{ padding: '15px' }}>{isID ? 'Tanggal' : 'Date'}</th>
+                                    <th style={{ padding: '15px', textAlign: 'right' }}>{isID ? 'Nominal' : 'Amount'}</th>
+                                    <th style={{ padding: '15px', textAlign: 'right' }}>{isID ? 'Potongan Pajak' : 'Tax Deduction'}</th>
+                                    <th style={{ padding: '15px', textAlign: 'right' }}>Total</th>
+                                    <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Bukti' : 'Proof'}</th>
+                                    <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Aksi' : 'Action'}</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {monthData.items.map(t => (
+                                    <tr key={t.id} style={{ borderBottom: '1px solid var(--glass-border)' }} className="table-row-hover">
+                                      <td style={{ padding: '15px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <span style={{
+                                            fontSize: '0.65rem', padding: '2px 6px', borderRadius: '12px',
+                                            background: t.type === 'income' ? 'rgba(16,185,129,0.15)' : 'rgba(236,72,153,0.15)',
+                                            color: t.type === 'income' ? 'var(--success)' : '#ec4899', fontWeight: '800', textTransform: 'uppercase'
+                                          }}>
+                                            {isID ? (t.type === 'income' ? 'MASUK' : 'KELUAR') : (t.type === 'income' ? 'INCOME' : 'EXPENSE')}
+                                          </span>
+                                          <span style={{ fontWeight: '700', color: 'var(--text)' }}>
+                                            {t.description || (isID ? 'Tanpa Deskripsi' : 'No Description')}
+                                          </span>
+                                        </div>
+                                        {t.employeeName && t.employeeName !== 'Umum' && (
+                                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+                                            <span>{isID ? 'Karyawan' : 'Employee'}: {t.employeeName}</span>
+                                            {t.position && (
+                                              <>
+                                                <span>(</span>
+                                                {renderPositionTags(t.position)}
+                                                <span>)</span>
+                                              </>
+                                            )}
+                                          </div>
+                                        )}
+                                      </td>
+                                      <td style={{ padding: '15px' }}>
+                                        <span style={{
+                                          fontSize: '0.75rem', padding: '4px 10px', borderRadius: '6px',
+                                          background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--glass-border)',
+                                          fontWeight: '600', display: 'inline-block'
+                                        }}>
+                                          {t.category || (isID ? 'Lain-lain' : 'Others')}
+                                        </span>
+                                        {t.subcategory && (
+                                          <div style={{ fontSize: '0.7rem', color: 'var(--secondary)', marginTop: '4px', paddingLeft: '4px', fontWeight: '500' }}>
+                                            ↳ {t.subcategory}
+                                          </div>
+                                        )}
+                                      </td>
+                                      <td style={{ padding: '15px' }}>
+                                        {t.bankName && t.bankName !== '-' ? (
+                                          <div style={{ marginBottom: '6px' }}>
+                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                                              {isID ? 'Penerima:' : 'Recipient:'}
+                                            </span>
+                                            <div style={{ fontSize: '0.85rem' }}>{t.bankName}</div>
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--secondary)', fontWeight: '600' }}>{t.bankAccount}</div>
+                                          </div>
+                                        ) : null}
+
+                                        {(() => {
+                                          if (t.companyBankAccountId === 'CUSTOM' && t.customSourceTarget) {
+                                            return (
+                                              <div>
+                                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                                                  {t.type === 'income' 
+                                                    ? (isID ? 'Target:' : 'Target:') 
+                                                    : (isID ? 'Sumber:' : 'Source:')}
+                                                </span>
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--text)' }}>{t.customSourceTarget}</div>
+                                              </div>
+                                            );
+                                          }
+                                          const companyBank = companyBankAccounts.find(b => b.id === t.companyBankAccountId);
+                                          if (companyBank) {
+                                            return (
+                                              <div>
+                                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                                                  {t.type === 'income' 
+                                                    ? (isID ? 'Target (Rek. Perusahaan):' : 'Target (Company Acc):') 
+                                                    : (isID ? 'Sumber (Rek. Perusahaan):' : 'Source (Company Acc):')}
+                                                </span>
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--text)' }}>{companyBank.bankName}</div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--success)', fontWeight: '600' }}>{companyBank.accountNumber}</div>
+                                              </div>
+                                            );
+                                          }
+                                          return !t.bankName || t.bankName === '-' ? <span style={{ color: 'var(--text-muted)' }}>-</span> : null;
+                                        })()}
+                                      </td>
+                                      <td style={{ padding: '15px' }}>{new Date(t.expenseDate || t.date).toLocaleDateString(isID ? 'id-ID' : 'en-US', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                                      <td style={{ padding: '15px', textAlign: 'right', fontWeight: '600' }}>Rp {parseFloat(t.amount || 0).toLocaleString()}</td>
+                                      <td style={{ padding: '15px', textAlign: 'right', color: 'var(--danger)' }}>
+                                        {t.taxes && t.taxes.length > 0 ? `- Rp ${t.taxes.reduce((acc, x) => acc + parseFloat(x.amount || 0), 0).toLocaleString()}` : '-'}
+                                      </td>
+                                      <td style={{
+                                        padding: '15px', textAlign: 'right', fontWeight: '800',
+                                        color: t.type === 'income' ? 'var(--success)' : '#ec4899'
+                                      }}>
+                                        {t.type === 'income' ? '+' : '-'} Rp {parseFloat(t.totalAfterTax || t.amount || 0).toLocaleString()}
+                                      </td>
+                                      <td style={{ padding: '15px', textAlign: 'center' }}>
+                                        {t.proofPhoto ? (
+                                          <button onClick={() => setPhotoViewer({ title: `${isID ? 'Bukti Transaksi' : 'Transaction Proof'} - ${t.description}`, photos: [t.proofPhoto] })} style={{ background:'none', border:'none', color:'var(--secondary)', cursor:'pointer' }}><Image size={18}/></button>
+                                        ) : <span style={{ color:'var(--text-muted)' }}>-</span>}
+                                      </td>
+                                      <td style={{ padding: '15px', textAlign: 'center' }}>
+                                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                          {canWrite && (
+                                            <button className="btn btn-sm" style={{ background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px solid var(--secondary)', display:'flex', alignItems:'center', justifyContent:'center', width:'32px', height:'32px', borderRadius:'6px', cursor:'pointer' }} onClick={() => handleEditOtherTransaction(t)}>
+                                              <Edit3 size={14} />
+                                            </button>
+                                          )}
+                                          {canWrite && (
+                                            <button className="btn btn-sm btn-danger" onClick={() => deleteOtherExpense(t.id)} style={{ width:'32px', height:'32px' }}>
+                                              <Trash2 size={14} />
+                                            </button>
+                                          )}
+                                          {!canWrite && <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>-</span>}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
-                          );
-                        }
-                        return !t.bankName || t.bankName === '-' ? <span style={{ color: 'var(--text-muted)' }}>-</span> : null;
-                      })()}
-                    </td>
-                    <td style={{ padding: '15px' }}>{new Date(t.expenseDate || t.date).toLocaleDateString(isID ? 'id-ID' : 'en-US', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                    <td style={{ padding: '15px', textAlign: 'right', fontWeight: '600' }}>Rp {parseFloat(t.amount || 0).toLocaleString()}</td>
-                    <td style={{ padding: '15px', textAlign: 'right', color: 'var(--danger)' }}>
-                      {t.taxes && t.taxes.length > 0 ? `- Rp ${t.taxes.reduce((acc, x) => acc + parseFloat(x.amount || 0), 0).toLocaleString()}` : '-'}
-                    </td>
-                    <td style={{
-                      padding: '15px', textAlign: 'right', fontWeight: '800',
-                      color: t.type === 'income' ? 'var(--success)' : '#ec4899'
-                    }}>
-                      {t.type === 'income' ? '+' : '-'} Rp {parseFloat(t.totalAfterTax || t.amount || 0).toLocaleString()}
-                    </td>
-                    <td style={{ padding: '15px', textAlign: 'center' }}>
-                      {t.proofPhoto ? (
-                        <button onClick={() => setPhotoViewer({ title: `${isID ? 'Bukti Transaksi' : 'Transaction Proof'} - ${t.description}`, photos: [t.proofPhoto] })} style={{ background:'none', border:'none', color:'var(--secondary)', cursor:'pointer' }}><Image size={18}/></button>
-                      ) : <span style={{ color:'var(--text-muted)' }}>-</span>}
-                    </td>
-                    <td style={{ padding: '15px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                        {canWrite && (
-                          <button className="btn btn-sm" style={{ background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px solid var(--secondary)', display:'flex', alignItems:'center', justifyContent:'center', width:'32px', height:'32px', borderRadius:'6px', cursor:'pointer' }} onClick={() => handleEditOtherTransaction(t)}>
-                            <Edit3 size={14} />
-                          </button>
+                          </div>
                         )}
-                        {canWrite && (
-                          <button className="btn btn-sm btn-danger" onClick={() => deleteOtherExpense(t.id)} style={{ width:'32px', height:'32px' }}>
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                        {!canWrite && <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>-</span>}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-                {filteredOtherTransactions.length === 0 && (
-                  <tr><td colSpan="9" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>{isID ? 'Belum ada data transaksi tercatat.' : 'No transactions recorded yet.'}</td></tr>
-                )}
-              </tbody>
-            </table></div></div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         </div>
       ) : activeTab === 'hutang' ? (
@@ -4422,79 +4534,175 @@ const Accounting = () => {
             {/* Detailed Transaction Log */}
             <div className="glass-card" style={{ padding:'30px' }}>
               <h4 style={{ marginBottom:'25px', display:'flex', alignItems:'center', gap:'10px' }}><Calendar size={20} style={{color:'var(--secondary)'}}/> {isID ? 'Log Detail Transaksi' : 'Transaction Detail Log'}</h4>
-              <div style={{ overflowX:'auto' }}>
-                <div className="table-container"><table style={{ width:'100%', borderCollapse:'collapse' }}>
-                  <thead>
-                    <tr style={{ textAlign:'left', borderBottom:'2px solid var(--glass-border)' }}>
-                      <th style={{ padding:'12px', fontSize:'0.8rem', color:'var(--text-muted)' }}>{isID ? 'Tanggal' : 'Date'}</th>
-                      <th style={{ padding:'12px', fontSize:'0.8rem', color:'var(--text-muted)' }}>{isID ? 'Deskripsi' : 'Description'}</th>
-                      <th style={{ padding:'12px', fontSize:'0.8rem', color:'var(--text-muted)' }}>{isID ? 'Kategori' : 'Category'}</th>
-                      <th style={{ padding:'12px', fontSize:'0.8rem', color:'var(--text-muted)', textAlign:'right' }}>{isID ? 'Jumlah' : 'Amount'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(() => {
-                      const logs = [
-                        ...invoices.filter(i => filterByDate(i.date)).map(i => ({ date: i.date, desc: `Invoice: ${i.id} (${i.customerName})`, cat: isID ? 'PENDAPATAN' : 'REVENUE', amt: i.amount, color: 'var(--success)' })),
-                        ...purchaseOrders.filter(p => filterByDate(p.date)).map(p => ({ date: p.date, desc: `PO: ${p.id} (${p.vendorName})`, cat: isID ? 'BIAYA OP' : 'OP COST', amt: -p.grandTotal, color: 'var(--warning)' })),
-                        ...salaries.filter(s => filterByDate(s.expenseDate || s.date)).map(s => ({ date: s.expenseDate || s.date, desc: isID ? `Gaji: ${s.name} (${s.period})` : `Payroll: ${s.name} (${s.period})`, cat: isID ? 'BIAYA GAJI' : 'PAYROLL', amt: -s.totalToPay, color: '#8b5cf6' })),
-                        ...enrichedOtherTransactions.filter(e => filterByDate(e.expenseDate || e.date)).map(e => {
-                          const isIncome = e.type === 'income';
-                          return {
-                            date: e.expenseDate || e.date,
-                            desc: (() => {
-                              let cbText = '';
-                              if (e.companyBankAccountId === 'CUSTOM' && e.customSourceTarget) {
-                                cbText = ` [${e.customSourceTarget}]`;
-                              } else {
-                                const cb = companyBankAccounts.find(b => b.id === e.companyBankAccountId);
-                                if (cb) cbText = ` [${cb.bankName}]`;
-                              }
-                              return isIncome 
-                                ? (isID ? `Pemasukan Lain: ${e.description} (${e.employeeName || 'Umum'})${cbText}` : `Other Income: ${e.description} (${e.employeeName || 'General'})${cbText}`)
-                                : (isID ? `Lain-lain: ${e.description} (${e.employeeName || 'Umum'})${cbText}` : `Misc: ${e.description} (${e.employeeName || 'General'})${cbText}`);
-                            })(),
-                            cat: isIncome 
-                              ? (isID ? 'PENDAPATAN LAIN' : 'OTHER INCOME') 
-                              : ((isID ? (e.category || 'PENGELUARAN') : (e.category || 'EXPENSE')) + (e.subcategory ? ` - ${e.subcategory}` : '')).toUpperCase(),
-                            amt: isIncome ? e.totalAfterTax || e.amount : -e.totalAfterTax,
-                            color: isIncome ? 'var(--success)' : '#ec4899'
-                          };
-                        }),
-                        ...reimbursementsList.filter(r => r.status === 'paid' && filterByDate(r.expenseDate || r.date)).map(r => {
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                {(() => {
+                  const logs = [
+                    ...invoices.filter(i => filterByDate(i.date)).map(i => ({ date: i.date, desc: `Invoice: ${i.id} (${i.customerName})`, cat: isID ? 'PENDAPATAN' : 'REVENUE', amt: i.amount, color: 'var(--success)' })),
+                    ...purchaseOrders.filter(p => filterByDate(p.date)).map(p => ({ date: p.date, desc: `PO: ${p.id} (${p.vendorName})`, cat: isID ? 'BIAYA OP' : 'OP COST', amt: -p.grandTotal, color: 'var(--warning)' })),
+                    ...salaries.filter(s => filterByDate(s.expenseDate || s.date)).map(s => ({ date: s.expenseDate || s.date, desc: isID ? `Gaji: ${s.name} (${s.period})` : `Payroll: ${s.name} (${s.period})`, cat: isID ? 'BIAYA GAJI' : 'PAYROLL', amt: -s.totalToPay, color: '#8b5cf6' })),
+                    ...enrichedOtherTransactions.filter(e => filterByDate(e.expenseDate || e.date)).map(e => {
+                      const isIncome = e.type === 'income';
+                      return {
+                        date: e.expenseDate || e.date,
+                        desc: (() => {
                           let cbText = '';
-                          if (r.companyBankAccountId === 'CUSTOM' && r.customSourceTarget) cbText = ` [${r.customSourceTarget}]`;
-                          else {
-                            const cb = companyBankAccounts.find(b => b.id === r.companyBankAccountId);
+                          if (e.companyBankAccountId === 'CUSTOM' && e.customSourceTarget) {
+                            cbText = ` [${e.customSourceTarget}]`;
+                          } else {
+                            const cb = companyBankAccounts.find(b => b.id === e.companyBankAccountId);
                             if (cb) cbText = ` [${cb.bankName}]`;
                           }
-                          return {
-                            date: r.expenseDate || r.date,
-                            desc: `Reimbursement: ${r.employeeName}${cbText}`,
-                            cat: isID ? 'REIMBURSEMENT' : 'REIMBURSEMENT',
-                            amt: -parseFloat(r.totalAfterTax || r.amount || 0),
-                            color: '#14b8a6'
-                          };
-                        })
-                      ].sort((a, b) => new Date(b.date) - new Date(a.date));
+                          return isIncome 
+                            ? (isID ? `Pemasukan Lain: ${e.description} (${e.employeeName || 'Umum'})${cbText}` : `Other Income: ${e.description} (${e.employeeName || 'General'})${cbText}`)
+                            : (isID ? `Lain-lain: ${e.description} (${e.employeeName || 'Umum'})${cbText}` : `Misc: ${e.description} (${e.employeeName || 'General'})${cbText}`);
+                        })(),
+                        cat: isIncome 
+                          ? (isID ? 'PENDAPATAN LAIN' : 'OTHER INCOME') 
+                          : ((isID ? (e.category || 'PENGELUARAN') : (e.category || 'EXPENSE')) + (e.subcategory ? ` - ${e.subcategory}` : '')).toUpperCase(),
+                        amt: isIncome ? e.totalAfterTax || e.amount : -e.totalAfterTax,
+                        color: isIncome ? 'var(--success)' : '#ec4899'
+                      };
+                    }),
+                    ...reimbursementsList.filter(r => r.status === 'paid' && filterByDate(r.expenseDate || r.date)).map(r => {
+                      let cbText = '';
+                      if (r.companyBankAccountId === 'CUSTOM' && r.customSourceTarget) cbText = ` [${r.customSourceTarget}]`;
+                      else {
+                        const cb = companyBankAccounts.find(b => b.id === r.companyBankAccountId);
+                        if (cb) cbText = ` [${cb.bankName}]`;
+                      }
+                      return {
+                        date: r.expenseDate || r.date,
+                        desc: `Reimbursement: ${r.employeeName}${cbText}`,
+                        cat: isID ? 'REIMBURSEMENT' : 'REIMBURSEMENT',
+                        amt: -parseFloat(r.totalAfterTax || r.amount || 0),
+                        color: '#14b8a6'
+                      };
+                    })
+                  ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-                      return logs.length > 0 ? logs.map((log, i) => (
-                        <tr key={i} style={{ borderBottom:'1px solid var(--glass-border)' }}>
-                          <td style={{ padding:'12px', fontSize:'0.85rem' }}>{new Date(log.date).toLocaleDateString()}</td>
-                          <td style={{ padding:'12px', fontSize:'0.85rem', fontWeight:'600' }}>{log.desc}</td>
-                          <td style={{ padding:'12px' }}>
-                            <span style={{ fontSize:'0.65rem', padding:'2px 8px', borderRadius:'10px', background: `${log.color}20`, color: log.color, fontWeight:'700' }}>{log.cat}</span>
-                          </td>
-                          <td style={{ padding:'12px', textAlign:'right', fontWeight:'700', color: log.amt >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                            {log.amt >= 0 ? '+' : '-'} Rp {Math.abs(log.amt).toLocaleString()}
-                          </td>
-                        </tr>
-                      )) : (
-                        <tr><td colSpan="4" style={{ padding:'40px', textAlign:'center', color:'var(--text-muted)' }}>{isID ? 'Tidak ada data dalam rentang tanggal yang dipilih.' : 'No data in selected date range.'}</td></tr>
-                      );
-                    })()}
-                  </tbody>
-                </table></div>
+                  const logsByMonth = {};
+                  logs.forEach(log => {
+                    const dateObj = new Date(log.date);
+                    let mKey = 'Unknown';
+                    if (!isNaN(dateObj.getTime())) {
+                      mKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+                    }
+                    if (!logsByMonth[mKey]) {
+                      logsByMonth[mKey] = {
+                        key: mKey,
+                        income: 0,
+                        expense: 0,
+                        items: []
+                      };
+                    }
+                    if (log.amt >= 0) {
+                      logsByMonth[mKey].income += log.amt;
+                    } else {
+                      logsByMonth[mKey].expense += Math.abs(log.amt);
+                    }
+                    logsByMonth[mKey].items.push(log);
+                  });
+
+                  const sortedMonths = Object.keys(logsByMonth).sort((a, b) => b.localeCompare(a));
+
+                  if (sortedMonths.length === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                        {isID ? 'Tidak ada data dalam rentang tanggal yang dipilih.' : 'No data in selected date range.'}
+                      </div>
+                    );
+                  }
+
+                  return sortedMonths.map(mKey => {
+                    const monthData = logsByMonth[mKey];
+                    const isExpanded = !!expandedReportMonths[mKey];
+                    const monthName = (() => {
+                      if (mKey === 'Unknown') return isID ? 'Tidak Diketahui' : 'Unknown';
+                      const [year, month] = mKey.split('-');
+                      const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+                      return date.toLocaleDateString(isID ? 'id-ID' : 'en-US', { month: 'long', year: 'numeric' });
+                    })();
+
+                    const netBalance = monthData.income - monthData.expense;
+
+                    return (
+                      <div key={mKey} className="glass-card" style={{ border: '1px solid var(--glass-border)', borderRadius: '12px', overflow: 'hidden', background: 'rgba(255,255,255,0.01)' }}>
+                        <div 
+                          onClick={() => setExpandedReportMonths(prev => ({ ...prev, [mKey]: !isExpanded }))}
+                          style={{ 
+                            padding: '15px 20px', 
+                            display: 'flex', 
+                            flexWrap: 'wrap', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center', 
+                            cursor: 'pointer', 
+                            background: isExpanded ? 'rgba(255,255,255,0.03)' : 'transparent',
+                            transition: 'background 0.2s',
+                            gap: '15px'
+                          }}
+                          className="table-row-hover"
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', color: 'var(--secondary)' }}>
+                              {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                            </span>
+                            <span style={{ fontWeight: '800', fontSize: '1rem', color: 'var(--secondary)' }}>{monthName}</span>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '10px' }}>
+                              ({monthData.items.length} {isID ? 'transaksi' : 'transactions'})
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', fontSize: '0.85rem' }}>
+                            <div>
+                              <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isID ? 'Pemasukan:' : 'Income:'}</span>
+                              <span style={{ fontWeight: '700', color: 'var(--success)' }}>+Rp {monthData.income.toLocaleString()}</span>
+                            </div>
+                            <div>
+                              <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isID ? 'Pengeluaran:' : 'Expense:'}</span>
+                              <span style={{ fontWeight: '700', color: 'var(--danger)' }}>-Rp {monthData.expense.toLocaleString()}</span>
+                            </div>
+                            <div style={{ borderLeft: '1px solid var(--glass-border)', paddingLeft: '20px' }}>
+                              <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>Net:</span>
+                              <span style={{ fontWeight: '800', color: netBalance >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                {netBalance >= 0 ? '+' : '-'}Rp {Math.abs(netBalance).toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div style={{ padding: '20px', borderTop: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.1)', overflowX: 'auto' }}>
+                            <div className="table-container">
+                              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                  <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--glass-border)' }}>
+                                    <th style={{ padding: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{isID ? 'Tanggal' : 'Date'}</th>
+                                    <th style={{ padding: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{isID ? 'Deskripsi' : 'Description'}</th>
+                                    <th style={{ padding: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{isID ? 'Kategori' : 'Category'}</th>
+                                    <th style={{ padding: '12px', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'right' }}>{isID ? 'Jumlah' : 'Amount'}</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {monthData.items.map((log, i) => (
+                                    <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }} className="table-row-hover">
+                                      <td style={{ padding: '12px', fontSize: '0.85rem' }}>{new Date(log.date).toLocaleDateString()}</td>
+                                      <td style={{ padding: '12px', fontSize: '0.85rem', fontWeight: '600' }}>{log.desc}</td>
+                                      <td style={{ padding: '12px' }}>
+                                        <span style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: '10px', background: `${log.color}20`, color: log.color, fontWeight: '700' }}>{log.cat}</span>
+                                      </td>
+                                      <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: log.amt >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                        {log.amt >= 0 ? '+' : '-'} Rp {Math.abs(log.amt).toLocaleString()}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
 

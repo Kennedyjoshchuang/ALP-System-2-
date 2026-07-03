@@ -1732,6 +1732,13 @@ const Marketing = () => {
                 {quotations
                   .filter(q => q.status === 'approved' && filterByDate(q.date))
                   .filter(q => {
+                    const qJOs = jobOrders.filter(jo => String(jo.quotationId) === String(q.id));
+                    if (qJOs.length > 0 && qJOs.every(jo => jo.status === 'invoiced')) {
+                      return false;
+                    }
+                    return true;
+                  })
+                  .filter(q => {
                     const name = q.customerName || '';
                     const id = q.id || '';
                     const pic = q.pic || '';
@@ -1770,7 +1777,7 @@ const Marketing = () => {
                   .map(quote => {
                     const firstItem = Array.isArray(quote.items) && quote.items.length > 0 ? quote.items[0] : null;
                     const activityLabel = firstItem ? firstItem.description : '-';
-                    const quoteJOs = jobOrders.filter(jo => String(jo.quotationId) === String(quote.id));
+                    const quoteJOs = jobOrders.filter(jo => String(jo.quotationId) === String(quote.id) && jo.status !== 'invoiced');
                     const isExpanded = !!expandedQuoteJOs[quote.id];
 
                     return (

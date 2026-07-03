@@ -117,7 +117,7 @@ const Executor = () => {
 
   const filteredJOs = jobOrders
     .filter(jo => {
-      const tabMatch = activeTab === 'active' ? jo.status === 'dispatched' : jo.status === 'done';
+      const tabMatch = activeTab === 'active' ? jo.status === 'dispatched' : (jo.status === 'done' || jo.status === 'invoiced');
       const searchMatch = (jo.id || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                         (jo.customerName || '').toLowerCase().includes(searchTerm.toLowerCase());
       return tabMatch && searchMatch && filterByDate(jo.date);

@@ -37,7 +37,7 @@ const SystemControl = () => {
 
   // Fallback to empty arrays to prevent TypeError if context values are not arrays
   const safeCustomers = Array.isArray(customers) ? customers : [];
-  const safeJobOrders = Array.isArray(jobOrders) ? jobOrders : [];
+  const safeJobOrders = (Array.isArray(jobOrders) ? jobOrders : []).filter(jo => jo.status !== 'invoiced');
   const safeInvoices = Array.isArray(invoices) ? invoices : [];
 
   const [confirmModal, setConfirmModal] = useState({ show: false, type: '', id: null, label: '' });
