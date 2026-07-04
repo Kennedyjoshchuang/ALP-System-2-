@@ -43,6 +43,7 @@ const Layout = ({ children }) => {
     { path: '/procurement', label: t('procurement'), icon: ShoppingCart, moduleKey: 'procurement' },
     { path: '/executor', label: t('executor'), icon: PlayCircle, moduleKey: 'executor' },
     { path: '/accounting', label: t('accounting'), icon: CreditCard, moduleKey: 'accounting' },
+    { path: '/cost-applications', label: language === 'id' ? 'Pengajuan Biaya' : 'Cost Applications', icon: Wallet, moduleKey: 'costApplications' },
     { path: '/hrd', label: t('hrd'), icon: UserCheck, moduleKey: 'hrd' },
     { path: '/system-control', label: t('systemControl'), icon: ShieldAlert, moduleKey: 'systemControl' },
   ].filter(item => hasAccess(item.moduleKey));

@@ -224,8 +224,11 @@ const authorize = (req, res, next) => {
     moduleKey = 'marketing';
   } else if (path.startsWith('/vendors')) {
     moduleKey = 'procurement';
-  } else if (path.startsWith('/invoices') || path.startsWith('/receivables') || path.startsWith('/salaries') || path.startsWith('/other-expenses') || path.startsWith('/company-bank-accounts')) {
+  } else if (path.startsWith('/invoices') || path.startsWith('/receivables') || path.startsWith('/salaries') || path.startsWith('/company-bank-accounts')) {
     moduleKey = 'accounting';
+  } else if (path.startsWith('/other-expenses')) {
+    // Permit all authenticated roles to make requests. Fine-grained RBAC is done in the route handlers.
+    return next();
   } else if (path.startsWith('/employees') || path.startsWith('/employee-accounts')) {
     moduleKey = 'hrd';
   } else if (path.startsWith('/system')) {
@@ -905,27 +908,165 @@ app.delete('/api/salaries/:id', async (req, res) => {
 app.get('/api/other-expenses', async (req, res) => {
   const { data, error } = await supabase.from('other_expenses').select('*');
   if (error) return handleError(res, error, 'GET other_expenses');
-  res.json(data);
+
+  const hasAccounting = req.user.role === 'owner' || req.user.permissions?.accounting === 'write';
+  if (hasAccounting) {
+    return res.json(data);
+  }
+
+  // Filter for regular staff: only show what they requested
+  const filtered = data.filter(e => {
+    if (e.employeeName === req.user.name) return true;
+    if (e.description && e.description.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(e.description);
+        return parsed.employeeId === req.user.employeeId || parsed.requestedBy === req.user.name;
+      } catch (err) {}
+    }
+    return false;
+  });
+  res.json(filtered);
 });
 
 app.post('/api/other-expenses', async (req, res) => {
   const { id, employeeName, position, bankAccount, bankName, amount, description, taxes, proofPhoto, expenseDate, totalAfterTax, date } = req.body;
-  const { error } = await supabase.from('other_expenses').insert({
-    id, employeeName, position, bankAccount, bankName, amount,
-    description, taxes: taxes || [], proofPhoto, expenseDate, totalAfterTax, date
-  });
+  
+  const hasAccounting = req.user.role === 'owner' || req.user.permissions?.accounting === 'write';
+  
+  let finalDescription = description;
+  let finalStatus = 'pending';
+  let finalType = 'expense';
+  
+  if (!hasAccounting) {
+    // Regular staff can only create pending cost applications
+    if (description && description.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(description);
+        finalType = 'cost_application';
+        parsed.type = 'cost_application';
+        parsed.status = 'pending';
+        parsed.requestedBy = req.user.name;
+        parsed.employeeId = req.user.employeeId || null;
+        finalDescription = JSON.stringify(parsed);
+      } catch (e) {
+        finalDescription = JSON.stringify({
+          type: 'cost_application',
+          status: 'pending',
+          requestedBy: req.user.name,
+          employeeId: req.user.employeeId || null,
+          notes: description
+        });
+      }
+    } else {
+      finalDescription = JSON.stringify({
+        type: 'cost_application',
+        status: 'pending',
+        requestedBy: req.user.name,
+        employeeId: req.user.employeeId || null,
+        notes: description || ''
+      });
+    }
+  }
+
+  const payload = {
+    id,
+    employeeName: hasAccounting ? employeeName : req.user.name,
+    position: hasAccounting ? position : (req.user.role || 'staff'),
+    bankAccount,
+    bankName,
+    amount: parseFloat(amount) || 0,
+    description: finalDescription,
+    taxes: hasAccounting ? (taxes || []) : [],
+    proofPhoto: proofPhoto || null,
+    expenseDate,
+    totalAfterTax: parseFloat(amount) || 0,
+    date
+  };
+
+  const { error } = await supabase.from('other_expenses').insert(payload);
   if (error) return handleError(res, error, 'POST other_expenses');
   res.status(201).json({ id });
 });
 
 app.put('/api/other-expenses/:id', async (req, res) => {
   const updates = req.body;
+  const hasAccounting = req.user.role === 'owner' || req.user.permissions?.accounting === 'write';
+
+  if (!hasAccounting) {
+    // 1. Fetch existing item
+    const { data: existing, error: fetchErr } = await supabase.from('other_expenses').select('*').eq('id', req.params.id).single();
+    if (fetchErr || !existing) return res.status(404).json({ error: 'Data tidak ditemukan.' });
+
+    // 2. Check ownership
+    let isOwner = existing.employeeName === req.user.name;
+    let existingStatus = 'pending';
+    if (existing.description && existing.description.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(existing.description);
+        if (parsed.requestedBy === req.user.name || parsed.employeeId === req.user.employeeId) {
+          isOwner = true;
+        }
+        existingStatus = parsed.status || 'pending';
+      } catch (e) {}
+    }
+
+    if (!isOwner) {
+      return res.status(403).json({ error: 'Akses ditolak: Anda tidak memiliki wewenang untuk aksi ini.' });
+    }
+
+    // 3. Only allow updates if pending
+    if (existingStatus !== 'pending') {
+      return res.status(403).json({ error: 'Akses ditolak: Transaksi yang sudah disetujui/dibayar tidak dapat diubah.' });
+    }
+
+    // 4. Prevent status escalation (non-accountants can't approve or pay)
+    if (updates.description && updates.description.startsWith('{')) {
+      try {
+        const parsedUpdates = JSON.parse(updates.description);
+        if (parsedUpdates.status && parsedUpdates.status !== 'pending' && parsedUpdates.status !== 'cancelled') {
+          return res.status(403).json({ error: 'Akses ditolak: Hanya bagian Accounting yang dapat menyetujui atau mencairkan dana.' });
+        }
+      } catch (e) {
+        return res.status(400).json({ error: 'Format deskripsi tidak valid.' });
+      }
+    }
+  }
+
   const { error } = await supabase.from('other_expenses').update(updates).eq('id', req.params.id);
   if (error) return handleError(res, error, 'PUT other_expenses');
   res.sendStatus(200);
 });
 
 app.delete('/api/other-expenses/:id', async (req, res) => {
+  const hasAccounting = req.user.role === 'owner' || req.user.permissions?.accounting === 'write';
+
+  if (!hasAccounting) {
+    // 1. Fetch existing item
+    const { data: existing, error: fetchErr } = await supabase.from('other_expenses').select('*').eq('id', req.params.id).single();
+    if (fetchErr || !existing) return res.status(404).json({ error: 'Data tidak ditemukan.' });
+
+    // 2. Check ownership and status
+    let isOwner = existing.employeeName === req.user.name;
+    let existingStatus = 'pending';
+    if (existing.description && existing.description.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(existing.description);
+        if (parsed.requestedBy === req.user.name || parsed.employeeId === req.user.employeeId) {
+          isOwner = true;
+        }
+        existingStatus = parsed.status || 'pending';
+      } catch (e) {}
+    }
+
+    if (!isOwner) {
+      return res.status(403).json({ error: 'Akses ditolak: Anda tidak memiliki wewenang untuk aksi ini.' });
+    }
+
+    if (existingStatus !== 'pending') {
+      return res.status(403).json({ error: 'Akses ditolak: Transaksi yang sudah disetujui/dibayar tidak dapat dihapus.' });
+    }
+  }
+
   const { error } = await supabase.from('other_expenses').delete().eq('id', req.params.id);
   if (error) return handleError(res, error, 'DELETE other_expenses');
   res.sendStatus(204);

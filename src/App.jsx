@@ -13,6 +13,7 @@ import Procurement from './pages/Procurement';
 import SystemControl from './pages/SystemControl';
 import HRD from './pages/HRD';
 import Login from './pages/Login';
+import CostApplications from './pages/CostApplications';
 import DashboardHome from './components/DashboardHome';
 import SuratJalanDetail from './pages/SuratJalanDetail';
 import PrintQuotation from './pages/PrintQuotation';
@@ -45,6 +46,7 @@ const AppRoutes = () => {
         <Route path="/admin" element={<ProtectedRoute><AdminHub /></ProtectedRoute>} />
         <Route path="/executor" element={<ProtectedRoute><Executor /></ProtectedRoute>} />
         <Route path="/accounting" element={<ProtectedRoute><Accounting /></ProtectedRoute>} />
+        <Route path="/cost-applications" element={<ProtectedRoute><CostApplications /></ProtectedRoute>} />
         <Route path="/procurement" element={<ProtectedRoute><Procurement /></ProtectedRoute>} />
         <Route path="/hrd" element={<ProtectedRoute><HRD /></ProtectedRoute>} />
         <Route path="/system-control" element={<ProtectedRoute><SystemControl /></ProtectedRoute>} />
