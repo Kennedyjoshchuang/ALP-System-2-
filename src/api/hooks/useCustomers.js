@@ -12,6 +12,19 @@ const CUSTOMERS_QUERY_KEY = ["customers"];
 export function useCustomers() {
   const queryClient = useQueryClient();
 
+  const hasAccessToCustomers = () => {
+    const saved = sessionStorage.getItem('alp_user');
+    if (!saved) return false;
+    try {
+      const user = JSON.parse(saved);
+      if (user.role === 'owner') return true;
+      const permissions = user.permissions || {};
+      return permissions.marketing === 'write' || permissions.marketing === 'read';
+    } catch (e) {
+      return false;
+    }
+  };
+
   // Fetch customers – cached and refetched based on React‑Query defaults
   const {
     data,
@@ -22,7 +35,7 @@ export function useCustomers() {
   } = useQuery({
     queryKey: CUSTOMERS_QUERY_KEY,
     queryFn: () => apiRequest("customers"),
-    enabled: !!sessionStorage.getItem('alp_user')
+    enabled: hasAccessToCustomers()
   });
 
   const customers = Array.isArray(data) ? data : [];

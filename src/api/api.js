@@ -31,6 +31,13 @@ export async function apiRequest(endpoint, options = {}) {
     } catch (e) {
       // Not JSON, use raw text
     }
+
+    if (response.status === 401 && errMsg && errMsg.includes("Akses ditolak")) {
+      sessionStorage.removeItem('alp_token');
+      sessionStorage.removeItem('alp_user');
+      window.dispatchEvent(new Event('alp-auth-unauthorized'));
+    }
+
     throw new Error(errMsg);
   }
   // 204 No Content → undefined

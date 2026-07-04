@@ -568,8 +568,8 @@ const CostApplications = () => {
                             </button>
                           )}
 
-                          {/* Staff actions: Edit / Delete (Only pending) */}
-                          {app.status === 'pending' && (
+                          {/* Staff actions: Edit / Delete (Only pending + authorized) */}
+                          {app.status === 'pending' && (isAccountant || app.employeeName === user?.name || app.requestedBy === user?.name || (app.employeeId && app.employeeId === user?.employeeId)) && (
                             <>
                               <button 
                                 onClick={() => handleOpenEditModal(app)}
