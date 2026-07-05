@@ -4,7 +4,15 @@ const PrintInvoiceAttachment = () => {
   const [data, setData] = useState(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('print_invoice_data');
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    let saved = null;
+    if (id) {
+      saved = localStorage.getItem('print_invoice_data_' + id);
+    }
+    if (!saved) {
+      saved = localStorage.getItem('print_invoice_data');
+    }
     if (saved) setData(JSON.parse(saved));
   }, []);
 

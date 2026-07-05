@@ -102,7 +102,20 @@ CREATE TABLE invoices (
     tax NUMERIC,
     extra_charges JSONB DEFAULT '[]'::jsonb,
     date TEXT,
-    status TEXT
+    status TEXT,
+    "signedReceiptPhoto" TEXT,
+    "signedInvoicePhoto" TEXT,
+    "deliveryStatus" TEXT DEFAULT 'not_sent',
+    "paymentProofPhoto" TEXT,
+    tax_deduction NUMERIC DEFAULT 0,
+    tax_deduction_proof TEXT,
+    taxes_deducted JSONB DEFAULT '[]'::jsonb,
+    notes TEXT,
+    currency TEXT DEFAULT 'IDR',
+    "currentRate" NUMERIC DEFAULT 1,
+    "usedRate" NUMERIC DEFAULT 1,
+    "disableCascade" BOOLEAN DEFAULT false,
+    "consolidatedJOs" JSONB DEFAULT '[]'::jsonb
 );
 
 CREATE TABLE receivables (

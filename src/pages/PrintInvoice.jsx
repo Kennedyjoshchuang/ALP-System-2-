@@ -15,7 +15,15 @@ const PrintInvoice = () => {
   });
 
   useEffect(() => {
-    const saved = localStorage.getItem('print_invoice_data');
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    let saved = null;
+    if (id) {
+      saved = localStorage.getItem('print_invoice_data_' + id);
+    }
+    if (!saved) {
+      saved = localStorage.getItem('print_invoice_data');
+    }
     if (saved) setData(JSON.parse(saved));
   }, []);
 
@@ -33,6 +41,18 @@ const PrintInvoice = () => {
   const fmtDate = (d) => {
     if (!d) return '—';
     return new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+  };
+
+  const getItemTitle = (item, idx) => {
+    const desc = item.description || '';
+    if (!desc || desc === 'Freight & Logistics Services' || desc === 'Freight &amp; Logistics Services') {
+      const joObj = targetJOs[idx];
+      if (joObj) {
+        return joObj.instruction || joObj.jobDescription || 'Freight Forwarding Services';
+      }
+      return 'Freight Forwarding Services';
+    }
+    return desc;
   };
 
   const dueDate = invoice?.date
@@ -166,7 +186,7 @@ const PrintInvoice = () => {
                 {[
                   ['Tanggal Invoice', fmtDate(invoice?.date)],
                   ['Jatuh Tempo', fmtDate(dueDate)],
-                  ['Referensi JO', invoice?.joId],
+                  ['Referensi JO', targetJOs.length > 0 ? targetJOs.map(j => j.id).join(', ') : invoice?.joId],
                 ].map(([label, val]) => (
                   <tr key={label}>
                     <td style={{ padding: '4px 14px 4px 0', color: '#64748b', fontWeight: '700', whiteSpace: 'nowrap' }}>{label}:</td>
@@ -188,58 +208,83 @@ const PrintInvoice = () => {
             </tr>
           </thead>
           <tbody>
-            {/* Main JO Items */}
-            {targetJOs.map((targetJo, joIdx) => {
-              if (Array.isArray(targetJo.items) && targetJo.items.length > 0) {
-                return targetJo.items.map((item, idx) => (
-                  <tr key={`jo-${targetJo.id}-item-${idx}`} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '15px 14px' }}>
-                      <div style={{ fontWeight: '800', fontSize: '1rem' }}>{item.serviceType || 'Logistics Service'}</div>
+            {/* Main Invoice Items */}
+            {Array.isArray(invoice?.items) && invoice.items.length > 0 ? (
+              invoice.items.map((item, idx) => (
+                <tr key={`inv-item-${idx}`} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '15px 14px' }}>
+                    <div style={{ fontWeight: '800', fontSize: '1rem' }}>{getItemTitle(item, idx)}</div>
+                    {targetJOs[idx] && (
                       <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px', fontWeight: '600' }}>
-                        Container: {Array.isArray(item.containerNo) ? item.containerNo.join(', ') : (item.containerNo || '-')} | Vehicle: {Array.isArray(item.vehicleNo) ? item.vehicleNo.join(', ') : (item.vehicleNo || '-')}
+                        {targetJOs[idx].containerNo && (Array.isArray(targetJOs[idx].containerNo) ? targetJOs[idx].containerNo.length > 0 : targetJOs[idx].containerNo) && `Container: ${Array.isArray(targetJOs[idx].containerNo) ? targetJOs[idx].containerNo.join(', ') : targetJOs[idx].containerNo}`}
+                        {targetJOs[idx].vehicleNo && (Array.isArray(targetJOs[idx].vehicleNo) ? targetJOs[idx].vehicleNo.length > 0 : targetJOs[idx].vehicleNo) && ` | Vehicle: ${Array.isArray(targetJOs[idx].vehicleNo) ? targetJOs[idx].vehicleNo.join(', ') : targetJOs[idx].vehicleNo}`}
                       </div>
-                      {item.driverName && <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Driver: {Array.isArray(item.driverName) ? item.driverName.join(', ') : item.driverName}</div>}
-                    </td>
-                    <td style={{ padding: '15px 14px', textAlign: 'center', fontWeight: '800', fontSize: '1.05rem' }}>
-                      {item.quantity || 1}
-                    </td>
-                    <td style={{ padding: '15px 14px', textAlign: 'right', color: '#475569', fontWeight: '700' }}>
-                      Rp {parseFloat(item.rate || 0).toLocaleString('id-ID')}
-                    </td>
-                    <td style={{ padding: '15px 14px', textAlign: 'right', fontWeight: '900', fontSize: '1.1rem' }}>
-                      Rp {(parseFloat(item.rate || 0) * (item.quantity || 1)).toLocaleString('id-ID')}
-                    </td>
-                  </tr>
-                ));
-              } else {
-                const qty = targetJo.issueQuantity || targetJo.quantity || 1;
-                const rate = targetJo.rate || 0;
-                return (
-                  <tr key={`jo-${targetJo.id || joIdx}`} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '18px 14px' }}>
-                      <div style={{ fontWeight: '800', fontSize: '1rem' }}>Freight &amp; Logistics Services</div>
-                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px', fontWeight: '600' }}>
-                        {targetJo.instruction || targetJo.jobDescription || 'Freight Forwarding Services'}
-                      </div>
-                      {targetJo.containerNo && (
-                        <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '2px' }}>
-                          Container: {Array.isArray(targetJo.containerNo) ? targetJo.containerNo.join(', ') : targetJo.containerNo}{targetJo.vehicleNo ? ` | Vehicle: ${Array.isArray(targetJo.vehicleNo) ? targetJo.vehicleNo.join(', ') : targetJo.vehicleNo}` : ''}
+                    )}
+                  </td>
+                  <td style={{ padding: '15px 14px', textAlign: 'center', fontWeight: '800', fontSize: '1.05rem' }}>
+                    {item.qty || 1}
+                  </td>
+                  <td style={{ padding: '15px 14px', textAlign: 'right', color: '#475569', fontWeight: '700' }}>
+                    Rp {parseFloat(item.rate || 0).toLocaleString('id-ID')}
+                  </td>
+                  <td style={{ padding: '15px 14px', textAlign: 'right', fontWeight: '900', fontSize: '1.1rem' }}>
+                    Rp {(parseFloat(item.rate || 0) * (item.qty || 1)).toLocaleString('id-ID')}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              /* Fallback to original targetJOs mapping if invoice.items is missing */
+              targetJOs.map((targetJo, joIdx) => {
+                if (Array.isArray(targetJo.items) && targetJo.items.length > 0) {
+                  return targetJo.items.map((item, idx) => (
+                    <tr key={`jo-${targetJo.id}-item-${idx}`} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '15px 14px' }}>
+                        <div style={{ fontWeight: '800', fontSize: '1rem' }}>{item.serviceType || 'Logistics Service'}</div>
+                        <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px', fontWeight: '600' }}>
+                          Container: {Array.isArray(item.containerNo) ? item.containerNo.join(', ') : (item.containerNo || '-')} | Vehicle: {Array.isArray(item.vehicleNo) ? item.vehicleNo.join(', ') : (item.vehicleNo || '-')}
                         </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '18px 14px', textAlign: 'center', fontWeight: '800', fontSize: '1.05rem' }}>
-                      {qty}
-                    </td>
-                    <td style={{ padding: '18px 14px', textAlign: 'right', color: '#475569', fontWeight: '700' }}>
-                      Rp {parseFloat(rate).toLocaleString('id-ID')}
-                    </td>
-                    <td style={{ padding: '18px 14px', textAlign: 'right', fontWeight: '900', fontSize: '1.1rem' }}>
-                      Rp {(parseFloat(rate) * parseFloat(qty)).toLocaleString('id-ID')}
-                    </td>
-                  </tr>
-                );
-              }
-            })}
+                        {item.driverName && <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Driver: {Array.isArray(item.driverName) ? item.driverName.join(', ') : item.driverName}</div>}
+                      </td>
+                      <td style={{ padding: '15px 14px', textAlign: 'center', fontWeight: '800', fontSize: '1.05rem' }}>
+                        {item.quantity || 1}
+                      </td>
+                      <td style={{ padding: '15px 14px', textAlign: 'right', color: '#475569', fontWeight: '700' }}>
+                        Rp {parseFloat(item.rate || 0).toLocaleString('id-ID')}
+                      </td>
+                      <td style={{ padding: '15px 14px', textAlign: 'right', fontWeight: '900', fontSize: '1.1rem' }}>
+                        Rp {(parseFloat(item.rate || 0) * (item.quantity || 1)).toLocaleString('id-ID')}
+                      </td>
+                    </tr>
+                  ));
+                } else {
+                  const qty = targetJo.issueQuantity || targetJo.quantity || 1;
+                  const rate = targetJo.rate || 0;
+                  return (
+                    <tr key={`jo-${targetJo.id || joIdx}`} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '18px 14px' }}>
+                        <div style={{ fontWeight: '800', fontSize: '1rem' }}>
+                          {targetJo.instruction || targetJo.jobDescription || 'Freight Forwarding Services'}
+                        </div>
+                        {targetJo.containerNo && (
+                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '2px' }}>
+                            Container: {Array.isArray(targetJo.containerNo) ? targetJo.containerNo.join(', ') : targetJo.containerNo}{targetJo.vehicleNo ? ` | Vehicle: ${Array.isArray(targetJo.vehicleNo) ? targetJo.vehicleNo.join(', ') : targetJo.vehicleNo}` : ''}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: '18px 14px', textAlign: 'center', fontWeight: '800', fontSize: '1.05rem' }}>
+                        {qty}
+                      </td>
+                      <td style={{ padding: '18px 14px', textAlign: 'right', color: '#475569', fontWeight: '700' }}>
+                        Rp {parseFloat(rate).toLocaleString('id-ID')}
+                      </td>
+                      <td style={{ padding: '18px 14px', textAlign: 'right', fontWeight: '900', fontSize: '1.1rem' }}>
+                        Rp {(parseFloat(rate) * parseFloat(qty)).toLocaleString('id-ID')}
+                      </td>
+                    </tr>
+                  );
+                }
+              })
+            )}
 
             {/* Extra Charges */}
             {extraCharges.map((ec, i) => (
@@ -253,12 +298,28 @@ const PrintInvoice = () => {
           </tbody>
         </table>
 
-        {/* Total */}
+        {/* Total Breakdown */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '28px' }}>
-          <div style={{ background: '#1e293b', color: 'white', padding: '18px 30px', borderRadius: '12px', textAlign: 'right', minWidth: '280px' }}>
-            <div style={{ fontSize: '0.68rem', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '6px' }}>TOTAL TAGIHAN</div>
-            <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#d4af37', letterSpacing: '-1px' }}>
-              Rp {grandTotal.toLocaleString('id-ID')}
+          <div style={{ background: '#1e293b', color: 'white', padding: '16px 24px', borderRadius: '12px', textAlign: 'right', minWidth: '320px', fontSize: '0.85rem' }}>
+            {(invoice?.tax > 0 || extraCharges.length > 0) && (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', margin: '4px 0', borderBottom: '1px dashed rgba(255,255,255,0.1)', paddingBottom: '6px' }}>
+                  <span style={{ color: '#94a3b8', fontWeight: '600' }}>Subtotal:</span>
+                  <span style={{ fontWeight: '800' }}>Rp {parseFloat(invoice?.subtotal || (invoice?.amount - (invoice?.tax || 0))).toLocaleString('id-ID')}</span>
+                </div>
+                {invoice?.tax > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', margin: '6px 0', borderBottom: '1px dashed rgba(255,255,255,0.1)', paddingBottom: '6px' }}>
+                    <span style={{ color: '#94a3b8', fontWeight: '600' }}>PPN:</span>
+                    <span style={{ fontWeight: '800' }}>Rp {parseFloat(invoice.tax).toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+              </>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1.5px' }}>TOTAL TAGIHAN:</span>
+              <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#d4af37', letterSpacing: '-1px' }}>
+                Rp {grandTotal.toLocaleString('id-ID')}
+              </span>
             </div>
           </div>
         </div>

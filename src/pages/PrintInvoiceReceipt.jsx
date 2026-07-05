@@ -14,7 +14,15 @@ const PrintInvoiceReceipt = () => {
   });
 
   useEffect(() => {
-    const savedData = localStorage.getItem('print_invoice_data');
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    let savedData = null;
+    if (id) {
+      savedData = localStorage.getItem('print_invoice_data_' + id);
+    }
+    if (!savedData) {
+      savedData = localStorage.getItem('print_invoice_data');
+    }
     if (savedData) {
       setData(JSON.parse(savedData));
     }

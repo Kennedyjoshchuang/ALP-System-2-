@@ -269,8 +269,8 @@ const Marketing = () => {
         marketingName: quoteMarketingName,
         marketingEmail: quoteMarketingEmail,
       };
-      localStorage.setItem('print_quotation_data', JSON.stringify(printData));
-      window.open('/print/quotation', '_blank');
+      localStorage.setItem('print_quotation_data_' + newQuote.id, JSON.stringify(printData));
+      window.open('/print/quotation?id=' + newQuote.id, '_blank');
 
       setActiveProspectForQuote(null);
       setQuoteGeneralNotes('');
@@ -526,8 +526,8 @@ const Marketing = () => {
       marketingName: quote.marketingName,
       marketingEmail: quote.marketingEmail,
     };
-    localStorage.setItem('print_quotation_data', JSON.stringify(printData));
-    window.open('/print/quotation', '_blank');
+    localStorage.setItem('print_quotation_data_' + quote.id, JSON.stringify(printData));
+    window.open('/print/quotation?id=' + quote.id, '_blank');
   };
 
   const handleExport = () => {

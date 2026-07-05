@@ -79,8 +79,8 @@ const QuotationList = () => {
       rate: quote.total || quote.rate || 0,
       isOfficial: true
     };
-    localStorage.setItem('print_quotation_data', JSON.stringify(printData));
-    window.open('/print/quotation', '_blank');
+    localStorage.setItem('print_quotation_data_' + quote.id, JSON.stringify(printData));
+    window.open('/print/quotation?id=' + quote.id, '_blank');
   };
 
   const handlePrint = () => {

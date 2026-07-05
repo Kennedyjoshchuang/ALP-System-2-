@@ -16,7 +16,15 @@ const PrintQuotation = () => {
   });
 
   useEffect(() => {
-    const savedData = localStorage.getItem('print_quotation_data');
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    let savedData = null;
+    if (id) {
+      savedData = localStorage.getItem('print_quotation_data_' + id);
+    }
+    if (!savedData) {
+      savedData = localStorage.getItem('print_quotation_data');
+    }
     if (savedData) {
       setData(JSON.parse(savedData));
     }
