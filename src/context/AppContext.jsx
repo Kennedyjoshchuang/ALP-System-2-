@@ -178,6 +178,10 @@ export const AppProvider = ({ children }) => {
         let instructionText = jo.instruction || '';
         let dispatchedAt = jo.dispatchedAt || null;
         let completedAt = jo.completedAt || null;
+        let shipmentStatus = jo.shipmentStatus || null;
+        let etd = jo.etd || null;
+        let eta = jo.eta || null;
+        let vesselName = jo.vesselName || null;
         
         if (instructionText && instructionText.includes('|||')) {
           const parts = instructionText.split('|||');
@@ -186,6 +190,10 @@ export const AppProvider = ({ children }) => {
             const meta = JSON.parse(parts[1].trim());
             if (meta.dispatchedAt) dispatchedAt = meta.dispatchedAt;
             if (meta.completedAt) completedAt = meta.completedAt;
+            if (meta.shipmentStatus) shipmentStatus = meta.shipmentStatus;
+            if (meta.etd) etd = meta.etd;
+            if (meta.eta) eta = meta.eta;
+            if (meta.vesselName) vesselName = meta.vesselName;
           } catch (e) {
             // failed to parse
           }
@@ -196,7 +204,11 @@ export const AppProvider = ({ children }) => {
           instruction: instructionText,
           jobDescription: instructionText,
           dispatchedAt,
-          completedAt
+          completedAt,
+          shipmentStatus,
+          etd,
+          eta,
+          vesselName
         };
       });
       setJobOrders(parsedJOs);
@@ -378,19 +390,27 @@ export const AppProvider = ({ children }) => {
   };
 
   const updateJOStatus = async (joId, updates) => {
-    // Intercept updates to serialize dispatchedAt/completedAt into instruction polymorphically
+    // Intercept updates to serialize dispatchedAt/completedAt/shipment fields into instruction polymorphically
     const currentJo = jobOrders.find(j => j.id === joId) || {};
     
     const dispatchedAt = 'dispatchedAt' in updates ? updates.dispatchedAt : currentJo.dispatchedAt;
     const completedAt = 'completedAt' in updates ? updates.completedAt : currentJo.completedAt;
+    const shipmentStatus = 'shipmentStatus' in updates ? updates.shipmentStatus : currentJo.shipmentStatus;
+    const etd = 'etd' in updates ? updates.etd : currentJo.etd;
+    const eta = 'eta' in updates ? updates.eta : currentJo.eta;
+    const vesselName = 'vesselName' in updates ? updates.vesselName : currentJo.vesselName;
     
     const finalUpdates = { ...updates };
     
     // Clean up SQL columns to avoid PostgREST schema cache error
     delete finalUpdates.dispatchedAt;
     delete finalUpdates.completedAt;
+    delete finalUpdates.shipmentStatus;
+    delete finalUpdates.etd;
+    delete finalUpdates.eta;
+    delete finalUpdates.vesselName;
     
-    if (dispatchedAt || completedAt) {
+    if (dispatchedAt || completedAt || shipmentStatus || etd || eta || vesselName) {
       // Get the raw instruction (without old metadata)
       let rawInstruction = updates.instruction || currentJo.instruction || '';
       // If the updates or current state has metadata, strip it first to get the pure instruction
@@ -398,7 +418,7 @@ export const AppProvider = ({ children }) => {
         rawInstruction = rawInstruction.split('|||')[0].trim();
       }
       
-      const meta = { dispatchedAt, completedAt };
+      const meta = { dispatchedAt, completedAt, shipmentStatus, etd, eta, vesselName };
       finalUpdates.instruction = `${rawInstruction} ||| ${JSON.stringify(meta)}`;
     }
     
@@ -413,6 +433,10 @@ export const AppProvider = ({ children }) => {
         merged.jobDescription = merged.instruction;
         merged.dispatchedAt = dispatchedAt;
         merged.completedAt = completedAt;
+        merged.shipmentStatus = shipmentStatus;
+        merged.etd = etd;
+        merged.eta = eta;
+        merged.vesselName = vesselName;
         return merged;
       }
       return jo;

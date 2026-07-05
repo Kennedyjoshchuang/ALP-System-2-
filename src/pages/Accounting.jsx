@@ -118,6 +118,8 @@ const Accounting = () => {
   const [isPendingCollapsed, setIsPendingCollapsed] = useState(false);
   const [isIssuedCollapsed, setIsIssuedCollapsed] = useState(false);
   const [undoConfirmJoId, setUndoConfirmJoId] = useState(null); // inline undo confirmation
+  const [shipmentEdits, setShipmentEdits] = useState({});
+  const [savingShipment, setSavingShipment] = useState({});
   const [uploadSignedModal, setUploadSignedModal] = useState(null); // { invId, type: 'invoice' | 'receipt' }
   
   // Mass Selection State
@@ -1056,6 +1058,58 @@ const Accounting = () => {
       }
       return 0;
     });
+
+  const handleShipmentChange = (joId, field, value) => {
+    setShipmentEdits(prev => {
+      const joEdits = prev[joId] || {};
+      const jo = jobOrders.find(j => j.id === joId) || {};
+      return {
+        ...prev,
+        [joId]: {
+          shipmentStatus: joEdits.shipmentStatus !== undefined ? joEdits.shipmentStatus : (jo.shipmentStatus || ''),
+          etd: joEdits.etd !== undefined ? joEdits.etd : (jo.etd || ''),
+          eta: joEdits.eta !== undefined ? joEdits.eta : (jo.eta || ''),
+          [field]: value
+        }
+      };
+    });
+  };
+
+  const hasShipmentChanges = (joId) => {
+    const edits = shipmentEdits[joId];
+    if (!edits) return false;
+    const jo = jobOrders.find(j => j.id === joId) || {};
+    return (
+      (edits.shipmentStatus !== (jo.shipmentStatus || '')) ||
+      (edits.etd !== (jo.etd || '')) ||
+      (edits.eta !== (jo.eta || ''))
+    );
+  };
+
+  const handleSaveShipment = async (joId) => {
+    const edits = shipmentEdits[joId];
+    if (!edits) return;
+    
+    setSavingShipment(prev => ({ ...prev, [joId]: true }));
+    try {
+      await updateJOStatus(joId, {
+        shipmentStatus: edits.shipmentStatus || null,
+        etd: edits.etd || null,
+        eta: edits.eta || null
+      });
+      toast.success(isID ? 'Status pengiriman berhasil diperbarui' : 'Shipment status updated successfully');
+      setShipmentEdits(prev => {
+        const copy = { ...prev };
+        delete copy[joId];
+        return copy;
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error(isID ? 'Gagal memperbarui status pengiriman' : 'Failed to update shipment status');
+    } finally {
+      setSavingShipment(prev => ({ ...prev, [joId]: false }));
+    }
+  };
 
   const paidInvoices = invoices
     .filter(inv => inv.status === 'paid')
@@ -3019,6 +3073,7 @@ const Accounting = () => {
                   <th style={{ padding: '15px' }}>JO Ref</th>
                   <th style={{ padding: '15px' }}>{isID ? 'Pelanggan' : 'Customer'}</th>
                   <th style={{ padding: '15px' }}>{isID ? 'Status' : 'Status'}</th>
+                  <th style={{ padding: '15px' }}>{isID ? 'Pengiriman' : 'Shipment'}</th>
                   <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Foto' : 'Photos'}</th>
                   <th style={{ padding: '15px' }}>{isID ? 'Aksi' : 'Action'}</th>
                 </tr>
@@ -3055,7 +3110,7 @@ const Accounting = () => {
                           }}
                           onClick={() => setExpandedCompletedGroups({ ...expandedCompletedGroups, [group.quotationId]: !isGroupExpanded })}
                         >
-                          <td colSpan="5" style={{ padding: '12px 15px', verticalAlign: 'middle' }}>
+                          <td colSpan="6" style={{ padding: '12px 15px', verticalAlign: 'middle' }}>
                             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <span style={{ fontSize: '1.2rem' }}>📁</span>
@@ -3063,7 +3118,7 @@ const Accounting = () => {
                                   {group.quotationId === 'direct' ? (isID ? 'Pekerjaan Langsung' : 'Direct Jobs') : group.quotationId}
                                 </span>
                                 <span style={{ color: 'var(--text)', fontWeight: '700', marginLeft: '5px' }}>
-                                  — {group.customerName}
+                                  🏢 {group.customerName}
                                 </span>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3094,7 +3149,7 @@ const Accounting = () => {
                           return (
                             <tr key={jo.id} style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.01)' }}>
                               <td style={{ padding: '15px', paddingLeft: '30px', fontWeight: 'bold', color: 'var(--secondary)' }}>
-                                <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>└</span> {jo.id}
+                                <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>📄</span> {jo.id}
                               </td>
                               <td style={{ padding: '15px' }}>
                                 <div style={{ fontWeight: '600' }}>{jo.customerName}</div>
@@ -3104,9 +3159,101 @@ const Accounting = () => {
                                 <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                                   {isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}
                                 </div>
+                                {jo.containerNo && (() => {
+                                  const cNo = jo.containerNo;
+                                  let filtered = [];
+                                  if (Array.isArray(cNo)) {
+                                    filtered = cNo.filter(Boolean);
+                                  } else if (cNo && String(cNo).trim()) {
+                                    filtered = [String(cNo).trim()];
+                                  }
+                                  if (filtered.length === 0) return null;
+                                  return (
+                                    <div style={{ marginTop: '6px' }}>
+                                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px' }}>
+                                        {isID ? 'Kontainer:' : 'Containers:'}
+                                      </div>
+                                      <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '4px' }}>
+                                        {filtered.map((num, idx) => (
+                                          <span key={idx} style={{ 
+                                            fontFamily: 'monospace', 
+                                            fontSize: '0.7rem', 
+                                            background: 'rgba(212, 175, 55, 0.1)', 
+                                            color: 'var(--secondary)', 
+                                            border: '1px solid rgba(212, 175, 55, 0.25)', 
+                                            padding: '2px 6px', 
+                                            borderRadius: '4px',
+                                            width: 'fit-content',
+                                            whiteSpace: 'nowrap'
+                                          }}>
+                                            {num}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
                               </td>
                               <td style={{ padding: '15px' }}>
                                 <span className="badge badge-done">{isID ? 'Selesai' : 'Completed'}</span>
+                              </td>
+                              <td style={{ padding: '15px' }}>
+                                {canWrite ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '160px', maxWidth: '200px' }}>
+                                    <select 
+                                      value={shipmentEdits[jo.id]?.shipmentStatus ?? jo.shipmentStatus ?? ''} 
+                                      onChange={(e) => handleShipmentChange(jo.id, 'shipmentStatus', e.target.value)}
+                                      style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text)', border: '1px solid var(--glass-border)', borderRadius: '4px', padding: '4px', fontSize: '0.75rem' }}
+                                    >
+                                      <option value="">{isID ? '-- Pilih Status --' : '-- Select Status --'}</option>
+                                      <option value="in_progress">{isID ? 'Dalam Proses' : 'In Progress'}</option>
+                                      <option value="done">{isID ? 'Selesai' : 'Done'}</option>
+                                    </select>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', width: '35px' }}>ETD:</span>
+                                      <input 
+                                        type="date" 
+                                        value={shipmentEdits[jo.id]?.etd ?? jo.etd ?? ''} 
+                                        onChange={(e) => handleShipmentChange(jo.id, 'etd', e.target.value)}
+                                        style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text)', border: '1px solid var(--glass-border)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.75rem', flex: 1, colorScheme: 'dark' }}
+                                      />
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', width: '35px' }}>ETA:</span>
+                                      <input 
+                                        type="date" 
+                                        value={shipmentEdits[jo.id]?.eta ?? jo.eta ?? ''} 
+                                        onChange={(e) => handleShipmentChange(jo.id, 'eta', e.target.value)}
+                                        style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text)', border: '1px solid var(--glass-border)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.75rem', flex: 1, colorScheme: 'dark' }}
+                                      />
+                                    </div>
+                                    {hasShipmentChanges(jo.id) && (
+                                      <ButtonWithLoading 
+                                        onClick={() => handleSaveShipment(jo.id)}
+                                        loading={savingShipment[jo.id]}
+                                        className="btn btn-gold"
+                                        style={{ padding: '4px 8px', fontSize: '0.7rem', marginTop: '2px', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}
+                                      >
+                                        {isID ? 'Simpan Pengiriman' : 'Save Shipment'}
+                                      </ButtonWithLoading>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.75rem' }}>
+                                    {jo.shipmentStatus && (
+                                      <div>
+                                        <span className={`badge ${jo.shipmentStatus === 'done' ? 'badge-done' : 'badge-dispatched'}`}>
+                                          {jo.shipmentStatus === 'done' ? (isID ? 'Selesai' : 'Done') : (isID ? 'Dalam Proses' : 'In Progress')}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {jo.etd && <div><span style={{ color: 'var(--text-muted)' }}>ETD:</span> {formatDate(jo.etd)}</div>}
+                                    {jo.eta && <div><span style={{ color: 'var(--text-muted)' }}>ETA:</span> {formatDate(jo.eta)}</div>}
+                                    {!jo.shipmentStatus && !jo.etd && !jo.eta && (
+                                      <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>-</span>
+                                    )}
+                                  </div>
+                                )}
                               </td>
                               <td style={{ padding: '15px', textAlign: 'center' }}>
                                 {jo.photos && jo.photos.length > 0 ? (

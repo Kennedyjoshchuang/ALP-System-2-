@@ -507,10 +507,11 @@ app.post('/api/job-orders', async (req, res) => {
     const { quotationId, customerName, jobDescription, phone, email, rate, quantity, quoteValidity } = req.body;
     const id = 'JO-' + Date.now() + String(Math.floor(Math.random() * 1000)).padStart(3, '0');
     const date = new Date().toISOString().split('T')[0];
+    const parsedRate = rate !== undefined && rate !== null ? Math.round(parseFloat(rate)) : 0;
     const { error } = await supabase.from('job_orders').insert({
       id, quotationId, customerName, instruction: jobDescription,
       status: 'pending', quantity, issueQuantity: 0,
-      phone, email, rate, quoteValidity, date,
+      phone, email, rate: parsedRate, quoteValidity, date,
       photos: [], costs: [],
       containerNo: [], vehicleNo: [], driverName: []
     });
@@ -534,10 +535,11 @@ app.post('/api/job-orders/bulk', async (req, res) => {
     for (const jo of jobOrders) {
       const id = 'JO-' + Date.now() + String(Math.floor(Math.random() * 1000)).padStart(3, '0');
       const { quotationId, customerName, jobDescription, phone, email, rate, quantity, quoteValidity } = jo;
+      const parsedRate = rate !== undefined && rate !== null ? Math.round(parseFloat(rate)) : 0;
       const { error } = await supabase.from('job_orders').insert({
         id, quotationId, customerName, instruction: jobDescription,
         status: 'pending', quantity, issueQuantity: 0,
-        phone, email, rate, quoteValidity, date,
+        phone, email, rate: parsedRate, quoteValidity, date,
         photos: [], costs: [],
         containerNo: [], vehicleNo: [], driverName: []
       });
@@ -545,7 +547,7 @@ app.post('/api/job-orders/bulk', async (req, res) => {
       insertedJOs.push({
         id, quotationId, customerName, instruction: jobDescription,
         status: 'pending', quantity, issueQuantity: 0,
-        phone, email, rate, quoteValidity, date,
+        phone, email, rate: parsedRate, quoteValidity, date,
         photos: [], costs: [],
         containerNo: [], vehicleNo: [], driverName: [],
         jobDescription

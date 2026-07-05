@@ -83,7 +83,11 @@ CREATE TABLE IF NOT EXISTS job_orders (
     email TEXT,
     rate NUMERIC,
     dispatchedAt TEXT,
-    completedAt TEXT
+    completedAt TEXT,
+    "shipmentStatus" TEXT,
+    etd TEXT,
+    eta TEXT,
+    "vesselName" TEXT
 );
 
 -- 6. Invoices

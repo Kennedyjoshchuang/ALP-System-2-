@@ -230,6 +230,7 @@ const Executor = () => {
           vehicleNo: Array.isArray(jo.vehicleNo) && jo.vehicleNo.length > 0 ? [...jo.vehicleNo] : [jo.vehicleNo || ''],
           driverName: Array.isArray(jo.driverName) && jo.driverName.length > 0 ? [...jo.driverName] : [jo.driverName || ''],
           activityStatus: jo.activityStatus || '',
+          vesselName: jo.vesselName || '',
           dispatchedAtLocal: toDatetimeLocal(jo.dispatchedAt),
           completedAtLocal: toDatetimeLocal(jo.completedAt)
         }
@@ -281,6 +282,7 @@ const Executor = () => {
       vehicleNo: jo.vehicleNo,
       driverName: jo.driverName,
       activityStatus: jo.activityStatus,
+      vesselName: jo.vesselName,
       dispatchedAtLocal: toDatetimeLocal(jo.dispatchedAt),
       completedAtLocal: toDatetimeLocal(jo.completedAt)
     };
@@ -314,6 +316,7 @@ const Executor = () => {
       vehicleNo: jo.vehicleNo,
       driverName: jo.driverName,
       activityStatus: jo.activityStatus,
+      vesselName: jo.vesselName,
       dispatchedAtLocal: toDatetimeLocal(jo.dispatchedAt),
       completedAtLocal: toDatetimeLocal(jo.completedAt)
     };
@@ -575,6 +578,11 @@ const Executor = () => {
                             <div style={{ fontSize: '0.85rem' }}>
                               <span style={{ color: 'var(--text-muted)' }}>{isID ? 'Knd:' : 'V:'}</span> {Array.isArray(jo.vehicleNo) ? jo.vehicleNo.join(', ') : jo.vehicleNo || '-'}
                             </div>
+                            {jo.vesselName && (
+                              <div style={{ fontSize: '0.85rem' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>{isID ? 'Kapal:' : 'Vessel:'}</span> {jo.vesselName}
+                              </div>
+                            )}
                           </td>
                           <td style={{ padding: '15px', fontSize: '0.9rem', fontWeight: '500' }}>
                             {formatDuration(jo.dispatchedAt, jo.completedAt, t, language)}
@@ -732,6 +740,17 @@ const Executor = () => {
                                           value={localData[jo.id]?.activityStatus || ''} 
                                           onChange={e => handleLocalUpdate(jo.id, 'activityStatus', e.target.value)} 
                                           placeholder={isID ? "Perbarui status operasional terakhir..." : "Update last operational status..."} 
+                                        />
+                                      </div>
+                                      
+                                      <div className="input-group">
+                                        <label>{isID ? 'Nama Kapal (Vessel)' : 'Vessel Name'}</label>
+                                        <input 
+                                          disabled={!canWrite}
+                                          type="text" 
+                                          value={localData[jo.id]?.vesselName || ''} 
+                                          onChange={e => handleLocalUpdate(jo.id, 'vesselName', e.target.value)} 
+                                          placeholder={isID ? "Masukkan nama kapal..." : "Enter vessel name..."} 
                                         />
                                       </div>
                                       
