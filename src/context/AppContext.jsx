@@ -357,6 +357,8 @@ export const AppProvider = ({ children }) => {
   const createJO = async (joData) => {
     const newJO = {
       ...joData,
+      instruction: joData.instruction || joData.jobDescription || '',
+      jobDescription: joData.instruction || joData.jobDescription || '',
       id: `JO-${Date.now().toString().slice(-6)}`,
       status: 'pending',
       containerNo: '',
@@ -412,7 +414,7 @@ export const AppProvider = ({ children }) => {
     
     if (dispatchedAt || completedAt || shipmentStatus || etd || eta || vesselName) {
       // Get the raw instruction (without old metadata)
-      let rawInstruction = updates.instruction || currentJo.instruction || '';
+      let rawInstruction = updates.instruction || updates.jobDescription || currentJo.instruction || currentJo.jobDescription || '';
       // If the updates or current state has metadata, strip it first to get the pure instruction
       if (rawInstruction.includes('|||')) {
         rawInstruction = rawInstruction.split('|||')[0].trim();

@@ -721,7 +721,7 @@ const AdminHub = () => {
           }}>
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-              className="glass-card" style={{ width: '100%', maxWidth: '600px', padding: '40px', position: 'relative'  , overflowX: 'auto' }}
+              className="glass-card" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', padding: '40px', position: 'relative'  , overflowX: 'auto' }}
             >
               <button onClick={() => setShowModal(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <X size={20} />

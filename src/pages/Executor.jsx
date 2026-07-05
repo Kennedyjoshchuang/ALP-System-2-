@@ -149,7 +149,7 @@ const Executor = () => {
       JO_ID: jo.id,
       Date: jo.date,
       Customer: jo.customerName,
-      Instruction: jo.jobDescription,
+      Instruction: jo.jobDescription || jo.instruction || '-',
       Container: jo.containerNo || '-',
       Vehicle: jo.vehicleNo || '-',
       Final_Status: jo.activityStatus || '-',
@@ -568,8 +568,8 @@ const Executor = () => {
                             <div style={{ fontWeight: '600' }}>{jo.customerName}</div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}</div>
                           </td>
-                          <td style={{ padding: '15px', fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {jo.jobDescription}
+                          <td style={{ padding: '15px', fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '250px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                            {jo.jobDescription || jo.instruction || '-'}
                           </td>
                           <td style={{ padding: '15px' }}>
                             <div style={{ fontSize: '0.85rem' }}>
@@ -795,7 +795,7 @@ const Executor = () => {
                                       </div>
                                       
                                       <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
-                                        <strong style={{ color: 'var(--text)' }}>{isID ? 'Instruksi Lengkap:' : 'Full Instruction:'}</strong> {jo.jobDescription}
+                                        <strong style={{ color: 'var(--text)' }}>{isID ? 'Instruksi Lengkap:' : 'Full Instruction:'}</strong> {jo.jobDescription || jo.instruction || '-'}
                                       </div>
                                       
                                       {canWrite && (

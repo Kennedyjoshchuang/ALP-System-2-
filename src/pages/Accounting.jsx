@@ -884,17 +884,37 @@ const Accounting = () => {
       // For billing, we can export issued invoices as primary
       dataToExport = invoices
         .filter(inv => filterByDate(inv.date))
-        .filter(inv => inv.id.toLowerCase().includes(searchTerm.toLowerCase()) || inv.customerName.toLowerCase().includes(searchTerm.toLowerCase()))
-        .map(inv => ({
-          Invoice_ID: inv.id,
-          JO_ID: inv.joId,
-          Date: inv.date,
-          Customer: inv.customerName,
-          Subtotal: inv.subtotal,
-          Tax: inv.tax,
-          Total_Amount: inv.amount,
-          Status: inv.status
-        }));
+        .filter(inv => {
+          const id = inv.id || '';
+          const name = inv.customerName || '';
+          const term = searchTerm.toLowerCase();
+          const linkedJO = jobOrders.find(j => String(j.id) === String(inv.joId));
+          const containerMatch = linkedJO ? (
+            Array.isArray(linkedJO.containerNo)
+              ? linkedJO.containerNo.some(c => c && c.toLowerCase().includes(term))
+              : (linkedJO.containerNo && linkedJO.containerNo.toLowerCase().includes(term))
+          ) : false;
+          return id.toLowerCase().includes(term) || name.toLowerCase().includes(term) || containerMatch;
+        })
+        .map(inv => {
+          const linkedJO = jobOrders.find(j => String(j.id) === String(inv.joId));
+          const containerNumbers = linkedJO ? (
+            Array.isArray(linkedJO.containerNo)
+              ? linkedJO.containerNo.filter(Boolean).join(', ')
+              : (linkedJO.containerNo || '')
+          ) : '';
+          return {
+            Invoice_ID: inv.id,
+            JO_ID: inv.joId,
+            Container_No: containerNumbers,
+            Date: inv.date,
+            Customer: inv.customerName,
+            Subtotal: inv.subtotal,
+            Tax: inv.tax,
+            Total_Amount: inv.amount,
+            Status: inv.status
+          };
+        });
       fileName = "Issued_Invoices_Report";
     } else if (activeTab === 'piutang') {
       const source = receivableSubTab === 'outstanding' ? receivables : paidInvoices;
@@ -1699,7 +1719,22 @@ const Accounting = () => {
     setBatchPrintPaidInvoices(selectedList);
   };
 
-
+  const filteredIssuedInvoices = React.useMemo(() => {
+    return (invoices || [])
+      .filter(inv => filterByDate(inv.date))
+      .filter(inv => {
+        const id = inv.id || '';
+        const name = inv.customerName || '';
+        const term = searchTerm.toLowerCase();
+        const linkedJO = jobOrders.find(j => String(j.id) === String(inv.joId));
+        const containerMatch = linkedJO ? (
+          Array.isArray(linkedJO.containerNo)
+            ? linkedJO.containerNo.some(c => c && c.toLowerCase().includes(term))
+            : (linkedJO.containerNo && linkedJO.containerNo.toLowerCase().includes(term))
+        ) : false;
+        return id.toLowerCase().includes(term) || name.toLowerCase().includes(term) || containerMatch;
+      });
+  }, [invoices, searchTerm, filterByDate, jobOrders]);
 
   return (
     <div className="accounting-container">
@@ -3352,12 +3387,12 @@ const Accounting = () => {
                   <th style={{ padding: '15px', width: '40px' }}>
                     <input 
                       type="checkbox" 
-                      checked={selectedIssued.size > 0 && selectedIssued.size === invoices.filter(inv => filterByDate(inv.date) && (inv.id.toLowerCase().includes(searchTerm.toLowerCase()) || inv.customerName.toLowerCase().includes(searchTerm.toLowerCase()))).length}
-                      onChange={() => toggleAllIssued(invoices.filter(inv => filterByDate(inv.date) && (inv.id.toLowerCase().includes(searchTerm.toLowerCase()) || inv.customerName.toLowerCase().includes(searchTerm.toLowerCase()))))}
+                      checked={selectedIssued.size > 0 && selectedIssued.size === filteredIssuedInvoices.length}
+                      onChange={() => toggleAllIssued(filteredIssuedInvoices)}
                     />
                   </th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'ID Inv / JO' : 'Inv ID / JO'}</th>
-
+                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'No. Kontainer' : 'Container No.'}</th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Pelanggan' : 'Customer'}</th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Tanggal' : 'Date'}</th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'right' }}>{isID ? 'Pendapatan (INV)' : 'Revenue (INV)'}</th>
@@ -3370,15 +3405,7 @@ const Accounting = () => {
                 </tr>
               </thead>
               <tbody>
-                {invoices
-                  .filter(inv => filterByDate(inv.date))
-                  .filter(inv => {
-                    const id = inv.id || '';
-                    const name = inv.customerName || '';
-                    const term = searchTerm.toLowerCase();
-                    return id.toLowerCase().includes(term) || name.toLowerCase().includes(term);
-                  })
-                  .map(inv => {
+                {filteredIssuedInvoices.map(inv => {
                     const linkedJO = jobOrders.find(j => String(j.id) === String(inv.joId));
                     return (
                     <tr key={inv.id} style={{ borderBottom:'1px solid var(--glass-border)' }} className="table-row-hover">
@@ -3392,6 +3419,51 @@ const Accounting = () => {
                       <td style={{ padding: '15px' }}>
                         <div style={{ fontWeight: '800', color: 'var(--secondary)' }}>{inv.id}</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>JO: {inv.joId}</div>
+                      </td>
+                      <td style={{ padding: '15px' }}>
+                        {(() => {
+                          if (!linkedJO) return '—';
+                          const cNo = linkedJO.containerNo;
+                          if (Array.isArray(cNo)) {
+                            const filtered = cNo.filter(Boolean);
+                            if (filtered.length === 0) return '—';
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {filtered.map((num, idx) => (
+                                  <span key={idx} style={{ 
+                                    fontFamily: 'monospace', 
+                                    fontSize: '0.75rem', 
+                                    background: 'rgba(212, 175, 55, 0.1)', 
+                                    color: 'var(--secondary)', 
+                                    border: '1px solid rgba(212, 175, 55, 0.25)', 
+                                    padding: '2px 6px', 
+                                    borderRadius: '4px',
+                                    width: 'fit-content',
+                                    whiteSpace: 'nowrap'
+                                  }}>
+                                    {num}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          }
+                          if (cNo && cNo.trim()) {
+                            return (
+                              <span style={{ 
+                                fontFamily: 'monospace', 
+                                fontSize: '0.75rem', 
+                                background: 'rgba(212, 175, 55, 0.1)', 
+                                color: 'var(--secondary)', 
+                                border: '1px solid rgba(212, 175, 55, 0.25)', 
+                                padding: '2px 6px', 
+                                borderRadius: '4px'
+                              }}>
+                                {cNo}
+                              </span>
+                            );
+                          }
+                          return '—';
+                        })()}
                       </td>
                       <td style={{ padding: '15px', fontWeight: '600' }}>{inv.customerName}</td>
                       <td style={{ padding: '15px', fontSize: '0.85rem' }}>{new Date(inv.date).toLocaleDateString()}</td>
@@ -5197,12 +5269,12 @@ const Accounting = () => {
               
               <div style={{ marginBottom:'20px' }}>
                 <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>
-                  {isID ? 'Catatan Kustom (Opsional)' : 'Custom Notes (Optional)'}
+                  {isID ? 'Keterangan (Opsional)' : 'Description (Optional)'}
                 </label>
                 <textarea 
                   value={customInvoiceForm.notes} 
                   onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, notes: e.target.value })}
-                  placeholder={isID ? "Masukkan catatan tambahan untuk invoice..." : "Enter additional notes for the invoice..."}
+                  placeholder={isID ? "Masukkan keterangan tambahan untuk invoice..." : "Enter additional description for the invoice..."}
                   style={{ width:'100%', minHeight:'70px', padding:'10px 12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontSize:'0.9rem', resize:'vertical' }}
                 />
               </div>
@@ -6762,12 +6834,12 @@ const Accounting = () => {
 
             <div style={{ marginBottom:'30px', textAlign:'left' }}>
               <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>
-                {isID ? 'Catatan Kustom (Opsional)' : 'Custom Notes (Optional)'}
+                {isID ? 'Keterangan (Opsional)' : 'Description (Optional)'}
               </label>
               <textarea 
                 value={invoiceNotes}
                 onChange={(e) => setInvoiceNotes(e.target.value)}
-                placeholder={isID ? "Masukkan catatan tambahan untuk invoice..." : "Enter additional notes for the invoice..."}
+                placeholder={isID ? "Masukkan keterangan tambahan untuk invoice..." : "Enter additional description for the invoice..."}
                 style={{ width:'100%', minHeight:'80px', padding:'12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'10px', color:'var(--text)', fontSize:'0.9rem', resize:'vertical' }}
               />
             </div>
@@ -6898,13 +6970,13 @@ const Accounting = () => {
 
               {/* Custom Notes Section */}
               <div style={{ marginBottom: '20px' }}>
-                <label style={labelStyle}>{isID ? 'Catatan Kustom (Opsional)' : 'Custom Notes (Optional)'}</label>
+                <label style={labelStyle}>{isID ? 'Keterangan (Opsional)' : 'Description (Optional)'}</label>
                 <textarea
                   rows={2}
                   style={{ ...inputStyle, resize: 'vertical' }}
                   value={f.notes || ''}
                   onChange={e => setF({ notes: e.target.value })}
-                  placeholder={isID ? 'Masukkan catatan tambahan untuk invoice...' : 'Enter additional notes for the invoice...'}
+                  placeholder={isID ? 'Masukkan keterangan tambahan untuk invoice...' : 'Enter additional description for the invoice...'}
                 />
               </div>
 

@@ -313,10 +313,24 @@ const PrintQuotation = () => {
             </div>
           </div>
         </div>
+
+        {/* Automatically Generated Note */}
+        <div style={{
+          borderTop: '1px solid #e2e8f0',
+          paddingTop: '8px',
+          marginTop: '25px',
+          fontSize: '0.72rem',
+          color: '#94a3b8',
+          textAlign: 'center',
+          fontWeight: '600'
+        }}>
+          * Dokumen ini dibuat secara otomatis dan sah tanpa tanda tangan basah. / This quotation is automatically generated and is valid without a physical signature.
+        </div>
       </div>
     </div>
   );
 };
 
 export default PrintQuotation;
+
 

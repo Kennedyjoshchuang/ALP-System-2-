@@ -3,6 +3,7 @@ import DigitalSignatureController from '../components/DigitalSignatureController
 
 const PrintInvoice = () => {
   const [data, setData] = useState(null);
+  const [dueDays, setDueDays] = useState(() => parseInt(localStorage.getItem('invoice_due_days') || '14', 10));
   const [sigConfig, setSigConfig] = useState({
     type: 'none',
     showStamp: true,
@@ -82,6 +83,21 @@ const PrintInvoice = () => {
           <div style={{ width: '1px', height: '24px', background: '#e2e8f0' }} />
           <span style={{ fontWeight: '800', fontSize: '1rem', color: '#1e293b' }}>Invoice {invoice?.id}</span>
           <span style={{ background: '#dcfce7', color: '#166534', fontSize: '0.7rem', fontWeight: '800', padding: '3px 12px', borderRadius: '20px', textTransform: 'uppercase' }}>Diterbitkan</span>
+          <div style={{ width: '1px', height: '24px', background: '#e2e8f0' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '4px 10px' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#64748b' }}>Tempo:</span>
+            <input 
+              type="number" 
+              value={dueDays} 
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10) || 0;
+                setDueDays(val);
+                localStorage.setItem('invoice_due_days', val.toString());
+              }} 
+              style={{ width: '45px', border: 'none', background: 'transparent', fontWeight: '800', fontSize: '0.85rem', color: '#1e293b', textAlign: 'center', padding: '2px 0' }}
+            />
+            <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#64748b' }}>hari</span>
+          </div>
         </div>
         
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -250,7 +266,7 @@ const PrintInvoice = () => {
         {/* Custom Notes */}
         {invoice?.notes && (
           <div style={{ padding: '14px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', marginBottom: '20px', textAlign: 'left', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-            <p style={{ margin: '0 0 8px 0', fontSize: '0.65rem', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1.5px' }}>Catatan / Notes</p>
+            <p style={{ margin: '0 0 8px 0', fontSize: '0.65rem', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1.5px' }}>Keterangan</p>
             <div style={{ fontSize: '0.85rem', color: '#1e293b', whiteSpace: 'pre-wrap', fontWeight: '600', lineHeight: '1.4' }}>
               {invoice.notes}
             </div>
@@ -308,8 +324,8 @@ const PrintInvoice = () => {
         {/* Signature Footer */}
         <div style={{ marginTop: 'auto', paddingTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <div style={{ maxWidth: '320px' }}>
-            <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '0 0 3px 0', fontWeight: '600' }}>* Pembayaran harap dilakukan dalam 14 hari kerja sejak tanggal invoice.</p>
-            <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: 0, fontWeight: '600' }}>* Dokumen ini sah tanpa tanda tangan basah.</p>
+            <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '0 0 3px 0', fontWeight: '600' }}>* Pembayaran harap dilakukan dalam {dueDays} hari kerja sejak tanggal invoice. / Payment should be made within {dueDays} working days from the invoice date.</p>
+            <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: 0, fontWeight: '600' }}>* Dokumen ini dibuat secara otomatis dan sah tanpa tanda tangan basah. / This invoice is automatically generated and is valid without a physical signature.</p>
           </div>
           <div style={{ textAlign: 'center', minWidth: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <p style={{ margin: '0 0 5px 0', fontSize: '0.78rem', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '1px' }}>Hormat Kami,</p>
