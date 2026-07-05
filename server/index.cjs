@@ -616,7 +616,7 @@ app.get('/api/invoices', async (req, res) => {
 });
 
 app.post('/api/invoices', async (req, res) => {
-  const { id, joId, customerName, amount, subtotal, tax, extra_charges, date, status, notes } = req.body;
+  const { id, joId, customerName, amount, subtotal, tax, extra_charges, date, status, notes, consolidatedJOs } = req.body;
   
   try {
     // 1. Create Invoice — try with all columns, fallback if schema is old
@@ -696,10 +696,31 @@ app.post('/api/invoices', async (req, res) => {
     }
 
     // 3. Update Job Order status to 'invoiced'
-    if (joId) {
-      const { error: joErr } = await supabase.from('job_orders').update({ status: 'invoiced' }).eq('id', joId);
+    let joIds = consolidatedJOs || [];
+    if (!Array.isArray(joIds) || joIds.length === 0) {
+      // Check notes for packed consolidatedJOs
+      const notesVal = notes || '';
+      if (notesVal && notesVal.includes('|||')) {
+        try {
+          const parts = notesVal.split('|||');
+          const meta = JSON.parse(parts[1].trim());
+          if (Array.isArray(meta.consolidatedJOs)) {
+            joIds = meta.consolidatedJOs;
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    if (!Array.isArray(joIds)) joIds = [];
+    if (joId && !joIds.includes(joId)) {
+      joIds.push(joId);
+    }
+
+    if (joIds.length > 0) {
+      const { error: joErr } = await supabase.from('job_orders').update({ status: 'invoiced' }).in('id', joIds);
       if (joErr) {
-        console.error(`[POST /invoices] JO Update error for ${joId}:`, joErr.message);
+        console.error(`[POST /invoices] JO Update error for JOs:`, joErr.message);
       } else {
         clearJobOrdersCache();
       }
@@ -783,10 +804,54 @@ app.put('/api/invoices/:id/settle', async (req, res) => {
 
 
 app.delete('/api/invoices/:id', async (req, res) => {
-  await supabase.from('receivables').delete().eq('invoiceId', req.params.id);
-  const { error } = await supabase.from('invoices').delete().eq('id', req.params.id);
-  if (error) return handleError(res, error, 'DELETE invoices');
-  res.sendStatus(204);
+  try {
+    // 1. Fetch the invoice first to identify linked Job Orders
+    const { data: invoice, error: fetchErr } = await supabase
+      .from('invoices')
+      .select('joId, notes')
+      .eq('id', req.params.id)
+      .single();
+
+    if (!fetchErr && invoice) {
+      let joIds = [];
+      const notesVal = invoice.notes || '';
+      if (notesVal && notesVal.includes('|||')) {
+        try {
+          const parts = notesVal.split('|||');
+          const meta = JSON.parse(parts[1].trim());
+          if (Array.isArray(meta.consolidatedJOs)) {
+            joIds = meta.consolidatedJOs;
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+      if (invoice.joId && !joIds.includes(invoice.joId)) {
+        joIds.push(invoice.joId);
+      }
+
+      if (joIds.length > 0) {
+        const { error: joErr } = await supabase
+          .from('job_orders')
+          .update({ status: 'done' })
+          .in('id', joIds);
+        if (joErr) {
+          console.error(`[DELETE /invoices/:id] Failed to revert JO status:`, joErr.message);
+        } else {
+          clearJobOrdersCache();
+        }
+      }
+    }
+
+    // 2. Delete receivables and invoice
+    await supabase.from('receivables').delete().eq('invoiceId', req.params.id);
+    const { error } = await supabase.from('invoices').delete().eq('id', req.params.id);
+    if (error) return handleError(res, error, 'DELETE invoices');
+    res.sendStatus(204);
+  } catch (err) {
+    console.error('DELETE Invoice exception:', err);
+    res.status(500).json({ error: 'Internal server error during invoice deletion' });
+  }
 });
 
 // --- RECEIVABLES ---

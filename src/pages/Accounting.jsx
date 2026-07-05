@@ -254,6 +254,38 @@ const Accounting = () => {
     hasAccess
   } = context || {};
 
+  const getAssociatedJOs = (invoice) => {
+    if (!invoice) return [];
+    const primaryJo = jobOrders.find(j => String(j.id) === String(invoice.joId));
+    const consolidated = invoice.consolidatedJOs || [];
+    if (consolidated.length > 0) {
+      return jobOrders.filter(j => consolidated.includes(j.id));
+    }
+    return primaryJo ? [primaryJo] : [];
+  };
+
+  const getAggregatedContainers = (associatedJOs) => {
+    const counts = {};
+    associatedJOs.forEach(jo => {
+      const cNo = jo.containerNo;
+      let list = [];
+      if (Array.isArray(cNo)) {
+        list = cNo.filter(Boolean);
+      } else if (cNo && String(cNo).trim()) {
+        list = [String(cNo).trim()];
+      }
+      list.forEach(num => {
+        const clean = String(num).trim();
+        if (clean) {
+          counts[clean] = (counts[clean] || 0) + 1;
+        }
+      });
+    });
+    return Object.entries(counts).map(([num, count]) => {
+      return count > 1 ? `${num} (${count}x)` : num;
+    });
+  };
+
   const canWrite = hasAccess ? hasAccess('accounting', true) : false;
 
   const isID = language === 'id';
@@ -888,21 +920,18 @@ const Accounting = () => {
           const id = inv.id || '';
           const name = inv.customerName || '';
           const term = searchTerm.toLowerCase();
-          const linkedJO = jobOrders.find(j => String(j.id) === String(inv.joId));
-          const containerMatch = linkedJO ? (
-            Array.isArray(linkedJO.containerNo)
-              ? linkedJO.containerNo.some(c => c && c.toLowerCase().includes(term))
-              : (linkedJO.containerNo && linkedJO.containerNo.toLowerCase().includes(term))
-          ) : false;
+          const associatedJOs = getAssociatedJOs(inv);
+          const containerMatch = associatedJOs.some(jo => {
+            if (Array.isArray(jo.containerNo)) {
+              return jo.containerNo.some(c => c && c.toLowerCase().includes(term));
+            }
+            return jo.containerNo && jo.containerNo.toLowerCase().includes(term);
+          });
           return id.toLowerCase().includes(term) || name.toLowerCase().includes(term) || containerMatch;
         })
         .map(inv => {
-          const linkedJO = jobOrders.find(j => String(j.id) === String(inv.joId));
-          const containerNumbers = linkedJO ? (
-            Array.isArray(linkedJO.containerNo)
-              ? linkedJO.containerNo.filter(Boolean).join(', ')
-              : (linkedJO.containerNo || '')
-          ) : '';
+          const associatedJOs = getAssociatedJOs(inv);
+          const containerNumbers = getAggregatedContainers(associatedJOs).join(', ');
           return {
             Invoice_ID: inv.id,
             JO_ID: inv.joId,
@@ -1726,12 +1755,13 @@ const Accounting = () => {
         const id = inv.id || '';
         const name = inv.customerName || '';
         const term = searchTerm.toLowerCase();
-        const linkedJO = jobOrders.find(j => String(j.id) === String(inv.joId));
-        const containerMatch = linkedJO ? (
-          Array.isArray(linkedJO.containerNo)
-            ? linkedJO.containerNo.some(c => c && c.toLowerCase().includes(term))
-            : (linkedJO.containerNo && linkedJO.containerNo.toLowerCase().includes(term))
-        ) : false;
+        const associatedJOs = getAssociatedJOs(inv);
+        const containerMatch = associatedJOs.some(jo => {
+          if (Array.isArray(jo.containerNo)) {
+            return jo.containerNo.some(c => c && c.toLowerCase().includes(term));
+          }
+          return jo.containerNo && jo.containerNo.toLowerCase().includes(term);
+        });
         return id.toLowerCase().includes(term) || name.toLowerCase().includes(term) || containerMatch;
       });
   }, [invoices, searchTerm, filterByDate, jobOrders]);
@@ -1838,37 +1868,77 @@ const Accounting = () => {
                   </div>
                 </div>
 
-                {isPaid && linkedJO && (
-                  <div style={{ borderTop: '2px dashed #cbd5e1', paddingTop: '50px', marginTop: '60px' }}>
-                    <h4 style={{ color: '#065f46', marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '10px', textTransform: 'uppercase', fontSize: '0.9rem', fontWeight: '900', letterSpacing: '1px' }}>
-                      <CheckCircle size={20} /> Operational Execution Proof (POD)
-                    </h4>
+                {isPaid && (
+                  (() => {
+                    const associatedJOs = getAssociatedJOs(selectedInvoice);
+                    if (associatedJOs.length === 0) return null;
                     
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '30px', marginBottom: '40px', background: 'white', border: '1px solid #e2e8f0', padding: '25px', borderRadius: '12px' }}>
-                      <div>
-                        <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '800' }}>Container No.</span>
-                        <div style={{ fontWeight: '900', fontSize: '1.2rem', color: '#0f172a' }}>{linkedJO.containerNo || 'N/A'}</div>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '800' }}>Vehicle No.</span>
-                        <div style={{ fontWeight: '900', fontSize: '1.2rem', color: '#0f172a' }}>{linkedJO.vehicleNo || 'N/A'}</div>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '800' }}>Final Activity Status</span>
-                        <div style={{ fontWeight: '900', fontSize: '1.2rem', color: 'var(--success)' }}>{linkedJO.activityStatus || 'DELIVERED'}</div>
-                      </div>
-                    </div>
-
-                    {linkedJO.photos && linkedJO.photos.length > 0 && (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px' }}>
-                        {linkedJO.photos.map((photo, idx) => (
-                          <div key={idx} style={{ height: '140px', borderRadius: '10px', overflow: 'hidden', border: '2px solid #f1f5f9' }}>
-                            <img src={photo} alt="Operation Proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    let allVehicles = [];
+                    let allPhotos = [];
+                    let allStatuses = [];
+                    
+                    associatedJOs.forEach(jo => {
+                      if (Array.isArray(jo.vehicleNo)) {
+                        allVehicles.push(...jo.vehicleNo.filter(Boolean));
+                      } else if (jo.vehicleNo && String(jo.vehicleNo).trim()) {
+                        allVehicles.push(String(jo.vehicleNo).trim());
+                      }
+                      
+                      if (Array.isArray(jo.photos)) {
+                        allPhotos.push(...jo.photos.filter(Boolean));
+                      }
+                      
+                      if (jo.activityStatus) {
+                        allStatuses.push(jo.activityStatus);
+                      }
+                    });
+                    
+                    const allContainers = getAggregatedContainers(associatedJOs);
+                    allVehicles = [...new Set(allVehicles)];
+                    allPhotos = [...new Set(allPhotos)];
+                    allStatuses = [...new Set(allStatuses)];
+                    
+                    const displayStatus = allStatuses.length > 0 ? allStatuses.join(', ') : 'DELIVERED';
+                    
+                    return (
+                      <div style={{ borderTop: '2px dashed #cbd5e1', paddingTop: '50px', marginTop: '60px' }}>
+                        <h4 style={{ color: '#065f46', marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '10px', textTransform: 'uppercase', fontSize: '0.9rem', fontWeight: '900', letterSpacing: '1px' }}>
+                          <CheckCircle size={20} /> Operational Execution Proof (POD)
+                        </h4>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '30px', marginBottom: '40px', background: 'white', border: '1px solid #e2e8f0', padding: '25px', borderRadius: '12px' }}>
+                          <div>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '800' }}>Container No.</span>
+                            <div style={{ fontWeight: '900', fontSize: '1.2rem', color: '#0f172a', whiteSpace: 'pre-wrap' }}>
+                              {allContainers.length > 0 ? allContainers.join(', ') : 'N/A'}
+                            </div>
                           </div>
-                        ))}
+                          <div>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '800' }}>Vehicle No.</span>
+                            <div style={{ fontWeight: '900', fontSize: '1.2rem', color: '#0f172a', whiteSpace: 'pre-wrap' }}>
+                              {allVehicles.length > 0 ? allVehicles.join(', ') : 'N/A'}
+                            </div>
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '800' }}>Final Activity Status</span>
+                            <div style={{ fontWeight: '900', fontSize: '1.2rem', color: 'var(--success)' }}>
+                              {displayStatus}
+                            </div>
+                          </div>
+                        </div>
+
+                        {allPhotos.length > 0 && (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px' }}>
+                            {allPhotos.map((photo, idx) => (
+                              <div key={idx} style={{ height: '140px', borderRadius: '10px', overflow: 'hidden', border: '2px solid #f1f5f9' }}>
+                                <img src={photo} alt="Operation Proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()
                 )}
 
                 <div style={{ marginTop: '100px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
@@ -3422,47 +3492,28 @@ const Accounting = () => {
                       </td>
                       <td style={{ padding: '15px' }}>
                         {(() => {
-                          if (!linkedJO) return '—';
-                          const cNo = linkedJO.containerNo;
-                          if (Array.isArray(cNo)) {
-                            const filtered = cNo.filter(Boolean);
-                            if (filtered.length === 0) return '—';
-                            return (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                {filtered.map((num, idx) => (
-                                  <span key={idx} style={{ 
-                                    fontFamily: 'monospace', 
-                                    fontSize: '0.75rem', 
-                                    background: 'rgba(212, 175, 55, 0.1)', 
-                                    color: 'var(--secondary)', 
-                                    border: '1px solid rgba(212, 175, 55, 0.25)', 
-                                    padding: '2px 6px', 
-                                    borderRadius: '4px',
-                                    width: 'fit-content',
-                                    whiteSpace: 'nowrap'
-                                  }}>
-                                    {num}
-                                  </span>
-                                ))}
-                              </div>
-                            );
-                          }
-                          if (cNo && cNo.trim()) {
-                            return (
-                              <span style={{ 
-                                fontFamily: 'monospace', 
-                                fontSize: '0.75rem', 
-                                background: 'rgba(212, 175, 55, 0.1)', 
-                                color: 'var(--secondary)', 
-                                border: '1px solid rgba(212, 175, 55, 0.25)', 
-                                padding: '2px 6px', 
-                                borderRadius: '4px'
-                              }}>
-                                {cNo}
-                              </span>
-                            );
-                          }
-                          return '—';
+                          const associatedJOs = getAssociatedJOs(inv);
+                          const allContainers = getAggregatedContainers(associatedJOs);
+                          if (allContainers.length === 0) return '—';
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              {allContainers.map((num, idx) => (
+                                <span key={idx} style={{ 
+                                  fontFamily: 'monospace', 
+                                  fontSize: '0.75rem', 
+                                  background: 'rgba(212, 175, 55, 0.1)', 
+                                  color: 'var(--secondary)', 
+                                  border: '1px solid rgba(212, 175, 55, 0.25)', 
+                                  padding: '2px 6px', 
+                                  borderRadius: '4px',
+                                  width: 'fit-content',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {num}
+                                </span>
+                              ))}
+                            </div>
+                          );
                         })()}
                       </td>
                       <td style={{ padding: '15px', fontWeight: '600' }}>{inv.customerName}</td>

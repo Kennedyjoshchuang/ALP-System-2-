@@ -212,8 +212,39 @@ export const AppProvider = ({ children }) => {
         };
       });
       setJobOrders(parsedJOs);
-      setInvoices(safeParse(invData, ['extra_charges', 'tax_deduction_proof', 'taxes_deducted', 'paymentProofPhoto', 'signedInvoicePhoto', 'signedReceiptPhoto']));
-      setReceivables(safeParse(recData, ['extra_charges', 'tax_deduction_proof', 'taxes_deducted', 'paymentProofPhoto', 'signedInvoicePhoto', 'signedReceiptPhoto']));
+      const unpackInvoiceNotes = (inv) => {
+        let notesText = inv.notes || '';
+        let consolidatedJOs = [];
+        if (notesText && notesText.includes('|||')) {
+          const parts = notesText.split('|||');
+          notesText = parts[0].trim();
+          try {
+            const meta = JSON.parse(parts[1].trim());
+            if (Array.isArray(meta.consolidatedJOs)) {
+              consolidatedJOs = meta.consolidatedJOs;
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+        return {
+          ...inv,
+          notes: notesText || null,
+          consolidatedJOs: consolidatedJOs.length > 0 ? consolidatedJOs : (inv.joId ? [inv.joId] : [])
+        };
+      };
+
+      setInvoices(safeParse(invData, ['extra_charges', 'tax_deduction_proof', 'taxes_deducted', 'paymentProofPhoto', 'signedInvoicePhoto', 'signedReceiptPhoto']).map(unpackInvoiceNotes));
+      const parsedReceivables = safeParse(recData, ['extra_charges', 'tax_deduction_proof', 'taxes_deducted', 'paymentProofPhoto', 'signedInvoicePhoto', 'signedReceiptPhoto']).map(rec => {
+        const originalInv = invData.find(i => i.id === rec.id || i.id === rec.invoiceId);
+        const unpackedInv = originalInv ? unpackInvoiceNotes(originalInv) : null;
+        return {
+          ...rec,
+          joId: rec.joId || (unpackedInv ? unpackedInv.joId : null),
+          consolidatedJOs: (unpackedInv && unpackedInv.consolidatedJOs) ? unpackedInv.consolidatedJOs : (rec.joId ? [rec.joId] : [])
+        };
+      });
+      setReceivables(parsedReceivables);
       setVendors(safeParse(venData, ['services', 'assets']));
       setPurchaseOrders(safeParse(poData, ['items', 'vendorInvoicePhoto', 'paymentProofPhoto']));
       setSalaries(safeParse(salData, ['taxes']));
@@ -531,6 +562,10 @@ export const AppProvider = ({ children }) => {
     const newInvoiceId = `INV-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
     const consolidatedJOs = targetJOs.map(j => j.id);
 
+    const packedNotes = notes
+      ? `${notes} ||| ${JSON.stringify({ consolidatedJOs })}`
+      : `||| ${JSON.stringify({ consolidatedJOs })}`;
+
     const newInvoice = {
       id: newInvoiceId,
       joId, // Primary JO reference
@@ -541,7 +576,7 @@ export const AppProvider = ({ children }) => {
       tax: 0,
       date: new Date().toISOString(),
       status: 'unpaid',
-      notes: notes || null,
+      notes: packedNotes,
       extra_charges: [],
       signedReceiptPhoto: null,
       signedInvoicePhoto: null,
@@ -554,7 +589,12 @@ export const AppProvider = ({ children }) => {
         body: JSON.stringify(newInvoice)
       });
       
-      const finalInvoice = { ...newInvoice, id: data.id || newInvoice.id };
+      const finalInvoice = { 
+        ...newInvoice, 
+        id: data.id || newInvoice.id,
+        notes: notes || null,
+        consolidatedJOs
+      };
       
       setInvoices(prev => [...prev, finalInvoice]);
       setReceivables(prev => [...prev, { ...finalInvoice, balance: finalInvoice.amount }]);
@@ -579,6 +619,10 @@ export const AppProvider = ({ children }) => {
       ? invoiceData.consolidatedJOs
       : invoiceData.joId ? [invoiceData.joId] : [];
 
+    const packedNotes = invoiceData.notes
+      ? `${invoiceData.notes} ||| ${JSON.stringify({ consolidatedJOs })}`
+      : `||| ${JSON.stringify({ consolidatedJOs })}`;
+
     const newInvoice = {
       id: newInvoiceId,
       joId: invoiceData.joId || null,
@@ -593,7 +637,7 @@ export const AppProvider = ({ children }) => {
       tax: cleanNumber(invoiceData.tax || 0),
       date: invoiceData.date || new Date().toISOString(),
       status: invoiceData.status || 'unpaid',
-      notes: invoiceData.notes || null,
+      notes: packedNotes,
       extra_charges: invoiceData.extra_charges || [],
       signedReceiptPhoto: null,
       signedInvoicePhoto: null,
@@ -606,7 +650,12 @@ export const AppProvider = ({ children }) => {
         body: JSON.stringify(newInvoice)
       });
       
-      const finalInvoice = { ...newInvoice, id: data.id || newInvoice.id };
+      const finalInvoice = { 
+        ...newInvoice, 
+        id: data.id || newInvoice.id,
+        notes: invoiceData.notes || null,
+        consolidatedJOs
+      };
       
       setInvoices(prev => [...prev, finalInvoice]);
       setReceivables(prev => [...prev, { ...finalInvoice, balance: finalInvoice.amount }]);

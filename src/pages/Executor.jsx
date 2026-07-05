@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { Truck, Camera, CheckCircle2, Package, History, PlayCircle, X, Search, FileSpreadsheet, Plus, FileText, Printer, Trash2, Folder, FolderOpen, ChevronDown, ChevronRight } from 'lucide-react';
+import { Truck, Camera, CheckCircle2, Package, History, PlayCircle, X, Search, FileSpreadsheet, Plus, FileText, Printer, Trash2, Folder, FolderOpen, ChevronDown, ChevronRight, RefreshCw, Receipt } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
@@ -56,7 +56,7 @@ const formatDuration = (dispatchedAt, completedAt, t, language) => {
 };
 
 const Executor = () => {
-  const { jobOrders, updateJOStatus, completeJO, deleteJO, t, language, hasAccess } = useApp();
+  const { jobOrders, invoices = [], quotations = [], createInvoice, deleteInvoice, updateJOStatus, completeJO, deleteJO, t, language, hasAccess } = useApp();
   const isID = language === 'id';
   const canWrite = hasAccess ? hasAccess('executor', true) : false;
   const navigate = useNavigate();
@@ -163,6 +163,35 @@ const Executor = () => {
 
     const fileName = activeTab === 'active' ? "Field_Operations_Aktif" : "Field_Operations_Records";
     exportToExcel(dataToExport, fileName);
+  };
+
+  const handleRecreateInvoice = async (jo) => {
+    try {
+      const existingInvoice = invoices.find(inv => 
+        String(inv.joId) === String(jo.id) || 
+        (inv.consolidatedJOs && inv.consolidatedJOs.map(String).includes(String(jo.id)))
+      );
+      
+      const confirmMsg = existingInvoice
+        ? (isID 
+            ? `Invoice lama (${existingInvoice.id}) akan dihapus dan dibuat ulang. Lanjutkan?` 
+            : `The old invoice (${existingInvoice.id}) will be deleted and recreated. Continue?`)
+        : (isID 
+            ? `Buat invoice untuk JO ${jo.id}?` 
+            : `Create invoice for JO ${jo.id}?`);
+            
+      if (!window.confirm(confirmMsg)) return;
+
+      if (existingInvoice) {
+        await deleteInvoice(existingInvoice.id);
+      }
+      
+      await createInvoice(jo.id);
+      toast.success(isID ? "Invoice berhasil dibuat ulang!" : "Invoice successfully recreated!");
+    } catch (err) {
+      console.error(err);
+      toast.error(isID ? `Gagal membuat ulang invoice: ${err.message}` : `Failed to recreate invoice: ${err.message}`);
+    }
   };
 
   const handleLocalUpdate = (joId, field, value) => {
@@ -634,6 +663,48 @@ const Executor = () => {
                               >
                                 <Printer size={20} />
                               </button>
+                              {activeTab === 'records' && (() => {
+                                const existingInvoice = invoices.find(inv => 
+                                  String(inv.joId) === String(jo.id) || 
+                                  (inv.consolidatedJOs && inv.consolidatedJOs.map(String).includes(String(jo.id)))
+                                );
+                                if (!existingInvoice) return null;
+                                return (
+                                  <button 
+                                    className="btn-icon" 
+                                    style={{ width: '38px', height: '38px', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)' }}
+                                    onClick={(e) => { 
+                                      e.stopPropagation(); 
+                                      const linkedJO = jobOrders.find(j => String(j.id) === String(existingInvoice.joId));
+                                      const linkedQuo = linkedJO ? quotations.find(q => String(q.id) === String(linkedJO.quotationId)) : null;
+                                      const consolidatedJOs = existingInvoice.consolidatedJOs 
+                                        ? jobOrders.filter(j => existingInvoice.consolidatedJOs.includes(j.id))
+                                        : linkedJO ? [linkedJO] : [];
+                                      
+                                      localStorage.setItem('print_invoice_data', JSON.stringify({ 
+                                        invoice: existingInvoice, 
+                                        jo: linkedJO, 
+                                        consolidatedJOs: consolidatedJOs,
+                                        quotation: linkedQuo 
+                                      }));
+                                      window.open('/print/invoice', '_blank');
+                                    }}
+                                    title={isID ? "Lihat Invoice" : "View Invoice"}
+                                  >
+                                    <Receipt size={18} />
+                                  </button>
+                                );
+                              })()}
+                              {activeTab === 'records' && canWrite && (
+                                <button 
+                                  className="btn-icon" 
+                                  style={{ width: '38px', height: '38px', color: '#3b82f6', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)' }}
+                                  onClick={(e) => { e.stopPropagation(); handleRecreateInvoice(jo); }}
+                                  title={isID ? "Buat Ulang Invoice" : "Recreate Invoice"}
+                                >
+                                  <RefreshCw size={18} />
+                                </button>
+                              )}
                               {activeTab === 'records' && canWrite && (
                                 <button 
                                   className="btn-icon" 
