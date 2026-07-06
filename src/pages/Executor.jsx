@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { Truck, Camera, CheckCircle2, Package, History, PlayCircle, X, Search, FileSpreadsheet, Plus, FileText, Printer, Trash2, Folder, FolderOpen, ChevronDown, ChevronRight, RefreshCw, Receipt } from 'lucide-react';
+import { Truck, Camera, CheckCircle2, Package, History, PlayCircle, X, Search, FileSpreadsheet, Plus, FileText, Printer, Trash2, Folder, FolderOpen, ChevronDown, ChevronRight, RefreshCw, Receipt, ChevronUp, Image } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
@@ -56,11 +56,11 @@ const formatDuration = (dispatchedAt, completedAt, t, language) => {
 };
 
 const Executor = () => {
-  const { jobOrders, invoices = [], quotations = [], createInvoice, deleteInvoice, updateJOStatus, completeJO, deleteJO, t, language, hasAccess } = useApp();
+  const { jobOrders, invoices = [], quotations = [], createInvoice, createCustomInvoice, deleteInvoice, updateJOStatus, completeJO, deleteJO, companyBankAccounts = [], t, language, hasAccess } = useApp();
   const isID = language === 'id';
   const canWrite = hasAccess ? hasAccess('executor', true) : false;
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('active'); // 'active' or 'records'
+  const [activeTab, setActiveTab] = useState('active'); // 'active' or 'records' or 'pending_invoices'
   const fileInputRef = useRef(null);
   const [uploadingForId, setUploadingForId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -73,6 +73,38 @@ const Executor = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [localData, setLocalData] = useState({}); // { [joId]: { containerNo: [], vehicleNo: [], driverName: [], activityStatus: '' } }
   const [expandedGroups, setExpandedGroups] = useState({});
+  const [expandedCompletedGroups, setExpandedCompletedGroups] = useState({});
+  const [shipmentEdits, setShipmentEdits] = useState({});
+  const [savingShipment, setSavingShipment] = useState({});
+  const [photoViewer, setPhotoViewer] = useState(null);
+  const [issuingInvoiceJoId, setIssuingInvoiceJoId] = useState(null);
+  const [selectedBankId, setSelectedBankId] = useState('');
+  const [invoiceNotes, setInvoiceNotes] = useState('');
+  const [invoiceConfirmData, setInvoiceConfirmData] = useState(null);
+
+  const handleHeaderClick = (columnType) => {
+    if (columnType === 'id') {
+      setSortBy(prev => prev === 'id_asc' ? 'id_desc' : 'id_asc');
+    } else if (columnType === 'company') {
+      setSortBy(prev => prev === 'company_asc' ? 'company_desc' : 'company_asc');
+    } else if (columnType === 'created') {
+      setSortBy(prev => prev === 'created_desc' ? 'created_asc' : 'created_desc');
+    }
+  };
+
+  const renderSortIndicator = (columnType) => {
+    if (columnType === 'id') {
+      if (sortBy === 'id_asc') return ' ▲';
+      if (sortBy === 'id_desc') return ' ▼';
+    } else if (columnType === 'company') {
+      if (sortBy === 'company_asc') return ' ▲';
+      if (sortBy === 'company_desc') return ' ▼';
+    } else if (columnType === 'created') {
+      if (sortBy === 'created_asc') return ' ▲';
+      if (sortBy === 'created_desc') return ' ▼';
+    }
+    return '';
+  };
 
   const [tick, setTick] = useState(0);
   React.useEffect(() => {
@@ -81,6 +113,217 @@ const Executor = () => {
     }, 60000);
     return () => clearInterval(timer);
   }, []);
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const getAssociatedJOs = (invoice) => {
+    if (!invoice) return [];
+    const primaryJo = jobOrders.find(j => String(j.id) === String(invoice.joId));
+    const consolidated = invoice.consolidatedJOs || [];
+    if (consolidated.length > 0) {
+      return jobOrders.filter(j => consolidated.includes(j.id));
+    }
+    return primaryJo ? [primaryJo] : [];
+  };
+
+  const handleShipmentChange = (joId, field, value) => {
+    setShipmentEdits(prev => ({
+      ...prev,
+      [joId]: {
+        ...prev[joId],
+        [field]: value
+      }
+    }));
+  };
+
+  const hasShipmentChanges = (joId) => {
+    const edit = shipmentEdits[joId];
+    if (!edit) return false;
+    const jo = jobOrders.find(j => j.id === joId);
+    if (!jo) return false;
+    return edit.shipmentStatus !== (jo.shipmentStatus || '') ||
+      edit.etd !== (jo.etd || '') ||
+      edit.eta !== (jo.eta || '');
+  };
+
+  const handleSaveShipment = async (joId) => {
+    const edit = shipmentEdits[joId];
+    if (!edit) return;
+    setSavingShipment(prev => ({ ...prev, [joId]: true }));
+    try {
+      await updateJOStatus(joId, {
+        shipmentStatus: edit.shipmentStatus || null,
+        etd: edit.etd || null,
+        eta: edit.eta || null
+      });
+      toast.success(isID ? 'Status pengiriman berhasil diperbarui' : 'Shipment status updated successfully');
+      setShipmentEdits(prev => {
+        const next = { ...prev };
+        delete next[joId];
+        return next;
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error(isID ? 'Gagal memperbarui status pengiriman' : 'Failed to update shipment status');
+    } finally {
+      setSavingShipment(prev => ({ ...prev, [joId]: false }));
+    }
+  };
+
+  const handleIssueInvoice = async (joId, bankAccount, notes) => {
+    try {
+      if (!bankAccount) {
+        setIssuingInvoiceJoId(joId);
+        setInvoiceNotes('');
+        if (companyBankAccounts.length > 0) {
+          setSelectedBankId(companyBankAccounts[0].id);
+        }
+        return;
+      }
+
+      const linkedJO = jobOrders.find(j => String(j.id) === String(joId));
+      if (!linkedJO) {
+        toast.error('Job Order tidak ditemukan.');
+        return;
+      }
+
+      const linkedQuo = linkedJO.quotationId
+        ? quotations.find(q => String(q.id) === String(linkedJO.quotationId))
+        : null;
+
+      let targetJOs = [linkedJO];
+      if (linkedJO.quotationId) {
+        targetJOs = jobOrders.filter(j =>
+          String(j.quotationId) === String(linkedJO.quotationId) &&
+          (j.status === 'done' || String(j.id) === String(joId)) &&
+          j.customerName === linkedJO.customerName
+        );
+      }
+
+      const cleanNum = (val) => {
+        if (typeof val === 'number') return isNaN(val) ? 0 : val;
+        if (!val) return 0;
+        if (/^\d+(\.\d+)?$/.test(String(val))) return parseFloat(val);
+        let str = String(val).replace(/[^\d.,-]/g, '');
+        if (str.includes(',') && str.includes('.')) str = str.replace(/\./g, '').replace(/,/g, '.');
+        else if (str.includes(',')) str = str.replace(/,/g, '.');
+        const parsed = parseFloat(str);
+        return isNaN(parsed) ? 0 : parsed;
+      };
+
+      const items = targetJOs.map(targetJo => {
+        let quoItems = [];
+        const quo = targetJo.quotationId
+          ? quotations.find(q => String(q.id) === String(targetJo.quotationId))
+          : null;
+        if (quo && quo.items) {
+          try { quoItems = typeof quo.items === 'string' ? JSON.parse(quo.items) : quo.items; } catch(e) { quoItems = []; }
+        }
+        if (!Array.isArray(quoItems)) quoItems = [];
+        const targetDesc = (targetJo.instruction || targetJo.jobDescription || '').trim().toLowerCase();
+        const matchedItem = quoItems.find(i => (i.description || '').trim().toLowerCase() === targetDesc);
+        const rate = matchedItem ? cleanNum(matchedItem.rate) : cleanNum(targetJo.rate);
+        const qty = cleanNum(targetJo.issueQuantity || targetJo.quantity || 1);
+        return {
+          description: targetJo.instruction || targetJo.jobDescription || 'Freight Forwarding Services',
+          qty,
+          rate,
+        };
+      });
+
+      const newInvoiceId = `INV-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+
+      setInvoiceConfirmData({
+        joId,
+        bankAccount,
+        consolidatedJOIds: targetJOs.map(j => j.id),
+        linkedJOs: targetJOs,
+        form: {
+          id: newInvoiceId,
+          customerName: linkedJO.customerName || '',
+          customerAddress: linkedQuo?.companyAddress || linkedJO?.address || '',
+          customerPic: linkedQuo?.pic || '',
+          customerPhone: linkedQuo?.phone || '',
+          customerEmail: linkedQuo?.email || '',
+          date: new Date().toISOString().substring(0, 10),
+          items,
+          extraCharges: [],
+          taxPercent: 0,
+          bankAccountId: bankAccount.id,
+          notes: notes || '',
+        },
+      });
+
+    } catch (err) {
+      console.error('Issue Invoice error:', err);
+      toast.error('Error saat menerbitkan invoice: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  const handleConfirmAndIssueInvoice = async () => {
+    if (!invoiceConfirmData) return;
+    const { joId, consolidatedJOIds, linkedJOs } = invoiceConfirmData;
+    const f = invoiceConfirmData.form;
+    try {
+      const bank = companyBankAccounts.find(b => b.id === f.bankAccountId) || invoiceConfirmData.bankAccount;
+
+      const allLines = [...(f.items || []), ...(f.extraCharges || [])];
+      let subtotal = 0;
+      const extra_charges = allLines.map(line => {
+        const qty = parseFloat(line.qty) || 1;
+        const rate = parseFloat(line.rate) || 0;
+        const amount = qty * rate;
+        subtotal += amount;
+        return { description: line.description, qty, rate, amount };
+      });
+      const tax = subtotal * ((parseFloat(f.taxPercent) || 0) / 100);
+      const grandTotal = subtotal + tax;
+
+      const invoiceData = {
+        id: f.id.trim() || undefined,
+        joId,
+        consolidatedJOs: consolidatedJOIds,
+        customerName: f.customerName,
+        customerAddress: f.customerAddress,
+        customerPic: f.customerPic,
+        customerPhone: f.customerPhone,
+        customerEmail: f.customerEmail,
+        date: f.date,
+        amount: grandTotal,
+        subtotal,
+        tax,
+        extra_charges,
+        notes: f.notes || null,
+      };
+
+      const newInv = await createCustomInvoice(invoiceData);
+      if (!newInv) throw new Error('Gagal menerbitkan invoice.');
+
+      const linkedJO = jobOrders.find(j => String(j.id) === String(joId));
+      const linkedQuo = linkedJO?.quotationId
+        ? quotations.find(q => String(q.id) === String(linkedJO.quotationId))
+        : null;
+      const printData = {
+        invoice: newInv,
+        jo: linkedJO || null,
+        consolidatedJOs: linkedJOs || [],
+        quotation: linkedQuo || null,
+        bankAccount: bank,
+      };
+      localStorage.setItem('print_invoice_data_' + newInv.id, JSON.stringify(printData));
+
+      setInvoiceConfirmData(null);
+      setIssuingInvoiceJoId(null);
+      window.open('/print/invoice?id=' + newInv.id, '_blank');
+
+    } catch (err) {
+      console.error('Confirm Issue Invoice error:', err);
+      toast.error('Error: ' + (err.message || 'Gagal menerbitkan invoice.'));
+    }
+  };
 
   const handlePrint = () => {
     window.print();
@@ -121,6 +364,37 @@ const Executor = () => {
       const searchMatch = (jo.id || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                         (jo.customerName || '').toLowerCase().includes(searchTerm.toLowerCase());
       return tabMatch && searchMatch && filterByDate(jo.date);
+    })
+    .sort((a, b) => {
+      if (sortBy === 'created_desc') {
+        return getJoTimestamp(b) - getJoTimestamp(a) || (b.id || '').localeCompare(a.id || '');
+      }
+      if (sortBy === 'created_asc') {
+        return getJoTimestamp(a) - getJoTimestamp(b) || (a.id || '').localeCompare(b.id || '');
+      }
+      if (sortBy === 'company_asc') {
+        return (a.customerName || '').localeCompare(b.customerName || '');
+      }
+      if (sortBy === 'company_desc') {
+        return (b.customerName || '').localeCompare(a.customerName || '');
+      }
+      if (sortBy === 'id_asc') {
+        return (a.id || '').localeCompare(b.id || '');
+      }
+      if (sortBy === 'id_desc') {
+        return (b.id || '').localeCompare(a.id || '');
+      }
+      return 0;
+    });
+
+  const completedJOs = jobOrders
+    .filter(jo => jo.status === 'done')
+    .filter(jo => filterByDate(jo.date))
+    .filter(jo => {
+      const id = jo.id || '';
+      const name = jo.customerName || '';
+      const term = searchTerm.toLowerCase();
+      return id.toLowerCase().includes(term) || name.toLowerCase().includes(term);
     })
     .sort((a, b) => {
       if (sortBy === 'created_desc') {
@@ -481,6 +755,18 @@ const Executor = () => {
             {isID ? 'Catatan JO' : 'JO Records'}
             {activeTab === 'records' && <motion.div layoutId="execTab" style={{ position: 'absolute', bottom: -1, left: 0, right: 0, background: 'var(--secondary)', height: '2px' }} />}
           </button>
+          <button 
+            onClick={() => setActiveTab('pending_invoices')}
+            style={{
+              background: 'none', border: 'none', padding: '10px 0',
+              color: activeTab === 'pending_invoices' ? 'var(--secondary)' : 'var(--text-muted)',
+              fontSize: '1rem', fontWeight: '600', cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', gap: '8px'
+            }}
+          >
+            <Receipt size={18} />
+            {isID ? 'Invoice Tertunda' : 'Pending Invoices'}
+            {activeTab === 'pending_invoices' && <motion.div layoutId="execTab" style={{ position: 'absolute', bottom: -1, left: 0, right: 0, background: 'var(--secondary)', height: '2px' }} />}
+          </button>
         </div>
       </div>
 
@@ -522,20 +808,281 @@ const Executor = () => {
       </div>
 
       <div className="glass-card" style={{ padding: '25px', overflowX: 'auto' }}>
-        <div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
-          <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--secondary)' }}>
-              <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>JO ID</th>
-              <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Pelanggan' : 'Customer'}</th>
-              <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Instruksi' : 'Instruction'}</th>
-              <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Kontainer & Unit' : 'Container & Unit'}</th>
-              <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Durasi Pengiriman' : 'Dispatched Duration'}</th>
-              <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Status Operasional' : 'Operational Status'}</th>
-              <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'center' }}>{isID ? 'Dokumentasi' : 'Documentation'}</th>
-              <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'center' }}>{isID ? 'Aksi' : 'Action'}</th>
-            </tr>
-          </thead>
-          <tbody>
+        {activeTab === 'pending_invoices' ? (
+          <div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
+            <thead>
+              <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--secondary)' }}>
+                <th 
+                  style={{ padding: '15px', cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => handleHeaderClick('id')}
+                >
+                  JO Ref{renderSortIndicator('id')}
+                </th>
+                <th 
+                  style={{ padding: '15px', cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => handleHeaderClick('company')}
+                >
+                  {isID ? 'Pelanggan' : 'Customer'}{renderSortIndicator('company')}
+                </th>
+                <th style={{ padding: '15px' }}>{isID ? 'Status' : 'Status'}</th>
+                <th 
+                  style={{ padding: '15px', cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => handleHeaderClick('created')}
+                >
+                  {isID ? 'Pengiriman' : 'Shipment'}{renderSortIndicator('created')}
+                </th>
+                <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Foto' : 'Photos'}</th>
+                <th style={{ padding: '15px' }}>{isID ? 'Aksi' : 'Action'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(() => {
+                const groups = {};
+                completedJOs.forEach(jo => {
+                  const qId = jo.quotationId || 'direct';
+                  if (!groups[qId]) {
+                    groups[qId] = {
+                      quotationId: qId,
+                      customerName: jo.customerName || 'Direct Customer',
+                      jobOrders: []
+                    };
+                  }
+                  groups[qId].jobOrders.push(jo);
+                });
+
+                if (Object.keys(groups).length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        {isID ? 'Tidak ada invoice tertunda.' : 'No pending invoices found.'}
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return Object.values(groups).map(group => {
+                  const isGroupExpanded = expandedCompletedGroups[group.quotationId] !== false;
+                  const uninvoicedJOs = group.jobOrders.filter(jo => !invoices.some(inv => String(inv.joId) === String(jo.id)));
+                  const allInvoiced = uninvoicedJOs.length === 0;
+
+                  return (
+                    <React.Fragment key={group.quotationId}>
+                      <tr 
+                        style={{ 
+                          background: 'var(--secondary-bg)', 
+                          borderBottom: '2px solid var(--secondary)',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => setExpandedCompletedGroups({ ...expandedCompletedGroups, [group.quotationId]: !isGroupExpanded })}
+                      >
+                        <td colSpan="6" style={{ padding: '12px 15px', verticalAlign: 'middle' }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ fontSize: '1.2rem' }}>📁</span>
+                              <span style={{ fontWeight: '800', color: 'var(--secondary)' }}>
+                                {group.quotationId === 'direct' ? (isID ? 'Pekerjaan Langsung' : 'Direct Jobs') : group.quotationId}
+                              </span>
+                              <span style={{ color: 'var(--text)', fontWeight: '700', marginLeft: '5px' }}>
+                                🏢 {group.customerName}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                              {!allInvoiced && canWrite && (
+                                <ButtonWithLoading 
+                                  className="btn btn-gold" 
+                                  style={{ padding: '6px 14px', fontSize: '0.75rem', gap: '6px' }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleIssueInvoice(uninvoicedJOs[0].id);
+                                  }}
+                                >
+                                  {isID ? 'Terbitkan Invoice Gabungan' : 'Issue Combined Invoice'}
+                                </ButtonWithLoading>
+                              )}
+                              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                                {group.jobOrders.length} {isID ? 'Pekerjaan' : 'Jobs'}
+                              </span>
+                              {isGroupExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {isGroupExpanded && group.jobOrders.map(jo => {
+                        const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id));
+                        return (
+                          <tr key={jo.id} style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.01)' }}>
+                            <td style={{ padding: '15px', paddingLeft: '30px', fontWeight: 'bold', color: 'var(--secondary)' }}>
+                              <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>📄</span> {jo.id}
+                            </td>
+                            <td style={{ padding: '15px' }}>
+                              <div style={{ fontWeight: '600' }}>{jo.customerName}</div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                {jo.instruction || jo.jobDescription}
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                {isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}
+                              </div>
+                              {jo.containerNo && (() => {
+                                const cNo = jo.containerNo;
+                                let filtered = [];
+                                if (Array.isArray(cNo)) {
+                                  filtered = cNo.filter(Boolean);
+                                } else if (cNo && String(cNo).trim()) {
+                                  filtered = [String(cNo).trim()];
+                                }
+                                if (filtered.length === 0) return null;
+                                return (
+                                  <div style={{ marginTop: '6px' }}>
+                                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px' }}>
+                                      {isID ? 'Kontainer:' : 'Containers:'}
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '4px' }}>
+                                      {filtered.map((num, idx) => (
+                                        <span key={idx} style={{ 
+                                          fontFamily: 'monospace', 
+                                          fontSize: '0.7rem', 
+                                          background: 'rgba(212, 175, 55, 0.1)', 
+                                          color: 'var(--secondary)', 
+                                          border: '1px solid rgba(212, 175, 55, 0.25)', 
+                                          padding: '2px 6px', 
+                                          borderRadius: '4px',
+                                          width: 'fit-content',
+                                          whiteSpace: 'nowrap'
+                                        }}>
+                                          {num}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                            <td style={{ padding: '15px' }}>
+                              <span className="badge badge-done">{isID ? 'Selesai' : 'Completed'}</span>
+                            </td>
+                            <td style={{ padding: '15px' }}>
+                              {canWrite ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '160px', maxWidth: '200px' }}>
+                                  <select 
+                                    value={shipmentEdits[jo.id]?.shipmentStatus ?? jo.shipmentStatus ?? ''} 
+                                    onChange={(e) => handleShipmentChange(jo.id, 'shipmentStatus', e.target.value)}
+                                    style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text)', border: '1px solid var(--glass-border)', borderRadius: '4px', padding: '4px', fontSize: '0.75rem' }}
+                                  >
+                                    <option value="">{isID ? '-- Pilih Status --' : '-- Select Status --'}</option>
+                                    <option value="in_progress">{isID ? 'Dalam Proses' : 'In Progress'}</option>
+                                    <option value="done">{isID ? 'Selesai' : 'Done'}</option>
+                                  </select>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', width: '35px' }}>ETD:</span>
+                                    <input 
+                                      type="date" 
+                                      value={shipmentEdits[jo.id]?.etd ?? jo.etd ?? ''} 
+                                      onChange={(e) => handleShipmentChange(jo.id, 'etd', e.target.value)}
+                                      style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text)', border: '1px solid var(--glass-border)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.75rem', flex: 1, colorScheme: 'dark' }}
+                                    />
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', width: '35px' }}>ETA:</span>
+                                    <input 
+                                      type="date" 
+                                      value={shipmentEdits[jo.id]?.eta ?? jo.eta ?? ''} 
+                                      onChange={(e) => handleShipmentChange(jo.id, 'eta', e.target.value)}
+                                      style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text)', border: '1px solid var(--glass-border)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.75rem', flex: 1, colorScheme: 'dark' }}
+                                    />
+                                  </div>
+                                  {hasShipmentChanges(jo.id) && (
+                                    <ButtonWithLoading 
+                                      onClick={() => handleSaveShipment(jo.id)}
+                                      loading={savingShipment[jo.id]}
+                                      className="btn btn-gold"
+                                      style={{ padding: '4px 8px', fontSize: '0.7rem', marginTop: '2px', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}
+                                    >
+                                      {isID ? 'Simpan Pengiriman' : 'Save Shipment'}
+                                    </ButtonWithLoading>
+                                  )}
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.75rem' }}>
+                                  {jo.shipmentStatus && (
+                                    <div>
+                                      <span className={`badge ${jo.shipmentStatus === 'done' ? 'badge-done' : 'badge-dispatched'}`}>
+                                        {jo.shipmentStatus === 'done' ? (isID ? 'Selesai' : 'Done') : (isID ? 'Dalam Proses' : 'In Progress')}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {jo.etd && <div><span style={{ color: 'var(--text-muted)' }}>ETD:</span> {formatDate(jo.etd)}</div>}
+                                  {jo.eta && <div><span style={{ color: 'var(--text-muted)' }}>ETA:</span> {formatDate(jo.eta)}</div>}
+                                  {!jo.shipmentStatus && !jo.etd && !jo.eta && (
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>-</span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '15px', textAlign: 'center' }}>
+                              {jo.photos && jo.photos.length > 0 ? (
+                                <button 
+                                  onClick={() => setPhotoViewer({ joId: jo.id, photos: jo.photos })}
+                                  style={{ background: 'var(--secondary-bg)', border: '1px solid var(--secondary)', borderRadius: '6px', padding: '5px 10px', color: 'var(--secondary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem' }}
+                                >
+                                  <Image size={14} /> {jo.photos.length} {isID ? 'Foto' : 'Photos'}
+                                </button>
+                              ) : (
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{isID ? 'Tidak Ada Foto' : 'No Photos'}</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '15px' }}>
+                              <div style={{ display: 'flex', gap: '10px' }}>
+                                {!hasInvoice && canWrite ? (
+                                  <ButtonWithLoading className="btn btn-gold" style={{ padding: '8px 16px', fontSize: '0.85rem' }} onClick={() => handleIssueInvoice(jo.id)}>
+                                    {isID ? 'Terbitkan Invoice' : 'Issue Invoice'}
+                                  </ButtonWithLoading>
+                                ) : (
+                                  <span style={{ color: 'var(--success)', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                                    {isID ? 'Sudah Ditagih' : 'Invoiced'}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                });
+              })()}
+            </tbody>
+          </table></div>
+        ) : (
+          <div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
+            <thead>
+              <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--secondary)' }}>
+                <th 
+                  style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => handleHeaderClick('id')}
+                >
+                  JO ID{renderSortIndicator('id')}
+                </th>
+                <th 
+                  style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => handleHeaderClick('company')}
+                >
+                  {isID ? 'Pelanggan' : 'Customer'}{renderSortIndicator('company')}
+                </th>
+                <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Instruksi' : 'Instruction'}</th>
+                <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Kontainer & Unit' : 'Container & Unit'}</th>
+                <th 
+                  style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => handleHeaderClick('created')}
+                >
+                  {isID ? 'Durasi Pengiriman' : 'Dispatched Duration'}{renderSortIndicator('created')}
+                </th>
+                <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Status Operasional' : 'Operational Status'}</th>
+                <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'center' }}>{isID ? 'Dokumentasi' : 'Documentation'}</th>
+                <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'center' }}>{isID ? 'Aksi' : 'Action'}</th>
+              </tr>
+            </thead>
+            <tbody>
             {(() => {
               // Group filteredJOs by quotationId
               const groups = {};
@@ -926,10 +1473,10 @@ const Executor = () => {
               });
             })()}
           </tbody>
-        </table></div>
+        </table></div>)}
 
         {/* Surat Jalan Modal */}
-        {filteredJOs.length === 0 && (
+        {activeTab !== 'pending_invoices' && filteredJOs.length === 0 && (
           <div style={{ textAlign: 'center', padding: '100px 20px' }}>
             <Package size={64} color="rgba(255,255,255,0.05)" style={{ marginBottom: '20px' }} />
             <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>
@@ -938,6 +1485,273 @@ const Executor = () => {
           </div>
         )}
       </div>
+
+      {/* Bank Selection Modal for Invoice Issuance */}
+      {issuingInvoiceJoId && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:10001, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }}>
+          <div className="glass-card" style={{ width:'100%', maxWidth:'500px', padding:'35px', textAlign:'center' }}>
+            <h3 style={{ color:'var(--secondary)', marginBottom:'20px' }}>{isID ? 'Pilih Rekening untuk Invoice' : 'Select Bank Account for Invoice'}</h3>
+            <p style={{ color:'var(--text-muted)', fontSize:'0.85rem', marginBottom:'25px' }}>
+              {isID ? 'Silakan pilih rekening bank yang akan dicantumkan pada Invoice untuk Job Order:' : 'Please select the bank account to be printed on the Invoice for Job Order:'} <strong>{issuingInvoiceJoId}</strong>
+            </p>
+            
+            <div style={{ marginBottom:'30px' }}>
+              <select 
+                value={selectedBankId} 
+                onChange={(e) => setSelectedBankId(e.target.value)}
+                style={{ width:'100%', padding:'12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'10px', color:'var(--text)', fontSize:'1rem' }}
+              >
+                {companyBankAccounts.map(bank => (
+                  <option key={bank.id} value={bank.id} style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+                    {bank.bankName} - {bank.accountNumber} ({bank.accountName})
+                  </option>
+                ))}
+                {companyBankAccounts.length === 0 && <option value="" style={{ background: 'var(--bg)', color: 'var(--text-muted)' }}>{isID ? 'Belum ada rekening terdaftar' : 'No registered bank accounts'}</option>}
+              </select>
+              {companyBankAccounts.length === 0 && (
+                <p style={{ color:'var(--danger)', fontSize:'0.75rem', marginTop:'10px' }}>
+                  {isID ? 'Mohon tambahkan rekening perusahaan di menu Pengaturan Rekening Bank terlebih dahulu.' : 'Please add a company bank account in the Settings menu first.'}
+                </p>
+              )}
+            </div>
+
+            <div style={{ marginBottom:'30px', textAlign:'left' }}>
+              <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>
+                {isID ? 'Keterangan (Opsional)' : 'Description (Optional)'}
+              </label>
+              <textarea 
+                value={invoiceNotes}
+                onChange={(e) => setInvoiceNotes(e.target.value)}
+                placeholder={isID ? "Masukkan keterangan tambahan untuk invoice..." : "Enter additional description for the invoice..."}
+                style={{ width:'100%', minHeight:'80px', padding:'12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'10px', color:'var(--text)', fontSize:'0.9rem', resize:'vertical' }}
+              />
+            </div>
+
+            <div style={{ display:'flex', gap:'12px', justifyContent:'center' }}>
+              <button 
+                onClick={() => setIssuingInvoiceJoId(null)} 
+                className="btn" 
+                style={{ flex:1, padding:'12px', background:'rgba(255,255,255,0.05)', color:'var(--text)' }}
+              >
+                {isID ? 'Batal' : 'Cancel'}
+              </button>
+              <button 
+                onClick={() => {
+                  const bank = companyBankAccounts.find(b => b.id === selectedBankId);
+                  if (bank) {
+                    handleIssueInvoice(issuingInvoiceJoId, bank, invoiceNotes);
+                  } else {
+                    toast.error(isID ? "Silakan pilih rekening bank yang valid." : "Please select a valid bank account.");
+                  }
+                }} 
+                className="btn btn-gold" 
+                style={{ flex:2, padding:'12px', fontWeight:'700' }}
+                disabled={companyBankAccounts.length === 0}
+              >
+                {isID ? 'Konfirmasi & Terbitkan' : 'Confirm & Issue'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Confirmation & Edit Modal */}
+      {invoiceConfirmData && (() => {
+        const f = invoiceConfirmData.form;
+        const setF = (patch) => setInvoiceConfirmData(prev => ({ ...prev, form: { ...prev.form, ...patch } }));
+
+        const updateItem = (idx, field, val) => {
+          const next = [...f.items];
+          next[idx] = { ...next[idx], [field]: val };
+          setF({ items: next });
+        };
+        const addItem = () => setF({ items: [...f.items, { description: '', qty: 1, rate: 0 }] });
+        const removeItem = (idx) => setF({ items: f.items.filter((_, i) => i !== idx) });
+
+        const updateExtra = (idx, field, val) => {
+          const next = [...f.extraCharges];
+          next[idx] = { ...next[idx], [field]: val };
+          setF({ extraCharges: next });
+        };
+        const addExtra = () => setF({ extraCharges: [...f.extraCharges, { description: '', qty: 1, rate: 0 }] });
+        const removeExtra = (idx) => setF({ extraCharges: f.extraCharges.filter((_, i) => i !== idx) });
+
+        const subtotal = [...f.items, ...f.extraCharges].reduce((s, l) => s + (parseFloat(l.qty) || 1) * (parseFloat(l.rate) || 0), 0);
+        const taxAmt = subtotal * ((parseFloat(f.taxPercent) || 0) / 100);
+        const grandTotal = subtotal + taxAmt;
+
+        const fmtRp = (n) => `Rp ${n.toLocaleString('id-ID')}`;
+
+        const inputStyle = { width: '100%', padding: '8px 11px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.88rem' };
+        const labelStyle = { fontSize: '0.7rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '5px', display: 'block' };
+
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 10002, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '20px', overflowY: 'auto' }}>
+            <div className="glass-card" style={{ width: '100%', maxWidth: '780px', padding: '32px', marginTop: '10px', marginBottom: '30px' }}>
+
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '18px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '900', color: 'var(--secondary)' }}>🧾 {isID ? 'Konfirmasi & Edit Invoice' : 'Confirm & Edit Invoice'}</h3>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  {isID ? 'Periksa dan edit semua data sebelum invoice diterbitkan.' : 'Review and edit all data before the invoice is issued.'}
+                </p>
+              </div>
+
+              {/* Form Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+                <div>
+                  <label style={labelStyle}>{isID ? 'No. Invoice' : 'Invoice No.'}</label>
+                  <input type="text" value={f.id} onChange={(e) => setF({ id: e.target.value })} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>{isID ? 'Tanggal Invoice' : 'Invoice Date'}</label>
+                  <input type="date" value={f.date} onChange={(e) => setF({ date: e.target.value })} style={{ ...inputStyle, colorScheme: 'dark' }} />
+                </div>
+              </div>
+
+              {/* Customer Info */}
+              <div className="glass-card" style={{ padding: '20px', marginBottom: '24px', background: 'rgba(255,255,255,0.015)' }}>
+                <p style={{ ...labelStyle, fontSize: '0.72rem', color: 'var(--secondary)', marginBottom: '14px' }}>📋 {isID ? 'Info Pelanggan' : 'Customer Info'}</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                  <div>
+                    <label style={labelStyle}>{isID ? 'Nama Customer' : 'Customer Name'}</label>
+                    <input type="text" value={f.customerName} onChange={(e) => setF({ customerName: e.target.value })} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>{isID ? 'Alamat' : 'Address'}</label>
+                    <input 
+                      type="text" 
+                      value={f.customerAddress} 
+                      onChange={(e) => setF({ customerAddress: e.target.value })} 
+                      style={inputStyle} 
+                      placeholder={isID ? 'Alamat perusahaan customer...' : 'Customer company address...'}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px' }}>
+                  <div>
+                    <label style={labelStyle}>PIC</label>
+                    <input type="text" value={f.customerPic} onChange={(e) => setF({ customerPic: e.target.value })} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>{isID ? 'Telepon' : 'Phone'}</label>
+                    <input type="text" value={f.customerPhone} onChange={(e) => setF({ customerPhone: e.target.value })} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Email</label>
+                    <input type="text" value={f.customerEmail} onChange={(e) => setF({ customerEmail: e.target.value })} style={inputStyle} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div style={{ marginBottom: '24px' }}>
+                <label style={labelStyle}>{isID ? 'Keterangan (Opsional)' : 'Description (Optional)'}</label>
+                <textarea 
+                  value={f.notes} 
+                  onChange={(e) => setF({ notes: e.target.value })} 
+                  style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }} 
+                  placeholder={isID ? 'Masukkan keterangan tambahan untuk invoice...' : 'Enter additional description for the invoice...'}
+                />
+              </div>
+
+              {/* Service Items */}
+              <div style={{ marginBottom: '24px' }}>
+                <p style={{ ...labelStyle, fontSize: '0.72rem', color: 'var(--text)', marginBottom: '10px' }}>📦 {isID ? 'Item Layanan' : 'Service Items'}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {f.items.map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <input type="text" placeholder={isID ? "Deskripsi layanan..." : "Service description..."} value={item.description} onChange={(e) => updateItem(idx, 'description', e.target.value)} style={{ ...inputStyle, flex: 3 }} />
+                      <input type="number" placeholder="Qty" value={item.qty} onChange={(e) => updateItem(idx, 'qty', e.target.value)} style={{ ...inputStyle, flex: 0.8 }} />
+                      <input type="number" placeholder="Rate" value={item.rate} onChange={(e) => updateItem(idx, 'rate', e.target.value)} style={{ ...inputStyle, flex: 1.5 }} />
+                      <button onClick={() => removeItem(idx)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '5px' }}><Trash2 size={16} /></button>
+                    </div>
+                  ))}
+                  <button className="btn" onClick={addItem} style={{ alignSelf: 'flex-start', padding: '6px 12px', fontSize: '0.78rem', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                    <Plus size={14} /> {isID ? 'Tambah Item' : 'Add Item'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Extra Charges */}
+              <div style={{ marginBottom: '32px' }}>
+                <p style={{ ...labelStyle, fontSize: '0.72rem', color: 'var(--text)', marginBottom: '10px' }}>➕ {isID ? 'Biaya Tambahan' : 'Extra Charges'}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {f.extraCharges.map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <input type="text" placeholder={isID ? "Deskripsi biaya tambahan..." : "Extra charge description..."} value={item.description} onChange={(e) => updateExtra(idx, 'description', e.target.value)} style={{ ...inputStyle, flex: 3 }} />
+                      <input type="number" placeholder="Qty" value={item.qty} onChange={(e) => updateExtra(idx, 'qty', e.target.value)} style={{ ...inputStyle, flex: 0.8 }} />
+                      <input type="number" placeholder="Rate" value={item.rate} onChange={(e) => updateExtra(idx, 'rate', e.target.value)} style={{ ...inputStyle, flex: 1.5 }} />
+                      <button onClick={() => removeExtra(idx)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '5px' }}><Trash2 size={16} /></button>
+                    </div>
+                  ))}
+                  <button className="btn" onClick={addExtra} style={{ alignSelf: 'flex-start', padding: '6px 12px', fontSize: '0.78rem', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                    <Plus size={14} /> {isID ? 'Tambah Biaya Tambahan' : 'Add Extra Charge'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Bottom Details (Tax and Summary) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '30px', borderTop: '1px solid var(--glass-border)', paddingTop: '24px' }}>
+                <div>
+                  <label style={labelStyle}>{isID ? 'Pajak (%)' : 'Tax (%)'}</label>
+                  <input type="number" value={f.taxPercent} onChange={(e) => setF({ taxPercent: e.target.value })} style={{ ...inputStyle, maxWidth: '120px' }} />
+                  <div style={{ marginTop: '20px' }}>
+                    <label style={labelStyle}>{isID ? 'Rekening Bank' : 'Bank Account'}</label>
+                    <select value={f.bankAccountId} onChange={(e) => setF({ bankAccountId: e.target.value })} style={inputStyle}>
+                      {companyBankAccounts.map(bank => (
+                        <option key={bank.id} value={bank.id} style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+                          {bank.bankName} - {bank.accountNumber} ({bank.accountName})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '20px' }}>
+                  <p style={{ ...labelStyle, color: 'var(--secondary)', marginBottom: '12px' }}>{isID ? 'Ringkasan' : 'Summary'}</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.9rem' }}>
+                    {[
+                      [isID ? 'Subtotal' : 'Subtotal', fmtRp(subtotal)],
+                      [isID ? `Pajak (${f.taxPercent}%)` : `Tax (${f.taxPercent}%)`, fmtRp(taxAmt)],
+                      [isID ? 'Total Tagihan' : 'Grand Total', fmtRp(grandTotal), true]
+                    ].map(([label, val, highlight], idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: highlight ? '900' : 'normal', borderTop: highlight ? '1px dashed var(--glass-border)' : 'none', paddingTop: highlight ? '10px' : '0', color: highlight ? 'var(--secondary)' : 'var(--text)' }}>
+                        <span>{label}</span>
+                        <span>{val}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: '15px', justifyContent: 'flex-end', marginTop: '35px', borderTop: '1px solid var(--glass-border)', paddingTop: '20px' }}>
+                <button className="btn" onClick={() => setInvoiceConfirmData(null)} style={{ padding: '10px 24px', background: 'rgba(255,255,255,0.05)' }}>
+                  ← {isID ? 'Kembali' : 'Back'}
+                </button>
+                <button className="btn btn-gold" onClick={handleConfirmAndIssueInvoice} style={{ padding: '10px 30px', fontWeight: '800' }}>
+                  ✓ {isID ? 'Konfirmasi & Terbitkan' : 'Confirm & Issue'}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Fullscreen Photo Viewer Modal */}
+      {photoViewer && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.95)', zIndex:10005, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px' }}>
+          <button onClick={() => setPhotoViewer(null)} style={{ position:'absolute', top:'20px', right:'20px', background:'none', border:'none', color:'white', cursor:'pointer' }}><X size={30} /></button>
+          <div style={{ maxWidth:'90%', maxHeight:'80%', overflow:'auto', display:'flex', gap:'20px', flexWrap:'wrap', justifyContent:'center' }}>
+            {photoViewer.photos.map((url, i) => (
+              <img key={i} src={url} alt={`Proof ${i}`} style={{ maxWidth:'400px', maxHeight:'400px', objectFit:'contain', borderRadius:'8px', border:'2px solid rgba(255,255,255,0.1)' }} />
+            ))}
+          </div>
+          <div style={{ marginTop:'20px', color:'var(--text-muted)' }}>JO Reference: {photoViewer.joId}</div>
+        </div>
+      )}
     </div>
   );
 };

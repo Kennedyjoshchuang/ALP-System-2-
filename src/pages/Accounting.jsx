@@ -40,6 +40,45 @@ const defaultSubcategories = {
   ]
 };
 
+const sortInvoices = (list, sortBy) => {
+  return [...list].sort((a, b) => {
+    const idA = a.id || '';
+    const idB = b.id || '';
+    const dateA = a.date ? new Date(a.date) : new Date(0);
+    const dateB = b.date ? new Date(b.date) : new Date(0);
+    const nameA = a.customerName || '';
+    const nameB = b.customerName || '';
+    const amountA = parseFloat(a.balance || a.amount || 0);
+    const amountB = parseFloat(b.balance || b.amount || 0);
+
+    if (sortBy === 'inv_no_desc') {
+      return idB.localeCompare(idA, undefined, { numeric: true, sensitivity: 'base' });
+    }
+    if (sortBy === 'inv_no_asc') {
+      return idA.localeCompare(idB, undefined, { numeric: true, sensitivity: 'base' });
+    }
+    if (sortBy === 'date_desc') {
+      return dateB - dateA;
+    }
+    if (sortBy === 'date_asc') {
+      return dateA - dateB;
+    }
+    if (sortBy === 'client_asc') {
+      return nameA.localeCompare(nameB);
+    }
+    if (sortBy === 'client_desc') {
+      return nameB.localeCompare(nameA);
+    }
+    if (sortBy === 'amount_desc') {
+      return amountB - amountA;
+    }
+    if (sortBy === 'amount_asc') {
+      return amountA - amountB;
+    }
+    return 0;
+  });
+};
+
 const Accounting = () => {
   const context = useApp();
   const confirm = useConfirm();
@@ -111,6 +150,7 @@ const Accounting = () => {
   const [costLines, setCostLines] = useState([{ vendorId: '', serviceIdx: '', qty: 1 }]);
   const [searchTerm, setSearchTerm] = useState('');
   const [joSortBy, setJoSortBy] = useState('created_desc');
+  const [invoiceSortBy, setInvoiceSortBy] = useState('inv_no_desc');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [editingInvoice, setEditingInvoice] = useState(null);
@@ -262,6 +302,31 @@ const Accounting = () => {
       return jobOrders.filter(j => consolidated.includes(j.id));
     }
     return primaryJo ? [primaryJo] : [];
+  };
+
+  const renderShipmentInfo = (associatedJOs) => {
+    if (!associatedJOs || associatedJOs.length === 0) return '—';
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.75rem' }}>
+        {associatedJOs.map(jo => (
+          <div key={jo.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px', background: 'rgba(255,255,255,0.02)', padding: '6px', borderRadius: '6px', border: '1px solid var(--glass-border)' }}>
+            <div style={{ fontWeight: 'bold', color: 'var(--secondary)', fontSize: '0.7rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+              <span>{jo.id}</span>
+              {jo.shipmentStatus && (
+                <span className={`badge ${jo.shipmentStatus === 'done' ? 'badge-done' : 'badge-dispatched'}`} style={{ fontSize: '0.6rem', padding: '1px 4px' }}>
+                  {jo.shipmentStatus === 'done' ? (isID ? 'Selesai' : 'Done') : (isID ? 'Dalam Proses' : 'In Progress')}
+                </span>
+              )}
+            </div>
+            {jo.etd && <div><span style={{ color: 'var(--text-muted)' }}>ETD:</span> {formatDate(jo.etd)}</div>}
+            {jo.eta && <div><span style={{ color: 'var(--text-muted)' }}>ETA:</span> {formatDate(jo.eta)}</div>}
+            {!jo.shipmentStatus && !jo.etd && !jo.eta && (
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>-</span>
+            )}
+          </div>
+        ))}
+      </div>
+    );
   };
 
   const getAggregatedContainers = (associatedJOs) => {
@@ -1749,7 +1814,7 @@ const Accounting = () => {
   };
 
   const filteredIssuedInvoices = React.useMemo(() => {
-    return (invoices || [])
+    const list = (invoices || [])
       .filter(inv => filterByDate(inv.date))
       .filter(inv => {
         const id = inv.id || '';
@@ -1764,7 +1829,9 @@ const Accounting = () => {
         });
         return id.toLowerCase().includes(term) || name.toLowerCase().includes(term) || containerMatch;
       });
-  }, [invoices, searchTerm, filterByDate, jobOrders]);
+
+    return sortInvoices(list, invoiceSortBy);
+  }, [invoices, searchTerm, filterByDate, jobOrders, invoiceSortBy]);
 
   return (
     <div className="accounting-container">
@@ -3060,7 +3127,7 @@ const Accounting = () => {
         </div>
         {(activeTab === 'billing' || activeTab === 'costing') && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{isID ? 'Urutkan:' : 'Sort:'}</span>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{isID ? 'Urutkan JO:' : 'Sort JOs:'}</span>
             <select 
               value={joSortBy} 
               onChange={(e) => setJoSortBy(e.target.value)}
@@ -3072,6 +3139,25 @@ const Accounting = () => {
               <option value="company_desc">{isID ? 'Nama Perusahaan (Z-A)' : 'Company Name (Z-A)'}</option>
               <option value="id_asc">{isID ? 'JO ID (Asc)' : 'JO ID (Asc)'}</option>
               <option value="id_desc">{isID ? 'JO ID (Desc)' : 'JO ID (Desc)'}</option>
+            </select>
+          </div>
+        )}
+        {(activeTab === 'billing' || activeTab === 'piutang') && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{isID ? 'Urutkan Invoice:' : 'Sort Invoices:'}</span>
+            <select 
+              value={invoiceSortBy} 
+              onChange={(e) => setInvoiceSortBy(e.target.value)}
+              style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem', outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="inv_no_desc">{isID ? 'Nomor Invoice (Terbesar)' : 'Invoice Number (Highest First)'}</option>
+              <option value="inv_no_asc">{isID ? 'Nomor Invoice (Terkecil)' : 'Invoice Number (Lowest First)'}</option>
+              <option value="date_desc">{isID ? 'Tanggal Invoice (Terbaru)' : 'Invoice Date (Newest First)'}</option>
+              <option value="date_asc">{isID ? 'Tanggal Invoice (Terlama)' : 'Invoice Date (Oldest First)'}</option>
+              <option value="client_asc">{isID ? 'Nama Pelanggan (A-Z)' : 'Customer Name (A-Z)'}</option>
+              <option value="client_desc">{isID ? 'Nama Pelanggan (Z-A)' : 'Customer Name (Z-A)'}</option>
+              <option value="amount_desc">{isID ? 'Jumlah (Terbesar)' : 'Amount (Highest First)'}</option>
+              <option value="amount_asc">{isID ? 'Jumlah (Terkecil)' : 'Amount (Lowest First)'}</option>
             </select>
           </div>
         )}
@@ -3186,187 +3272,145 @@ const Accounting = () => {
         </div>
       ) : activeTab === 'billing' ? (
         <div className="billing-section">
+          {/* Readonly Pending Invoices Card */}
           <div className="glass-card" style={{ padding: '25px', marginBottom: '40px' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: isPendingCollapsed ? '0' : '20px', cursor:'pointer' }} onClick={() => setIsPendingCollapsed(!isPendingCollapsed)}>
-              <h4 style={{ margin:0 }}>{isID ? 'Invoice Tertunda (dari Operasional)' : 'Pending Invoices (from Operations)'}</h4>
+              <h4 style={{ margin:0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Receipt size={20} style={{ color: 'var(--secondary)' }} />
+                {isID ? 'Invoice Tertunda (dari Operasional - Readonly)' : 'Pending Invoices (from Operations - Readonly)'}
+              </h4>
               <button style={{ background:'none', border:'none', color:'var(--secondary)', cursor:'pointer' }}>
                 {isPendingCollapsed ? <ChevronDown /> : <ChevronUp />}
               </button>
             </div>
             
             {!isPendingCollapsed && (
-              <div className="table-container"><div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--glass-border)' }}>
-                  <th style={{ padding: '15px' }}>JO Ref</th>
-                  <th style={{ padding: '15px' }}>{isID ? 'Pelanggan' : 'Customer'}</th>
-                  <th style={{ padding: '15px' }}>{isID ? 'Status' : 'Status'}</th>
-                  <th style={{ padding: '15px' }}>{isID ? 'Pengiriman' : 'Shipment'}</th>
-                  <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Foto' : 'Photos'}</th>
-                  <th style={{ padding: '15px' }}>{isID ? 'Aksi' : 'Action'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(() => {
-                  // Group completed JOs by quotationId
-                  const groups = {};
-                  completedJOs.forEach(jo => {
-                    const qId = jo.quotationId || 'direct';
-                    if (!groups[qId]) {
-                      groups[qId] = {
-                        quotationId: qId,
-                        customerName: jo.customerName || 'Direct Customer',
-                        jobOrders: []
-                      };
-                    }
-                    groups[qId].jobOrders.push(jo);
-                  });
+              <div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--glass-border)' }}>
+                    <th style={{ padding: '15px' }}>JO Ref</th>
+                    <th style={{ padding: '15px' }}>{isID ? 'Pelanggan' : 'Customer'}</th>
+                    <th style={{ padding: '15px' }}>{isID ? 'Status' : 'Status'}</th>
+                    <th style={{ padding: '15px' }}>{isID ? 'Pengiriman' : 'Shipment'}</th>
+                    <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Foto' : 'Photos'}</th>
+                    <th style={{ padding: '15px' }}>{isID ? 'Status Penagihan' : 'Billing Status'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const groups = {};
+                    completedJOs.forEach(jo => {
+                      const qId = jo.quotationId || 'direct';
+                      if (!groups[qId]) {
+                        groups[qId] = {
+                          quotationId: qId,
+                          customerName: jo.customerName || 'Direct Customer',
+                          jobOrders: []
+                        };
+                      }
+                      groups[qId].jobOrders.push(jo);
+                    });
 
-                  return Object.values(groups).map(group => {
-                    const isGroupExpanded = expandedCompletedGroups[group.quotationId] !== false;
-                    const uninvoicedJOs = group.jobOrders.filter(jo => !invoices.some(inv => String(inv.joId) === String(jo.id)));
-                    const allInvoiced = uninvoicedJOs.length === 0;
-
-                    return (
-                      <React.Fragment key={group.quotationId}>
-                        {/* Quotation Group Folder Row */}
-                        <tr 
-                          style={{ 
-                            background: 'var(--secondary-bg)', 
-                            borderBottom: '2px solid var(--secondary)',
-                            cursor: 'pointer'
-                          }}
-                          onClick={() => setExpandedCompletedGroups({ ...expandedCompletedGroups, [group.quotationId]: !isGroupExpanded })}
-                        >
-                          <td colSpan="6" style={{ padding: '12px 15px', verticalAlign: 'middle' }}>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <span style={{ fontSize: '1.2rem' }}>📁</span>
-                                <span style={{ fontWeight: '800', color: 'var(--secondary)' }}>
-                                  {group.quotationId === 'direct' ? (isID ? 'Pekerjaan Langsung' : 'Direct Jobs') : group.quotationId}
-                                </span>
-                                <span style={{ color: 'var(--text)', fontWeight: '700', marginLeft: '5px' }}>
-                                  🏢 {group.customerName}
-                                </span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                {!allInvoiced && canWrite && (
-                                  <ButtonWithLoading 
-                                    className="btn btn-gold" 
-                                    style={{ padding: '6px 14px', fontSize: '0.75rem', gap: '6px' }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleIssueInvoice(uninvoicedJOs[0].id);
-                                    }}
-                                  >
-                                    {isID ? 'Terbitkan Invoice Gabungan' : 'Issue Combined Invoice'}
-                                  </ButtonWithLoading>
-                                )}
-                                <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                                  {group.jobOrders.length} {isID ? 'Pekerjaan' : 'Jobs'}
-                                </span>
-                                {isGroupExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                              </div>
-                            </div>
+                    if (Object.keys(groups).length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan="6" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                            {isID ? 'Tidak ada invoice tertunda.' : 'No pending invoices found.'}
                           </td>
                         </tr>
+                      );
+                    }
 
-                        {/* Child Completed Job Orders */}
-                        {isGroupExpanded && group.jobOrders.map(jo => {
-                          const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id));
-                          return (
-                            <tr key={jo.id} style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.01)' }}>
-                              <td style={{ padding: '15px', paddingLeft: '30px', fontWeight: 'bold', color: 'var(--secondary)' }}>
-                                <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>📄</span> {jo.id}
-                              </td>
-                              <td style={{ padding: '15px' }}>
-                                <div style={{ fontWeight: '600' }}>{jo.customerName}</div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                  {jo.instruction || jo.jobDescription}
+                    return Object.values(groups).map(group => {
+                      const isGroupExpanded = expandedCompletedGroups[group.quotationId] !== false;
+
+                      return (
+                        <React.Fragment key={group.quotationId}>
+                          {/* Quotation Group Folder Row */}
+                          <tr 
+                            style={{ 
+                              background: 'var(--secondary-bg)', 
+                              borderBottom: '2px solid var(--secondary)',
+                              cursor: 'pointer'
+                            }}
+                            onClick={() => setExpandedCompletedGroups({ ...expandedCompletedGroups, [group.quotationId]: !isGroupExpanded })}
+                          >
+                            <td colSpan="6" style={{ padding: '12px 15px', verticalAlign: 'middle' }}>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <span style={{ fontSize: '1.2rem' }}>📁</span>
+                                  <span style={{ fontWeight: '800', color: 'var(--secondary)' }}>
+                                    {group.quotationId === 'direct' ? (isID ? 'Pekerjaan Langsung' : 'Direct Jobs') : group.quotationId}
+                                  </span>
+                                  <span style={{ color: 'var(--text)', fontWeight: '700', marginLeft: '5px' }}>
+                                    🏢 {group.customerName}
+                                  </span>
                                 </div>
-                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                  {isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                                    {group.jobOrders.length} {isID ? 'Pekerjaan' : 'Jobs'}
+                                  </span>
+                                  {isGroupExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                 </div>
-                                {jo.containerNo && (() => {
-                                  const cNo = jo.containerNo;
-                                  let filtered = [];
-                                  if (Array.isArray(cNo)) {
-                                    filtered = cNo.filter(Boolean);
-                                  } else if (cNo && String(cNo).trim()) {
-                                    filtered = [String(cNo).trim()];
-                                  }
-                                  if (filtered.length === 0) return null;
-                                  return (
-                                    <div style={{ marginTop: '6px' }}>
-                                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px' }}>
-                                        {isID ? 'Kontainer:' : 'Containers:'}
-                                      </div>
-                                      <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '4px' }}>
-                                        {filtered.map((num, idx) => (
-                                          <span key={idx} style={{ 
-                                            fontFamily: 'monospace', 
-                                            fontSize: '0.7rem', 
-                                            background: 'rgba(212, 175, 55, 0.1)', 
-                                            color: 'var(--secondary)', 
-                                            border: '1px solid rgba(212, 175, 55, 0.25)', 
-                                            padding: '2px 6px', 
-                                            borderRadius: '4px',
-                                            width: 'fit-content',
-                                            whiteSpace: 'nowrap'
-                                          }}>
-                                            {num}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
-                              </td>
-                              <td style={{ padding: '15px' }}>
-                                <span className="badge badge-done">{isID ? 'Selesai' : 'Completed'}</span>
-                              </td>
-                              <td style={{ padding: '15px' }}>
-                                {canWrite ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '160px', maxWidth: '200px' }}>
-                                    <select 
-                                      value={shipmentEdits[jo.id]?.shipmentStatus ?? jo.shipmentStatus ?? ''} 
-                                      onChange={(e) => handleShipmentChange(jo.id, 'shipmentStatus', e.target.value)}
-                                      style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text)', border: '1px solid var(--glass-border)', borderRadius: '4px', padding: '4px', fontSize: '0.75rem' }}
-                                    >
-                                      <option value="">{isID ? '-- Pilih Status --' : '-- Select Status --'}</option>
-                                      <option value="in_progress">{isID ? 'Dalam Proses' : 'In Progress'}</option>
-                                      <option value="done">{isID ? 'Selesai' : 'Done'}</option>
-                                    </select>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', width: '35px' }}>ETD:</span>
-                                      <input 
-                                        type="date" 
-                                        value={shipmentEdits[jo.id]?.etd ?? jo.etd ?? ''} 
-                                        onChange={(e) => handleShipmentChange(jo.id, 'etd', e.target.value)}
-                                        style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text)', border: '1px solid var(--glass-border)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.75rem', flex: 1, colorScheme: 'dark' }}
-                                      />
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', width: '35px' }}>ETA:</span>
-                                      <input 
-                                        type="date" 
-                                        value={shipmentEdits[jo.id]?.eta ?? jo.eta ?? ''} 
-                                        onChange={(e) => handleShipmentChange(jo.id, 'eta', e.target.value)}
-                                        style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text)', border: '1px solid var(--glass-border)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.75rem', flex: 1, colorScheme: 'dark' }}
-                                      />
-                                    </div>
-                                    {hasShipmentChanges(jo.id) && (
-                                      <ButtonWithLoading 
-                                        onClick={() => handleSaveShipment(jo.id)}
-                                        loading={savingShipment[jo.id]}
-                                        className="btn btn-gold"
-                                        style={{ padding: '4px 8px', fontSize: '0.7rem', marginTop: '2px', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}
-                                      >
-                                        {isID ? 'Simpan Pengiriman' : 'Save Shipment'}
-                                      </ButtonWithLoading>
-                                    )}
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Child Job Orders */}
+                          {isGroupExpanded && group.jobOrders.map(jo => {
+                            const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id));
+                            return (
+                              <tr key={jo.id} style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.01)' }}>
+                                <td style={{ padding: '15px', paddingLeft: '30px', fontWeight: 'bold', color: 'var(--secondary)' }}>
+                                  <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>📄</span> {jo.id}
+                                </td>
+                                <td style={{ padding: '15px' }}>
+                                  <div style={{ fontWeight: '600' }}>{jo.customerName}</div>
+                                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                    {jo.instruction || jo.jobDescription}
                                   </div>
-                                ) : (
+                                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                    {isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}
+                                  </div>
+                                  {jo.containerNo && (() => {
+                                    const cNo = jo.containerNo;
+                                    let filtered = [];
+                                    if (Array.isArray(cNo)) {
+                                      filtered = cNo.filter(Boolean);
+                                    } else if (cNo && String(cNo).trim()) {
+                                      filtered = [String(cNo).trim()];
+                                    }
+                                    if (filtered.length === 0) return null;
+                                    return (
+                                      <div style={{ marginTop: '6px' }}>
+                                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px' }}>
+                                          {isID ? 'Kontainer:' : 'Containers:'}
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '4px' }}>
+                                          {filtered.map((num, idx) => (
+                                            <span key={idx} style={{ 
+                                              fontFamily: 'monospace', 
+                                              fontSize: '0.7rem', 
+                                              background: 'rgba(212, 175, 55, 0.1)', 
+                                              color: 'var(--secondary)', 
+                                              border: '1px solid rgba(212, 175, 55, 0.25)', 
+                                              padding: '2px 6px', 
+                                              borderRadius: '4px',
+                                              width: 'fit-content',
+                                              whiteSpace: 'nowrap'
+                                            }}>
+                                              {num}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+                                </td>
+                                <td style={{ padding: '15px' }}>
+                                  <span className="badge badge-done">{isID ? 'Selesai' : 'Completed'}</span>
+                                </td>
+                                <td style={{ padding: '15px' }}>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.75rem' }}>
                                     {jo.shipmentStatus && (
                                       <div>
@@ -3381,84 +3425,39 @@ const Accounting = () => {
                                       <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>-</span>
                                     )}
                                   </div>
-                                )}
-                              </td>
-                              <td style={{ padding: '15px', textAlign: 'center' }}>
-                                {jo.photos && jo.photos.length > 0 ? (
-                                  <button 
-                                    onClick={() => setPhotoViewer({ joId: jo.id, photos: jo.photos })}
-                                    style={{ background: 'var(--secondary-bg)', border: '1px solid var(--secondary)', borderRadius: '6px', padding: '5px 10px', color: 'var(--secondary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem' }}
-                                  >
-                                    <Image size={14} /> {jo.photos.length} {isID ? 'Foto' : 'Photos'}
-                                  </button>
-                                ) : (
-                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{isID ? 'Tidak Ada Foto' : 'No Photos'}</span>
-                                )}
-                              </td>
-                              <td style={{ padding: '15px' }}>
-                                <div style={{ display: 'flex', gap: '10px' }}>
-                                  {!hasInvoice && canWrite ? (
-                                    <ButtonWithLoading className="btn btn-gold" style={{ padding: '8px 16px', fontSize: '0.85rem' }} onClick={() => handleIssueInvoice(jo.id)}>
-                                      {isID ? 'Terbitkan Invoice' : 'Issue Invoice'}
-                                    </ButtonWithLoading>
+                                </td>
+                                <td style={{ padding: '15px', textAlign: 'center' }}>
+                                  {jo.photos && jo.photos.length > 0 ? (
+                                    <button 
+                                      onClick={() => setPhotoViewer({ joId: jo.id, photos: jo.photos })}
+                                      style={{ background: 'var(--secondary-bg)', border: '1px solid var(--secondary)', borderRadius: '6px', padding: '5px 10px', color: 'var(--secondary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem' }}
+                                    >
+                                      <Image size={14} /> {jo.photos.length} {isID ? 'Foto' : 'Photos'}
+                                    </button>
                                   ) : (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                                      {undoConfirmJoId === jo.id ? (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid var(--danger-border)', borderRadius: '8px', padding: '4px 10px' }}>
-                                          <span style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: '600' }}>{isID ? 'Batalkan invoice ini?' : 'Cancel this invoice?'}</span>
-                                          <button
-                                            disabled={!canWrite}
-                                            onClick={() => handleUndoInvoice(jo.id)}
-                                            style={{ background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '5px', padding: '3px 10px', fontSize: '0.72rem', fontWeight: '700', cursor: canWrite ? 'pointer' : 'not-allowed', opacity: canWrite ? 1 : 0.5 }}
-                                          >
-                                            {isID ? 'Ya, Batalkan' : 'Yes, Cancel'}
-                                          </button>
-                                          <button
-                                            onClick={() => setUndoConfirmJoId(null)}
-                                            style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-muted)', border: '1px solid var(--glass-border)', borderRadius: '5px', padding: '3px 8px', fontSize: '0.72rem', cursor: 'pointer' }}
-                                          >
-                                            {isID ? 'Batal' : 'Cancel'}
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <>
-                                          <span style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', fontWeight: '600' }}>
-                                            <CheckCircle size={16} /> {isID ? 'Sudah Di-invoice' : 'Invoiced'}
-                                          </span>
-                                          <button
-                                            onClick={() => setUndoConfirmJoId(jo.id)}
-                                            style={{
-                                              background: 'var(--danger-bg)', color: 'var(--danger)',
-                                              border: '1px solid var(--danger-border)', padding: '4px 10px',
-                                              borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer',
-                                              display: 'flex', alignItems: 'center', gap: '5px'
-                                            }}
-                                            title={isID ? 'Batalkan / Tarik Invoice' : 'Undo / Revoke Invoice'}
-                                          >
-                                            <RotateCcw size={12} /> {isID ? 'Batalkan' : 'Undo'}
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{isID ? 'Tidak Ada Foto' : 'No Photos'}</span>
                                   )}
-                                  <button 
-                                    className="btn" 
-                                    style={{ padding: '8px 16px', fontSize: '0.85rem', background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px solid var(--secondary)' }} 
-                                    onClick={() => handleCreatePOFromAccounting(jo.id)}
-                                  >
-                                    + Purchase Order
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </React.Fragment>
-                    );
-                  });
-                })()}
-              </tbody>
-            </table></div></div>
+                                </td>
+                                <td style={{ padding: '15px' }}>
+                                  {hasInvoice ? (
+                                    <span style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', fontWeight: '600' }}>
+                                      <CheckCircle size={16} /> {isID ? 'Sudah Di-invoice' : 'Invoiced'}
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', fontWeight: '600' }}>
+                                      {isID ? 'Siap Ditagih' : 'Ready to Invoice'}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </React.Fragment>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table></div>
             )}
           </div>
 
@@ -3486,6 +3485,7 @@ const Accounting = () => {
                   </th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'ID Inv / JO' : 'Inv ID / JO'}</th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'No. Kontainer' : 'Container No.'}</th>
+                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Info Pengiriman' : 'Shipment Info'}</th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Pelanggan' : 'Customer'}</th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Tanggal' : 'Date'}</th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'right' }}>{isID ? 'Pendapatan (INV)' : 'Revenue (INV)'}</th>
@@ -3538,6 +3538,9 @@ const Accounting = () => {
                             </div>
                           );
                         })()}
+                      </td>
+                      <td style={{ padding: '15px' }}>
+                        {renderShipmentInfo(getAssociatedJOs(inv))}
                       </td>
                       <td style={{ padding: '15px', fontWeight: '600' }}>{inv.customerName}</td>
                       <td style={{ padding: '15px', fontSize: '0.85rem' }}>{new Date(inv.date).toLocaleDateString()}</td>
@@ -3783,6 +3786,7 @@ const Accounting = () => {
 
                   <th style={{ padding: '15px' }}>Invoice</th>
                   <th style={{ padding: '15px' }}>{isID ? 'Pelanggan' : 'Customer'}</th>
+                  <th style={{ padding: '15px' }}>{isID ? 'Info Pengiriman' : 'Shipment Info'}</th>
                   <th style={{ padding: '15px' }}>{receivableSubTab === 'outstanding' ? (isID ? 'Jumlah Piutang' : 'Outstanding Amount') : (isID ? 'Jumlah Dibayar' : 'Amount Paid')}</th>
                   {receivableSubTab === 'lunas' && <th style={{ padding: '15px' }}>{isID ? 'Potongan Pajak' : 'Tax Ded.'}</th>}
                   <th style={{ padding: '15px' }}>{isID ? 'Aksi' : 'Action'}</th>
@@ -3800,7 +3804,9 @@ const Accounting = () => {
                       return id.toLowerCase().includes(term) || name.toLowerCase().includes(term);
                     });
                   
-                  return filteredItems.map(item => (
+                  const sortedItems = sortInvoices(filteredItems, invoiceSortBy);
+                  
+                  return sortedItems.map(item => (
                     <tr key={item.id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
                       <td style={{ padding: '15px' }}>
                         <input 
@@ -3811,6 +3817,13 @@ const Accounting = () => {
                       </td>
                       <td style={{ padding: '15px', color: 'var(--secondary)', fontWeight: 'bold' }}>{item.id}</td>
                       <td style={{ padding: '15px' }}>{item.customerName}</td>
+                      <td style={{ padding: '15px' }}>
+                        {(() => {
+                          const originalInv = invoices.find(i => i.id === item.id || i.id === item.invoiceId);
+                          const associatedJOs = originalInv ? getAssociatedJOs(originalInv) : [];
+                          return renderShipmentInfo(associatedJOs);
+                        })()}
+                      </td>
                       <td style={{ padding: '15px', fontWeight: 'bold' }}>
                         Rp {(item.balance || item.amount).toLocaleString()}
                       </td>
