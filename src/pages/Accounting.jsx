@@ -197,6 +197,8 @@ const Accounting = () => {
   // Other Expense States
   const [otherExpenseModal, setOtherExpenseModal] = useState(false);
   const [transactionTypeFilter, setTransactionTypeFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [subcategoryFilter, setSubcategoryFilter] = useState('all');
   const [showOptionalDetails, setShowOptionalDetails] = useState(false);
   const [otherExpenseForm, setOtherExpenseForm] = useState({
     id: null,
@@ -454,6 +456,25 @@ const Accounting = () => {
     return [...defaultCats, ...customCats];
   }, [enrichedOtherTransactions]);
 
+  const availableSubcategories = React.useMemo(() => {
+    if (categoryFilter === 'all') return [];
+    const subs = new Set();
+    const defaults = defaultSubcategories[categoryFilter] || [];
+    defaults.forEach(s => {
+      subs.add(s.id);
+    });
+    enrichedOtherTransactions.forEach(t => {
+      if (t.category === categoryFilter && t.subcategory) {
+        subs.add(t.subcategory);
+      }
+    });
+    return Array.from(subs);
+  }, [categoryFilter, enrichedOtherTransactions]);
+
+  React.useEffect(() => {
+    setSubcategoryFilter('all');
+  }, [categoryFilter]);
+
   const filteredOtherTransactions = React.useMemo(() => {
     return enrichedOtherTransactions
       .filter(t => filterByDate(t.expenseDate || t.date))
@@ -462,15 +483,23 @@ const Accounting = () => {
         return t.type === transactionTypeFilter;
       })
       .filter(t => {
+        if (categoryFilter === 'all') return true;
+        return t.category === categoryFilter;
+      })
+      .filter(t => {
+        if (subcategoryFilter === 'all') return true;
+        return t.subcategory === subcategoryFilter;
+      })
+      .filter(t => {
         const term = searchTerm.toLowerCase();
         return (t.employeeName || '').toLowerCase().includes(term) ||
                (t.description || '').toLowerCase().includes(term) ||
                (t.category || '').toLowerCase().includes(term);
       });
-  }, [enrichedOtherTransactions, transactionTypeFilter, searchTerm, startDate, endDate]);
+  }, [enrichedOtherTransactions, transactionTypeFilter, searchTerm, startDate, endDate, categoryFilter, subcategoryFilter]);
 
   const handleEditOtherTransaction = (transaction) => {
-    const parsed = parsePolymorphicDescription(transaction.description);
+    const parsed = parsePolymorphicDescription(transaction.rawDescription || transaction.description);
     
     // Look up employeeId by name from database row if not serialized in JSON
     let employeeId = parsed.employeeId;
@@ -485,17 +514,26 @@ const Accounting = () => {
     }
 
     const category = parsed.category || 'Lain-lain';
-    const isDefaultCategory = ['Gaji', 'Operasional', 'Bonus', 'Sewa', 'Lain-lain'].includes(category);
-    const customCategory = !isDefaultCategory ? category : '';
+    const isExistingCategory = existingCategories.includes(category);
+    const customCategory = !isExistingCategory ? category : '';
 
     const subcategory = parsed.subcategory || '';
-    const defaultSubs = isDefaultCategory ? (defaultSubcategories[category] || []).map(s => s.id) : [];
-    const isCustomSubcategory = subcategory && !defaultSubs.includes(subcategory);
+    const defaultSubs = isExistingCategory ? (defaultSubcategories[category] || []).map(s => s.id) : [];
+    const customSubs = [];
+    if (category) {
+      enrichedOtherTransactions.forEach(t => {
+        if (t.category === category && t.subcategory && !defaultSubs.includes(t.subcategory) && !customSubs.includes(t.subcategory)) {
+          customSubs.push(t.subcategory);
+        }
+      });
+    }
+    const allSubs = [...defaultSubs, ...customSubs];
+    const isCustomSubcategory = subcategory && !allSubs.includes(subcategory);
 
     setOtherExpenseForm({
       ...transaction,
       type: parsed.type || 'expense',
-      category: isDefaultCategory ? category : 'CUSTOM',
+      category: isExistingCategory ? category : 'CUSTOM',
       customCategory: customCategory,
       subcategory: isCustomSubcategory ? 'CUSTOM' : subcategory,
       customSubcategory: isCustomSubcategory ? subcategory : '',
@@ -3166,8 +3204,8 @@ const Accounting = () => {
           <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
           <span style={{ color: 'var(--text-muted)' }}>{isID ? 's/d' : 'to'}</span>
           <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
-          {(startDate || endDate || searchTerm) && (
-            <button onClick={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); }} style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>Reset</button>
+          {(startDate || endDate || searchTerm || categoryFilter !== 'all' || subcategoryFilter !== 'all') && (
+            <button onClick={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); setCategoryFilter('all'); setSubcategoryFilter('all'); }} style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>Reset</button>
           )}
         </div>
         <div style={{ marginLeft: 'auto' }}>
@@ -4191,9 +4229,9 @@ const Accounting = () => {
               </div>
             </div>
 
-            {/* Sub-Navigation Toggle for Filter */}
-            <div style={{ display: 'flex', gap: '15px', marginBottom: '25px', background: 'rgba(255,255,255,0.02)', padding: '5px', borderRadius: '10px', width: 'fit-content', alignItems: 'center' }}>
-              <div style={{ display: 'flex', gap: '5px' }}>
+            {/* Sub-Navigation Toggle & Category/Subcategory Filters */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', marginBottom: '25px' }}>
+              <div style={{ display: 'flex', gap: '5px', background: 'rgba(255,255,255,0.02)', padding: '5px', borderRadius: '10px', alignItems: 'center' }}>
                 <button
                   onClick={() => setTransactionTypeFilter('all')}
                   style={{
@@ -4227,6 +4265,56 @@ const Accounting = () => {
                 >
                   {isID ? '🔴 Pengeluaran' : '🔴 Expense'}
                 </button>
+              </div>
+
+              {/* Category & Subcategory filters */}
+              <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>{isID ? 'Kategori:' : 'Category:'}</span>
+                  <select
+                    value={categoryFilter}
+                    onChange={e => setCategoryFilter(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      background: 'var(--input-bg)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text)',
+                      fontSize: '0.85rem',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">{isID ? 'Semua Kategori' : 'All Categories'}</option>
+                    {existingCategories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>{isID ? 'Subkategori:' : 'Subcategory:'}</span>
+                  <select
+                    value={subcategoryFilter}
+                    onChange={e => setSubcategoryFilter(e.target.value)}
+                    disabled={categoryFilter === 'all'}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      background: categoryFilter === 'all' ? 'rgba(255,255,255,0.02)' : 'var(--input-bg)',
+                      border: '1px solid var(--border)',
+                      color: categoryFilter === 'all' ? 'var(--text-muted)' : 'var(--text)',
+                      fontSize: '0.85rem',
+                      outline: 'none',
+                      cursor: categoryFilter === 'all' ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    <option value="all">{isID ? 'Semua Subkategori' : 'All Subcategories'}</option>
+                    {availableSubcategories.map(sub => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -5839,7 +5927,20 @@ const Accounting = () => {
                 <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Subkategori Transaksi' : 'Transaction Subcategory'}</label>
                 {(() => {
                   const currentCategory = otherExpenseForm.category === 'CUSTOM' ? otherExpenseForm.customCategory : otherExpenseForm.category;
-                  const subsList = defaultSubcategories[currentCategory] || [];
+                  const defaults = defaultSubcategories[currentCategory] || [];
+                  const defaultIds = defaults.map(s => s.id);
+                  const customSubs = [];
+                  if (currentCategory) {
+                    enrichedOtherTransactions.forEach(t => {
+                      if (t.category === currentCategory && t.subcategory && !defaultIds.includes(t.subcategory) && !customSubs.includes(t.subcategory)) {
+                        customSubs.push(t.subcategory);
+                      }
+                    });
+                  }
+                  const subsList = [
+                    ...defaults,
+                    ...customSubs.map(s => ({ id: s, en: s }))
+                  ];
                   const isCustomSub = otherExpenseForm.subcategory === 'CUSTOM';
                   
                   return (
