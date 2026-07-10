@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/ConfirmContext';
-import { Send, CheckCircle, Plus, X, FileText, ShoppingCart, Trash2, FileCheck, Search, FileSpreadsheet, ChevronDown, ChevronUp, Edit, ChevronRight, Folder, FolderOpen } from 'lucide-react';
+import { Send, CheckCircle, Plus, X, FileText, ShoppingCart, Trash2, FileCheck, Search, FileSpreadsheet, ChevronDown, ChevronUp, Edit, ChevronRight, Folder, FolderOpen, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
@@ -14,6 +14,8 @@ const AdminHub = () => {
   const confirm = useConfirm();
   
   const [quantities, setQuantities] = useState({});
+  const [selectedDispatchItems, setSelectedDispatchItems] = useState({});
+  const [dispatchQuantities, setDispatchQuantities] = useState({});
   const [showModal, setShowModal] = useState(false);
   const [selectedQuoteId, setSelectedQuoteId] = useState('');
   const [selectedActivityIndex, setSelectedActivityIndex] = useState(0);
@@ -39,8 +41,134 @@ const AdminHub = () => {
   const [printPO, setPrintPO] = useState(null);
   const [poNotes, setPoNotes] = useState('');
 
+  const [showConverterModal, setShowConverterModal] = useState(false);
+  const [selectedConvertGroup, setSelectedConvertGroup] = useState(null);
+  const [converting, setConverting] = useState(false);
+  const [batchConverting, setBatchConverting] = useState(false);
+  const [batchProgress, setBatchProgress] = useState('');
+  const [selectedGroupKeys, setSelectedGroupKeys] = useState(new Set());
+
   if (!context) return null;
-  const { quotations = [], jobOrders = [], createJO, dispatchJO, vendors = [], purchaseOrders = [], createPurchaseOrder, updatePurchaseOrder, issuePurchaseOrder, deletePurchaseOrder, user, t, loading, language, hasAccess } = context;
+  const { quotations = [], jobOrders = [], createJO, dispatchJO, vendors = [], purchaseOrders = [], invoices = [], createPurchaseOrder, updatePurchaseOrder, issuePurchaseOrder, deletePurchaseOrder, user, t, loading, language, hasAccess, convertLegacyJOs, convertBatchLegacyJOs } = context;
+  
+  const legacyGroups = React.useMemo(() => {
+    const groups = {};
+    jobOrders.forEach(jo => {
+      const isLegacy = !jo.items || jo.items.length === 0;
+      if (isLegacy) {
+        if (jo.quotationId) {
+          if (!groups[jo.quotationId]) {
+            groups[jo.quotationId] = [];
+          }
+          groups[jo.quotationId].push(jo);
+        } else {
+          groups['direct-' + jo.id] = [jo];
+        }
+      }
+    });
+
+    const groupsList = [];
+    Object.keys(groups).forEach(groupId => {
+      const jos = groups[groupId];
+      const isDirect = groupId.startsWith('direct-');
+      groupsList.push({
+        quotationId: isDirect ? 'Direct JO' : groupId,
+        isDirect: isDirect,
+        groupId: groupId,
+        customerName: jos[0].customerName || 'Unknown Customer',
+        date: jos[0].date || '',
+        jobOrders: jos
+      });
+    });
+    return groupsList;
+  }, [jobOrders]);
+
+  const compileLegacyGroupItems = (group) => {
+    const compiledItems = [];
+    group.jobOrders.forEach(jo => {
+      if (Array.isArray(jo.items) && jo.items.length > 0) {
+        jo.items.forEach(it => {
+          compiledItems.push({
+            description: it.description || jo.instruction || jo.jobDescription || 'Freight Forwarding Services',
+            qty: parseInt(it.issueQuantity || it.quantity || jo.issueQuantity || jo.quantity || 1, 10),
+            rate: parseFloat(it.rate || jo.rate || 0),
+            status: it.status || jo.status || 'pending',
+            containerNo: Array.isArray(it.containerNo) ? it.containerNo : (jo.containerNo ? [jo.containerNo] : []),
+            vehicleNo: Array.isArray(it.vehicleNo) ? it.vehicleNo : (jo.vehicleNo ? [jo.vehicleNo] : []),
+            driverName: Array.isArray(it.driverName) ? it.driverName : (jo.driverName ? [jo.driverName] : [])
+          });
+        });
+      } else {
+        compiledItems.push({
+          description: jo.instruction || jo.jobDescription || 'Freight Forwarding Services',
+          qty: parseInt(jo.issueQuantity || jo.quantity || 1, 10),
+          rate: parseFloat(jo.rate || 0),
+          status: jo.status || 'pending',
+          containerNo: Array.isArray(jo.containerNo) ? jo.containerNo : (jo.containerNo ? [jo.containerNo] : []),
+          vehicleNo: Array.isArray(jo.vehicleNo) ? jo.vehicleNo : (jo.vehicleNo ? [jo.vehicleNo] : []),
+          driverName: Array.isArray(jo.driverName) ? jo.driverName : (jo.driverName ? [jo.driverName] : [])
+        });
+      }
+    });
+    return compiledItems;
+  };
+
+  const handleBatchConvert = async () => {
+    if (selectedGroupKeys.size === 0) return;
+    setBatchConverting(true);
+    
+    const batches = [];
+    selectedGroupKeys.forEach(gKey => {
+      const group = legacyGroups.find(g => g.groupId === gKey);
+      if (group) {
+        batches.push({
+          primaryJoId: group.jobOrders[0].id,
+          joIdsToDelete: group.jobOrders.slice(1).map(j => j.id),
+          items: compileLegacyGroupItems(group),
+          quotationId: group.quotationId
+        });
+      }
+    });
+
+    try {
+      await convertBatchLegacyJOs(batches, (currentIndex, total, id) => {
+        setBatchProgress(isID 
+          ? `Mengonversi ${currentIndex + 1} dari ${total} (${id === 'Direct JO' ? 'Pekerjaan Langsung' : id})...`
+          : `Converting ${currentIndex + 1} of ${total} (${id})...`
+        );
+      });
+      toast.success(isID 
+        ? `Berhasil mengonversi ${batches.length} data legacy!` 
+        : `Successfully converted ${batches.length} legacy records!`
+      );
+      setSelectedGroupKeys(new Set());
+    } catch (err) {
+      console.error(err);
+      toast.error(isID ? 'Gagal melakukan konversi batch.' : 'Failed to run batch conversion.');
+    } finally {
+      setBatchConverting(false);
+      setBatchProgress('');
+    }
+  };
+
+  const toggleGroupSelection = (groupId) => {
+    const next = new Set(selectedGroupKeys);
+    if (next.has(groupId)) {
+      next.delete(groupId);
+    } else {
+      next.add(groupId);
+    }
+    setSelectedGroupKeys(next);
+  };
+
+  const toggleAllGroups = () => {
+    if (selectedGroupKeys.size === legacyGroups.length) {
+      setSelectedGroupKeys(new Set());
+    } else {
+      setSelectedGroupKeys(new Set(legacyGroups.map(g => g.groupId)));
+    }
+  };
+
   const isID = language === 'id';
   const canWrite = hasAccess ? hasAccess('admin', true) : false;
   
@@ -299,20 +427,27 @@ const AdminHub = () => {
         return;
       }
 
-      for (const idxStr of selectedIndexes) {
+      const joItems = selectedIndexes.map(idxStr => {
         const idx = parseInt(idxStr, 10);
         const item = quote.items[idx];
         const qty = selectedActivities[idx]?.quantity || item.quantity || 1;
-        await createJO({
-          quotationId: quote.id,
-          customerName: quote.customerName,
-          jobDescription: item.description,
-          phone: quote.phone || 'N/A',
-          email: quote.email || 'N/A',
+        return {
+          description: item.description,
           rate: parseFloat(item.rate || 0),
-          quantity: parseInt(qty, 10)
-        });
-      }
+          quantity: parseInt(qty, 10),
+          issueQuantity: 0,
+          status: 'pending'
+        };
+      });
+
+      await createJO({
+        quotationId: quote.id,
+        customerName: quote.customerName,
+        phone: quote.phone || 'N/A',
+        email: quote.email || 'N/A',
+        quoteValidity: quote.validTo || 'N/A',
+        items: joItems
+      });
     } else {
       await createJO({
         quotationId: quote.id,
@@ -343,30 +478,74 @@ const AdminHub = () => {
   const handleDispatch = async (joId) => {
     if (!canWrite) return;
     const jo = jobOrders.find(j => j.id === joId);
-    const qty = quantities[joId] || jo.quantity || 1;
-    await dispatchJO(joId, parseInt(qty));
+    if (!jo) return;
+
+    if (Array.isArray(jo.items) && jo.items.length > 0) {
+      const selectedMap = selectedDispatchItems[joId] || {};
+      const selectedIndices = jo.items.map((item, idx) => {
+        const isItemPending = item.status === 'pending' || !item.status;
+        const isChecked = selectedMap[idx] ?? isItemPending;
+        return isChecked && isItemPending ? idx : null;
+      }).filter(v => v !== null);
+
+      if (selectedIndices.length === 0) {
+        toast.error(isID ? 'Pilih setidaknya satu aktivitas!' : 'Select at least one activity!');
+        return;
+      }
+
+      const updatedItems = jo.items.map((item, idx) => {
+        const isItemPending = item.status === 'pending' || !item.status;
+        const isChecked = selectedMap[idx] ?? isItemPending;
+        if (isChecked && isItemPending) {
+          const qty = dispatchQuantities[joId]?.[idx] || item.quantity || 1;
+          return {
+            ...item,
+            issueQuantity: parseInt(qty, 10),
+            status: 'dispatched'
+          };
+        }
+        return item;
+      });
+
+      await dispatchJO(joId, null, updatedItems);
+    } else {
+      const qty = quantities[joId] || jo.quantity || 1;
+      await dispatchJO(joId, parseInt(qty, 10));
+    }
+
     toast.success(isID ? 'Job Order berhasil dikirim ke Pelaksana!' : 'Job Order dispatched to Executor!');
   };
 
   const handleDispatchAll = async (group) => {
     if (!canWrite) return;
-    const confirmed = await confirm(
-      isID 
+    confirm.show({
+      message: isID 
         ? `Kirim semua ${group.jobOrders.length} JO untuk ${group.customerName}?` 
         : `Dispatch all ${group.jobOrders.length} JOs for ${group.customerName}?`,
-      {
-        title: isID ? "Kirim Semua JO" : "Dispatch All JOs",
-        confirmText: isID ? "Kirim" : "Dispatch",
-        cancelText: isID ? "Batal" : "Cancel"
+      title: isID ? "Kirim Semua JO" : "Dispatch All JOs",
+      confirmText: isID ? "Kirim" : "Dispatch",
+      onConfirm: async () => {
+        for (const jo of group.jobOrders) {
+          if (Array.isArray(jo.items) && jo.items.length > 0) {
+            const updatedItems = jo.items.map(item => {
+              if (item.status === 'pending' || !item.status) {
+                return {
+                  ...item,
+                  issueQuantity: item.quantity || 1,
+                  status: 'dispatched'
+                };
+              }
+              return item;
+            });
+            await dispatchJO(jo.id, null, updatedItems);
+          } else {
+            const qty = quantities[jo.id] || jo.quantity || 1;
+            await dispatchJO(jo.id, parseInt(qty));
+          }
+        }
+        toast.success(isID ? 'Semua Job Order berhasil dikirim ke Pelaksana!' : 'All Job Orders dispatched to Executor!');
       }
-    );
-    if (confirmed) {
-      for (const jo of group.jobOrders) {
-        const qty = quantities[jo.id] || jo.quantity || 1;
-        await dispatchJO(jo.id, parseInt(qty));
-      }
-      toast.success(isID ? 'Semua Job Order berhasil dikirim ke Pelaksana!' : 'All Job Orders dispatched to Executor!');
-    }
+    });
   };
 
   return (
@@ -669,6 +848,15 @@ const AdminHub = () => {
             <button className="btn btn-primary" onClick={() => setShowModal(true)}>
               <Plus size={18} />
               {isID ? 'Buat Job Order' : 'Create Job Order'}
+            </button>
+            <button 
+              className="btn btn-danger" 
+              style={{ padding: '10px 22px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', borderRadius: '12px', fontWeight: '700' }}
+              onClick={() => {
+                setShowConverterModal(true);
+              }}
+            >
+              <RefreshCw size={18} /> {isID ? 'Konverter Legacy' : 'Legacy Converter'}
             </button>
           </div>
         )}
@@ -1156,25 +1344,98 @@ const AdminHub = () => {
                             </button>
                           )}
                         </div>
-                        <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '15px', minHeight: '35px', fontWeight: '500' }}>
-                          {jo.jobDescription}
-                        </p>
+                        
+                        {Array.isArray(jo.items) && jo.items.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '15px' }}>
+                            {jo.items.map((item, idx) => {
+                              const isItemPending = item.status === 'pending' || !item.status;
+                              const isChecked = selectedDispatchItems[jo.id]?.[idx] ?? isItemPending;
+                              const qtyVal = dispatchQuantities[jo.id]?.[idx] ?? item.quantity ?? 1;
+
+                              return (
+                                <div key={idx} style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '8px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    {isItemPending ? (
+                                      <input 
+                                        type="checkbox" 
+                                        checked={isChecked}
+                                        disabled={!canWrite}
+                                        onChange={(e) => {
+                                          const currentJoMap = selectedDispatchItems[jo.id] || {};
+                                          setSelectedDispatchItems({
+                                            ...selectedDispatchItems,
+                                            [jo.id]: {
+                                              ...currentJoMap,
+                                              [idx]: e.target.checked
+                                            }
+                                          });
+                                        }}
+                                      />
+                                    ) : (
+                                      <span style={{ fontSize: '0.7rem' }} className={`badge badge-${item.status}`}>
+                                        {item.status}
+                                      </span>
+                                    )}
+                                    <span style={{ fontSize: '0.85rem', fontWeight: '600', color: isItemPending ? 'var(--text)' : 'var(--text-muted)' }}>
+                                      {item.description}
+                                    </span>
+                                  </div>
+
+                                  {isItemPending && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingLeft: '22px' }}>
+                                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                        {isID ? `Kontrak: ${item.quantity} Unit` : `Contract: ${item.quantity} Units`}
+                                      </span>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{isID ? 'Kirim:' : 'Dispatch:'}</span>
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          step="any"
+                                          disabled={!canWrite}
+                                          value={qtyVal}
+                                          onChange={(e) => {
+                                            const currentQtyMap = dispatchQuantities[jo.id] || {};
+                                            setDispatchQuantities({
+                                              ...dispatchQuantities,
+                                              [jo.id]: {
+                                                ...currentQtyMap,
+                                                [idx]: e.target.value
+                                              }
+                                            });
+                                          }}
+                                          style={{ width: '60px', padding: '3px 6px', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--input-bg)', color: 'var(--text)' }}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '15px', minHeight: '35px', fontWeight: '500' }}>
+                            {jo.jobDescription}
+                          </p>
+                        )}
                       </div>
 
                       <div>
-                        <div className="input-group" style={{ marginBottom: '15px' }}>
-                          <label style={{ fontSize: '0.75rem', marginBottom: '4px', display: 'block' }}>{isID ? 'Jumlah Pekerjaan (Unit)' : 'Work Quantity (Units)'}</label>
-                          <input
-                            type="number"
-                            min="1"
-                            step="any"
-                            disabled={!canWrite}
-                            value={quantities[jo.id] || jo.quantity || ''}
-                            onChange={e => setQuantities({ ...quantities, [jo.id]: e.target.value })}
-                            placeholder={isID ? "Masukkan jumlah..." : "Enter quantity..."}
-                            style={{ borderRadius: '8px', padding: '6px 12px', fontSize: '0.9rem' }}
-                          />
-                        </div>
+                        {(!jo.items || jo.items.length === 0) && (
+                          <div className="input-group" style={{ marginBottom: '15px' }}>
+                            <label style={{ fontSize: '0.75rem', marginBottom: '4px', display: 'block' }}>{isID ? 'Jumlah Pekerjaan (Unit)' : 'Work Quantity (Units)'}</label>
+                            <input
+                              type="number"
+                              min="1"
+                              step="any"
+                              disabled={!canWrite}
+                              value={quantities[jo.id] || jo.quantity || ''}
+                              onChange={e => setQuantities({ ...quantities, [jo.id]: e.target.value })}
+                              placeholder={isID ? "Masukkan jumlah..." : "Enter quantity..."}
+                              style={{ borderRadius: '8px', padding: '6px 12px', fontSize: '0.9rem' }}
+                            />
+                          </div>
+                        )}
                         {canWrite && (
                           <ButtonWithLoading 
                             className="btn btn-gold" 
@@ -1194,6 +1455,292 @@ const AdminHub = () => {
           })()}
         </div>
       </div>
+
+      {/* Legacy Converter List Modal */}
+      {showConverterModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '900px', padding: '30px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '15px' }}>
+              <h3 style={{ color: 'var(--secondary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}><RefreshCw size={20} /> {isID ? 'Konverter Legacy Job Order' : 'Legacy Job Order Converter'}</h3>
+              <button onClick={() => setShowConverterModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={20} /></button>
+            </div>
+            
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px' }}>
+              {isID ? 'Daftar di bawah menunjukkan Quotation yang memiliki beberapa Job Order terpisah. Anda dapat menggabungkannya menjadi satu Job Order multi-item baru untuk menyederhanakan tracking operasional, costing, dan invoicing.' : 'The list below displays Quotations that have multiple separate legacy Job Orders. You can merge them into a single consolidated multi-item Job Order to simplify operational, costing, and billing tracking.'}
+            </p>
+
+            {batchProgress && (
+              <div style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid var(--secondary)', color: 'var(--secondary)', padding: '12px 20px', borderRadius: '8px', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                <span className="spinner-border spinner-border-sm" style={{ border: '2px solid', borderTopColor: 'transparent', borderRadius: '50%', width: '16px', height: '16px', display: 'inline-block', animation: 'spin 1s linear infinite' }}></span>
+                {batchProgress}
+              </div>
+            )}
+
+            {selectedGroupKeys.size > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.2)', padding: '12px 20px', borderRadius: '10px', marginBottom: '15px' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text)' }}>
+                  {isID 
+                    ? `Terpilih ${selectedGroupKeys.size} item untuk dikonversi` 
+                    : `Selected ${selectedGroupKeys.size} items to convert`}
+                </span>
+                <button 
+                  className="btn btn-danger" 
+                  style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+                  onClick={handleBatchConvert}
+                  disabled={batchConverting}
+                >
+                  {batchConverting 
+                    ? (batchProgress || (isID ? 'Memproses...' : 'Processing...'))
+                    : (isID ? `Konversi Sekaligus (${selectedGroupKeys.size})` : `Batch Convert (${selectedGroupKeys.size})`)}
+                </button>
+              </div>
+            )}
+
+            {legacyGroups.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+                🎉 {isID ? 'Semua data Job Order sudah menggunakan format baru!' : 'All Job Order data is already in the new format!'}
+              </div>
+            ) : (
+              <div className="table-container">
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border)' }}>
+                      <th style={{ padding: '12px', width: '40px', textAlign: 'center' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedGroupKeys.size > 0 && selectedGroupKeys.size === legacyGroups.length}
+                          onChange={toggleAllGroups}
+                          disabled={batchConverting}
+                        />
+                      </th>
+                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-muted)' }}>QUO ID</th>
+                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{isID ? 'PELANGGAN' : 'CUSTOMER'}</th>
+                      <th style={{ padding: '12px', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{isID ? 'JUMLAH JO SEPARASI' : 'SEPARATED JO COUNT'}</th>
+                      <th style={{ padding: '12px', textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{isID ? 'AKSI' : 'ACTION'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {legacyGroups.map((group, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={selectedGroupKeys.has(group.groupId)}
+                            onChange={() => toggleGroupSelection(group.groupId)}
+                            disabled={batchConverting}
+                          />
+                        </td>
+                        <td style={{ padding: '12px', fontWeight: '700' }}>{group.quotationId}</td>
+                        <td style={{ padding: '12px' }}>{group.customerName}</td>
+                        <td style={{ padding: '12px', textAlign: 'center', fontWeight: '800', color: 'var(--warning)' }}>{group.jobOrders.length}</td>
+                        <td style={{ padding: '12px', textAlign: 'right' }}>
+                          <button 
+                            className="btn btn-primary" 
+                            style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                            onClick={() => setSelectedConvertGroup(group)}
+                            disabled={batchConverting}
+                          >
+                            {isID ? 'Gabungkan & Konversi' : 'Merge & Convert'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Legacy Converter Details Modal */}
+      {selectedConvertGroup && (() => {
+        const jos = selectedConvertGroup.jobOrders;
+        const primaryJo = jos[0];
+        const joIdsToDelete = jos.slice(1).map(j => j.id);
+        
+        const compiledItems = [];
+        jos.forEach(jo => {
+          if (Array.isArray(jo.items) && jo.items.length > 0) {
+            jo.items.forEach(it => {
+              compiledItems.push({
+                description: it.description || jo.instruction || jo.jobDescription || 'Freight Forwarding Services',
+                qty: parseInt(it.issueQuantity || it.quantity || jo.issueQuantity || jo.quantity || 1, 10),
+                rate: parseFloat(it.rate || jo.rate || 0),
+                status: it.status || jo.status || 'pending',
+                containerNo: Array.isArray(it.containerNo) ? it.containerNo : (jo.containerNo ? [jo.containerNo] : []),
+                vehicleNo: Array.isArray(it.vehicleNo) ? it.vehicleNo : (jo.vehicleNo ? [jo.vehicleNo] : []),
+                driverName: Array.isArray(it.driverName) ? it.driverName : (jo.driverName ? [jo.driverName] : [])
+              });
+            });
+          } else {
+            compiledItems.push({
+              description: jo.instruction || jo.jobDescription || 'Freight Forwarding Services',
+              qty: parseInt(jo.issueQuantity || jo.quantity || 1, 10),
+              rate: parseFloat(jo.rate || 0),
+              status: jo.status || 'pending',
+              containerNo: Array.isArray(jo.containerNo) ? jo.containerNo : (jo.containerNo ? [jo.containerNo] : []),
+              vehicleNo: Array.isArray(jo.vehicleNo) ? jo.vehicleNo : (jo.vehicleNo ? [jo.vehicleNo] : []),
+              driverName: Array.isArray(jo.driverName) ? jo.driverName : (jo.driverName ? [jo.driverName] : [])
+            });
+          }
+        });
+
+        const linkedInvoices = invoices.filter(inv => String(inv.joId) === String(primaryJo.id) || joIdsToDelete.includes(inv.joId));
+        const linkedPOs = purchaseOrders.filter(po => String(po.joId) === String(primaryJo.id) || joIdsToDelete.includes(po.joId));
+        const manualCostsCount = jos.reduce((acc, j) => acc + (Array.isArray(j.costs) ? j.costs.length : 0), 0);
+        const photosCount = jos.reduce((acc, j) => acc + (Array.isArray(j.photos) ? j.photos.length : 0), 0);
+
+        const handleConfirmMerge = async () => {
+          setConverting(true);
+          try {
+            await convertLegacyJOs(primaryJo.id, joIdsToDelete, compiledItems);
+            toast.success(isID ? 'Job Order berhasil digabungkan!' : 'Job Orders merged successfully!');
+            setSelectedConvertGroup(null);
+          } catch (err) {
+            console.error(err);
+            toast.error(isID ? 'Gagal menggabungkan Job Order.' : 'Failed to merge Job Orders.');
+          } finally {
+            setConverting(false);
+          }
+        };
+
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 10002, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div className="glass-card" style={{ width: '100%', maxWidth: '850px', padding: '30px', maxHeight: '95vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '15px' }}>
+                <h3 style={{ color: 'var(--secondary)', margin: 0 }}>📋 {isID ? 'Detail Penggabungan & Konversi' : 'Merge & Convert Details'}</h3>
+                <button onClick={() => setSelectedConvertGroup(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={20} /></button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                <div>
+                  <p style={{ margin: '0 0 5px 0', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800' }}>{isID ? 'Quotation Asal' : 'Quotation Origin'}</p>
+                  <p style={{ margin: 0, fontWeight: '800', fontSize: '1.1rem' }}>{selectedConvertGroup.quotationId}</p>
+                </div>
+                <div>
+                  <p style={{ margin: '0 0 5px 0', fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800' }}>{isID ? 'Nama Pelanggan' : 'Customer Name'}</p>
+                  <p style={{ margin: 0, fontWeight: '800', fontSize: '1.1rem' }}>{selectedConvertGroup.customerName}</p>
+                </div>
+              </div>
+
+              {/* Legacy JOs to delete */}
+              <div style={{ marginBottom: '25px' }}>
+                <h4 style={{ color: 'var(--danger)', fontSize: '0.9rem', marginBottom: '10px', textTransform: 'uppercase', fontWeight: '800' }}>
+                  🚨 {isID ? (jos.length > 1 ? 'Job Order yang Akan Digabungkan' : 'Job Order yang Akan Dikonversi') : (jos.length > 1 ? 'Job Orders to be Merged' : 'Job Order to be Converted')}
+                </h4>
+                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '10px', padding: '15px' }}>
+                  {jos.map((j, i) => (
+                    <div key={j.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: i < jos.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                      <div>
+                        <span style={{ fontWeight: '700', marginRight: '10px', color: i === 0 ? 'var(--secondary)' : 'var(--text)' }}>{j.id}</span>
+                        <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>({j.instruction || j.jobDescription})</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '15px' }}>
+                        <span style={{ fontSize: '0.85rem' }}>Qty: <strong>{j.quantity}</strong></span>
+                        <span style={{ fontSize: '0.85rem' }}>Status: <strong style={{ color: j.status === 'done' ? 'var(--success)' : 'var(--warning)' }}>{j.status}</strong></span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Linked Invoices to Remap */}
+              <div style={{ marginBottom: '25px' }}>
+                <h4 style={{ color: 'var(--secondary)', fontSize: '0.9rem', marginBottom: '10px', textTransform: 'uppercase', fontWeight: '800' }}>📄 {isID ? 'Invoice Terkait (Akan Di-remap)' : 'Linked Invoices to be Remapped'}</h4>
+                {linkedInvoices.length === 0 ? (
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0, paddingLeft: '5px' }}>{isID ? 'Tidak ada invoice terkait.' : 'No associated invoices.'}</p>
+                ) : (
+                  <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '10px', padding: '15px' }}>
+                    {linkedInvoices.map((inv, idx) => (
+                      <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: idx < linkedInvoices.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                        <div>
+                          <strong style={{ color: 'var(--secondary)', marginRight: '10px' }}>{inv.id}</strong>
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>({isID ? 'Asal JO:' : 'Origin JO:'} {inv.joId})</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '15px' }}>
+                          <span style={{ fontSize: '0.85rem' }}>{isID ? 'Tanggal:' : 'Date:'} {inv.date || '-'}</span>
+                          <span style={{ fontSize: '0.85rem' }}>Total: <strong>Rp {parseFloat(inv.amount || inv.subtotal || 0).toLocaleString()}</strong></span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Linked Purchase Orders to Remap */}
+              <div style={{ marginBottom: '25px' }}>
+                <h4 style={{ color: 'var(--secondary)', fontSize: '0.9rem', marginBottom: '10px', textTransform: 'uppercase', fontWeight: '800' }}>🛒 {isID ? 'Purchase Order Terkait (Akan Di-remap)' : 'Linked Purchase Orders to be Remapped'}</h4>
+                {linkedPOs.length === 0 ? (
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0, paddingLeft: '5px' }}>{isID ? 'Tidak ada Purchase Order terkait.' : 'No associated Purchase Orders.'}</p>
+                ) : (
+                  <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '10px', padding: '15px' }}>
+                    {linkedPOs.map((po, idx) => (
+                      <div key={po.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: idx < linkedPOs.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                        <div>
+                          <strong style={{ color: 'var(--secondary)', marginRight: '10px' }}>{po.id}</strong>
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>({isID ? 'Asal JO:' : 'Origin JO:'} {po.joId})</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '15px' }}>
+                          <span style={{ fontSize: '0.85rem' }}>Vendor: <strong>{po.vendorName}</strong></span>
+                          <span style={{ fontSize: '0.85rem' }}>Total: <strong>Rp {parseFloat(po.grandTotal || 0).toLocaleString()}</strong></span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Photos and Manual Costings to aggregate */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '25px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '10px', padding: '15px' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', display: 'block', marginBottom: '4px' }}>💵 {isID ? 'Biaya Manual yang Digabungkan:' : 'Aggregated Manual Costs:'}</span>
+                  <strong style={{ fontSize: '1rem', color: 'var(--secondary)' }}>{manualCostsCount} {isID ? 'Biaya' : 'Entries'}</strong>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border)', borderRadius: '10px', padding: '15px' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', display: 'block', marginBottom: '4px' }}>🖼️ {isID ? 'Foto Operasional yang Digabungkan:' : 'Aggregated Operational Photos:'}</span>
+                  <strong style={{ fontSize: '1rem', color: 'var(--secondary)' }}>{photosCount} {isID ? 'Foto' : 'Photos'}</strong>
+                </div>
+              </div>
+
+              {/* Preview consolidated JO */}
+              <div style={{ marginBottom: '25px' }}>
+                <h4 style={{ color: 'var(--success)', fontSize: '0.9rem', marginBottom: '10px', textTransform: 'uppercase', fontWeight: '800' }}>✨ {isID ? 'Pratinjau Hasil Konsolidasi JO' : 'Consolidated JO Preview'}</h4>
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: '10px', padding: '15px' }}>
+                  <div style={{ marginBottom: '12px' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{isID ? 'ID Master Job Order (Dipertahankan):' : 'Master Job Order ID (Kept):'} </span>
+                    <strong style={{ color: 'var(--secondary)', fontSize: '1rem' }}>{primaryJo.id}</strong>
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '10px', fontWeight: '700' }}>{isID ? 'ITEM CONSOLS:' : 'CONSOLIDATED ITEMS:'}</div>
+                  {compiledItems.map((item, idx) => (
+                    <div key={idx} style={{ padding: '8px', background: 'rgba(255,255,255,0.01)', borderRadius: '5px', marginBottom: '8px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700' }}>
+                        <span>{item.description}</span>
+                        <span>Qty: {item.qty} | Rate: Rp {item.rate.toLocaleString('id-ID')}</span>
+                      </div>
+                      {(item.containerNo.length > 0 || item.vehicleNo.length > 0) && (
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          {item.containerNo.length > 0 && `Containers: ${item.containerNo.join(', ')}`}
+                          {item.vehicleNo.length > 0 && ` | Vehicles: ${item.vehicleNo.join(', ')}`}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '15px', justifyContent: 'flex-end' }}>
+                <button className="btn" onClick={() => setSelectedConvertGroup(null)} disabled={converting}>
+                  {isID ? 'Batal' : 'Cancel'}
+                </button>
+                <button className="btn btn-primary" onClick={handleConfirmMerge} disabled={converting}>
+                  {converting ? (isID ? 'Memproses...' : 'Processing...') : (isID ? 'Konfirmasi & Gabungkan' : 'Confirm & Merge')}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

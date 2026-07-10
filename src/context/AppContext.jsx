@@ -174,7 +174,7 @@ export const AppProvider = ({ children }) => {
 
       setProspects(Array.isArray(prosData) ? prosData : []);
       setQuotations(safeParse(quoData, ['items']));
-      const parsedJOs = safeParse(joData, ['photos', 'costs', 'containerNo', 'vehicleNo', 'driverName']).map(jo => {
+      const parsedJOs = safeParse(joData, ['photos', 'costs', 'containerNo', 'vehicleNo', 'driverName', 'items']).map(jo => {
         let instructionText = jo.instruction || '';
         let dispatchedAt = jo.dispatchedAt || null;
         let completedAt = jo.completedAt || null;
@@ -404,6 +404,7 @@ export const AppProvider = ({ children }) => {
       driverName: '',
       activityStatus: '',
       photos: [],
+      items: joData.items || [],
       date: new Date().toISOString()
     };
     const { id } = await apiRequest('job-orders', {
@@ -424,9 +425,12 @@ export const AppProvider = ({ children }) => {
     return createdJOs;
   };
 
-  const dispatchJO = async (joId, quantity) => {
+  const dispatchJO = async (joId, quantity, updatedItems) => {
     const dispatchedAt = new Date().toISOString();
-    await updateJOStatus(joId, { status: 'dispatched', issueQuantity: quantity, dispatchedAt });
+    const updates = { status: 'dispatched', dispatchedAt };
+    if (quantity !== undefined && quantity !== null) updates.issueQuantity = quantity;
+    if (updatedItems) updates.items = updatedItems;
+    await updateJOStatus(joId, updates);
   };
 
   const updateJOStatus = async (joId, updates) => {
@@ -534,38 +538,53 @@ export const AppProvider = ({ children }) => {
     
      // Calculate total amount across all target JOs and build items list
     let totalAmount = 0;
-    const items = targetJOs.map(targetJo => {
-      const quotation = targetJo.quotationId 
-        ? quotations.find(q => String(q.id) === String(targetJo.quotationId))
-        : null;
-      
-      let qItems = [];
-      if (quotation && quotation.items) {
-        try {
-          qItems = typeof quotation.items === 'string' ? JSON.parse(quotation.items) : quotation.items;
-        } catch (e) {
-          qItems = [];
-        }
-      }
-      if (!Array.isArray(qItems)) qItems = [];
-      
-      const targetDesc = (targetJo.instruction || targetJo.jobDescription || "").trim().toLowerCase();
-      const item = qItems.find(i => (i.description || "").trim().toLowerCase() === targetDesc);
-      
-      let rate = 0;
-      if (item && item.rate) {
-        rate = cleanNumber(item.rate);
+    const items = [];
+    targetJOs.forEach(targetJo => {
+      if (Array.isArray(targetJo.items) && targetJo.items.length > 0) {
+        // Multi-item job order
+        targetJo.items.forEach(item => {
+          if (item.status === 'done' || String(targetJo.id) === String(joId)) {
+            const qty = cleanNumber(item.issueQuantity || item.quantity || 1);
+            const rate = cleanNumber(item.rate);
+            totalAmount += rate * qty;
+            items.push({
+              description: item.description || 'Freight Forwarding Services',
+              qty,
+              rate
+            });
+          }
+        });
       } else {
-        rate = cleanNumber(targetJo.rate);
+        // Legacy single-item job order
+        const quotation = targetJo.quotationId 
+          ? quotations.find(q => String(q.id) === String(targetJo.quotationId))
+          : null;
+        let qItems = [];
+        if (quotation && quotation.items) {
+          try {
+            qItems = typeof quotation.items === 'string' ? JSON.parse(quotation.items) : quotation.items;
+          } catch (e) {
+            qItems = [];
+          }
+        }
+        if (!Array.isArray(qItems)) qItems = [];
+        const targetDesc = (targetJo.instruction || targetJo.jobDescription || "").trim().toLowerCase();
+        const matchedItem = qItems.find(i => (i.description || "").trim().toLowerCase() === targetDesc);
+        
+        let rate = 0;
+        if (matchedItem && matchedItem.rate) {
+          rate = cleanNumber(matchedItem.rate);
+        } else {
+          rate = cleanNumber(targetJo.rate);
+        }
+        const qty = cleanNumber(targetJo.issueQuantity || targetJo.quantity || 1);
+        totalAmount += rate * qty;
+        items.push({
+          description: targetJo.instruction || targetJo.jobDescription || 'Freight Forwarding Services',
+          qty,
+          rate
+        });
       }
-      const qty = cleanNumber(targetJo.issueQuantity || targetJo.quantity || 1);
-      totalAmount += rate * qty;
-      
-      return {
-        description: targetJo.instruction || targetJo.jobDescription || 'Freight Forwarding Services',
-        qty,
-        rate
-      };
     });
     
     if (isNaN(totalAmount)) {
@@ -688,6 +707,46 @@ export const AppProvider = ({ children }) => {
       return finalInvoice;
     } catch (error) {
       console.error("Failed to create custom invoice:", error);
+      throw error;
+    }
+  };
+
+  const convertLegacyJOs = async (primaryJoId, joIdsToDelete, items) => {
+    try {
+      await apiRequest('job-orders/convert-legacy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ primaryJoId, joIdsToDelete, items })
+      });
+      await fetchData();
+      return true;
+    } catch (error) {
+      console.error("Failed to convert legacy job orders:", error);
+      throw error;
+    }
+  };
+
+  const convertBatchLegacyJOs = async (batches, onProgress) => {
+    try {
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        if (onProgress) {
+          onProgress(i, batches.length, batch.quotationId || batch.primaryJoId);
+        }
+        await apiRequest('job-orders/convert-legacy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            primaryJoId: batch.primaryJoId, 
+            joIdsToDelete: batch.joIdsToDelete, 
+            items: batch.items 
+          })
+        });
+      }
+      await fetchData();
+      return true;
+    } catch (error) {
+      console.error("Failed to convert batch legacy job orders:", error);
       throw error;
     }
   };
@@ -1015,7 +1074,7 @@ export const AppProvider = ({ children }) => {
       prospects, addProspect, updateProspectStatus, convertProspectToCustomer, deleteProspect, updateProspect,
       prospectDrafts,
       quotations, createQuotation, updateQuotation, approveQuotation, unapproveQuotation, deleteQuotation,
-      jobOrders, createJO, createBulkJOs, dispatchJO, updateJOStatus, completeJO, deleteJO,
+      jobOrders, createJO, createBulkJOs, dispatchJO, updateJOStatus, completeJO, deleteJO, convertLegacyJOs, convertBatchLegacyJOs,
       invoices, createInvoice, createCustomInvoice, settleInvoice, deleteInvoice, updateInvoice,
       receivables, settleReceivable,
       salaries, addSalary, deleteSalary, updateSalary,

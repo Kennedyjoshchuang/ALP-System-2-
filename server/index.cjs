@@ -504,16 +504,33 @@ app.get('/api/job-orders/:id/photos/:index', async (req, res) => {
 
 app.post('/api/job-orders', async (req, res) => {
   try {
-    const { quotationId, customerName, jobDescription, phone, email, rate, quantity, quoteValidity } = req.body;
+    const { quotationId, customerName, jobDescription, phone, email, rate, quantity, quoteValidity, items } = req.body;
     const id = 'JO-' + Date.now() + String(Math.floor(Math.random() * 1000)).padStart(3, '0');
     const date = new Date().toISOString().split('T')[0];
-    const parsedRate = rate !== undefined && rate !== null ? Math.round(parseFloat(rate)) : 0;
+
+    let joItems = items || [];
+    if (!Array.isArray(joItems) || joItems.length === 0) {
+      const parsedRate = rate !== undefined && rate !== null ? Math.round(parseFloat(rate)) : 0;
+      joItems = [{
+        description: jobDescription || 'Freight Forwarding Services',
+        rate: parsedRate,
+        quantity: quantity || 1,
+        issueQuantity: 0,
+        status: 'pending'
+      }];
+    }
+
+    const parsedRate = rate !== undefined && rate !== null ? Math.round(parseFloat(rate)) : (joItems[0]?.rate || 0);
+    const parsedQty = quantity !== undefined && quantity !== null ? parseInt(quantity) : joItems.reduce((acc, i) => acc + (i.quantity || 0), 0);
+    const instructionStr = jobDescription || joItems.map(i => i.description).join(', ');
+
     const { error } = await supabase.from('job_orders').insert({
-      id, quotationId, customerName, instruction: jobDescription,
-      status: 'pending', quantity, issueQuantity: 0,
+      id, quotationId, customerName, instruction: instructionStr,
+      status: 'pending', quantity: parsedQty, issueQuantity: 0,
       phone, email, rate: parsedRate, quoteValidity, date,
       photos: [], costs: [],
-      containerNo: [], vehicleNo: [], driverName: []
+      containerNo: [], vehicleNo: [], driverName: [],
+      items: joItems
     });
     if (error) return handleError(res, error, 'POST job_orders');
     clearJobOrdersCache();
@@ -534,29 +551,288 @@ app.post('/api/job-orders/bulk', async (req, res) => {
     const date = new Date().toISOString().split('T')[0];
     for (const jo of jobOrders) {
       const id = 'JO-' + Date.now() + String(Math.floor(Math.random() * 1000)).padStart(3, '0');
-      const { quotationId, customerName, jobDescription, phone, email, rate, quantity, quoteValidity } = jo;
-      const parsedRate = rate !== undefined && rate !== null ? Math.round(parseFloat(rate)) : 0;
+      const { quotationId, customerName, jobDescription, phone, email, rate, quantity, quoteValidity, items } = jo;
+
+      let joItems = items || [];
+      if (!Array.isArray(joItems) || joItems.length === 0) {
+        const parsedRate = rate !== undefined && rate !== null ? Math.round(parseFloat(rate)) : 0;
+        joItems = [{
+          description: jobDescription || 'Freight Forwarding Services',
+          rate: parsedRate,
+          quantity: quantity || 1,
+          issueQuantity: 0,
+          status: 'pending'
+        }];
+      }
+
+      const parsedRate = rate !== undefined && rate !== null ? Math.round(parseFloat(rate)) : (joItems[0]?.rate || 0);
+      const parsedQty = quantity !== undefined && quantity !== null ? parseInt(quantity) : joItems.reduce((acc, i) => acc + (i.quantity || 0), 0);
+      const instructionStr = jobDescription || joItems.map(i => i.description).join(', ');
+
       const { error } = await supabase.from('job_orders').insert({
-        id, quotationId, customerName, instruction: jobDescription,
-        status: 'pending', quantity, issueQuantity: 0,
-        phone, email, rate: parsedRate, quoteValidity, date,
-        photos: [], costs: [],
-        containerNo: [], vehicleNo: [], driverName: []
-      });
-      if (error) throw error;
-      insertedJOs.push({
-        id, quotationId, customerName, instruction: jobDescription,
-        status: 'pending', quantity, issueQuantity: 0,
+        id, quotationId, customerName, instruction: instructionStr,
+        status: 'pending', quantity: parsedQty, issueQuantity: 0,
         phone, email, rate: parsedRate, quoteValidity, date,
         photos: [], costs: [],
         containerNo: [], vehicleNo: [], driverName: [],
-        jobDescription
+        items: joItems
+      });
+      if (error) throw error;
+      insertedJOs.push({
+        id, quotationId, customerName, instruction: instructionStr,
+        status: 'pending', quantity: parsedQty, issueQuantity: 0,
+        phone, email, rate: parsedRate, quoteValidity, date,
+        photos: [], costs: [],
+        containerNo: [], vehicleNo: [], driverName: [],
+        items: joItems,
+        jobDescription: instructionStr
       });
     }
     clearJobOrdersCache();
     res.status(201).json(insertedJOs);
   } catch (err) {
     console.error('Bulk Create JO Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/job-orders/convert-legacy', async (req, res) => {
+  try {
+    const { primaryJoId, joIdsToDelete, items } = req.body;
+    if (!primaryJoId || !Array.isArray(joIdsToDelete) || !Array.isArray(items)) {
+      return res.status(400).json({ error: 'Invalid parameters: primaryJoId, joIdsToDelete, and items are required.' });
+    }
+
+    // 1. Fetch all the Job Orders to merge (primary + secondary)
+    const allJoIds = [primaryJoId, ...joIdsToDelete];
+    const { data: jobOrders, error: fetchJOErr } = await supabase
+      .from('job_orders')
+      .select('*')
+      .in('id', allJoIds);
+
+    if (fetchJOErr) throw fetchJOErr;
+    if (!jobOrders || jobOrders.length === 0) {
+      return res.status(404).json({ error: 'Job orders not found.' });
+    }
+
+    const primaryJo = jobOrders.find(j => String(j.id) === String(primaryJoId));
+    if (!primaryJo) {
+      return res.status(404).json({ error: 'Primary Job order not found.' });
+    }
+
+    // 2. Aggregate containerNo, vehicleNo, driverName, photos, and costs
+    let aggregatedContainers = [];
+    let aggregatedVehicles = [];
+    let aggregatedDrivers = [];
+    let aggregatedPhotos = [];
+    let aggregatedCosts = [];
+
+    // Calculate index offsets for each JO's items in the consolidated list
+    let currentIdxOffset = 0;
+    const joIdxOffsets = {};
+    
+    // Iterate in the same order as frontend (primary first, then delete list)
+    const orderedJOs = [primaryJo, ...jobOrders.filter(j => String(j.id) !== String(primaryJoId))];
+
+    orderedJOs.forEach(jo => {
+      joIdxOffsets[jo.id] = currentIdxOffset;
+      const joItemsCount = Array.isArray(jo.items) && jo.items.length > 0 
+        ? jo.items.length 
+        : 1;
+      currentIdxOffset += joItemsCount;
+    });
+
+    jobOrders.forEach(jo => {
+      // Aggregate root lists with robust string/JSON parsing
+      let joContainers = [];
+      if (jo.containerNo) {
+        try {
+          joContainers = typeof jo.containerNo === 'string' ? JSON.parse(jo.containerNo) : jo.containerNo;
+        } catch (e) {
+          joContainers = [jo.containerNo];
+        }
+      }
+      if (!Array.isArray(joContainers)) joContainers = jo.containerNo ? [jo.containerNo] : [];
+
+      let joVehicles = [];
+      if (jo.vehicleNo) {
+        try {
+          joVehicles = typeof jo.vehicleNo === 'string' ? JSON.parse(jo.vehicleNo) : jo.vehicleNo;
+        } catch (e) {
+          joVehicles = [jo.vehicleNo];
+        }
+      }
+      if (!Array.isArray(joVehicles)) joVehicles = jo.vehicleNo ? [jo.vehicleNo] : [];
+
+      let joDrivers = [];
+      if (jo.driverName) {
+        try {
+          joDrivers = typeof jo.driverName === 'string' ? JSON.parse(jo.driverName) : jo.driverName;
+        } catch (e) {
+          joDrivers = [jo.driverName];
+        }
+      }
+      if (!Array.isArray(joDrivers)) joDrivers = jo.driverName ? [jo.driverName] : [];
+
+      let joPhotos = [];
+      if (jo.photos) {
+        try {
+          joPhotos = typeof jo.photos === 'string' ? JSON.parse(jo.photos) : jo.photos;
+        } catch (e) {
+          joPhotos = [jo.photos];
+        }
+      }
+      if (!Array.isArray(joPhotos)) joPhotos = jo.photos ? [jo.photos] : [];
+      
+      let joCosts = [];
+      if (jo.costs) {
+        try {
+          joCosts = typeof jo.costs === 'string' ? JSON.parse(jo.costs) : jo.costs;
+        } catch (e) {
+          joCosts = [];
+        }
+      }
+      if (!Array.isArray(joCosts)) joCosts = [];
+
+      // Shift targetItemIdx for costs belonging to merged secondary JOs
+      const offset = joIdxOffsets[jo.id] || 0;
+      const shiftedCosts = joCosts.map(c => {
+        const targetIdx = c.targetItemIdx !== undefined && c.targetItemIdx !== null 
+          ? parseInt(c.targetItemIdx, 10) 
+          : 0;
+        return {
+          ...c,
+          targetItemIdx: targetIdx + offset
+        };
+      });
+
+      aggregatedContainers = [...aggregatedContainers, ...joContainers];
+      aggregatedVehicles = [...aggregatedVehicles, ...joVehicles];
+      aggregatedDrivers = [...aggregatedDrivers, ...joDrivers];
+      aggregatedPhotos = [...aggregatedPhotos, ...joPhotos];
+      aggregatedCosts = [...aggregatedCosts, ...shiftedCosts];
+    });
+
+    // Deduplicate lists
+    aggregatedContainers = [...new Set(aggregatedContainers.filter(Boolean))];
+    aggregatedVehicles = [...new Set(aggregatedVehicles.filter(Boolean))];
+    aggregatedDrivers = [...new Set(aggregatedDrivers.filter(Boolean))];
+    aggregatedPhotos = [...new Set(aggregatedPhotos.filter(Boolean))];
+
+    // 3. Update primary Job Order
+    const { error: updatePrimaryErr } = await supabase
+      .from('job_orders')
+      .update({
+        items,
+        containerNo: aggregatedContainers,
+        vehicleNo: aggregatedVehicles,
+        driverName: aggregatedDrivers,
+        photos: aggregatedPhotos,
+        costs: aggregatedCosts,
+      })
+      .eq('id', primaryJoId);
+
+    if (updatePrimaryErr) throw updatePrimaryErr;
+
+    // 4. Update linked Invoices
+    const { data: invoices, error: fetchInvoicesErr } = await supabase
+      .from('invoices')
+      .select('*');
+
+    if (fetchInvoicesErr) throw fetchInvoicesErr;
+
+    if (invoices && invoices.length > 0) {
+      for (const inv of invoices) {
+        let isUpdated = false;
+        let updatedJoId = inv.joId;
+        let updatedConsolidated = Array.isArray(inv.consolidatedJOs) ? inv.consolidatedJOs : [];
+        let updatedNotes = inv.notes || '';
+
+        // If direct joId points to a deleted JO, update it to primary
+        if (joIdsToDelete.includes(inv.joId)) {
+          updatedJoId = primaryJoId;
+          isUpdated = true;
+        }
+
+        // If consolidatedJOs lists any deleted JOs, update/deduplicate them
+        if (updatedConsolidated.some(id => joIdsToDelete.includes(id))) {
+          updatedConsolidated = updatedConsolidated.map(id => joIdsToDelete.includes(id) ? primaryJoId : id);
+          updatedConsolidated = [...new Set(updatedConsolidated)];
+          isUpdated = true;
+        }
+
+        // Check if packed metadata in notes contains consolidatedJOs
+        if (updatedNotes.includes('|||')) {
+          const parts = updatedNotes.split('|||');
+          const notesText = parts[0].trim();
+          try {
+            const meta = JSON.parse(parts[1].trim());
+            let metaUpdated = false;
+
+            if (Array.isArray(meta.consolidatedJOs) && meta.consolidatedJOs.some(id => joIdsToDelete.includes(id))) {
+              meta.consolidatedJOs = meta.consolidatedJOs.map(id => joIdsToDelete.includes(id) ? primaryJoId : id);
+              meta.consolidatedJOs = [...new Set(meta.consolidatedJOs)];
+              metaUpdated = true;
+            }
+
+            if (metaUpdated) {
+              updatedNotes = `${notesText} ||| ${JSON.stringify(meta)}`;
+              isUpdated = true;
+            }
+          } catch (e) {
+            // ignore JSON parse error
+          }
+        }
+
+        if (isUpdated) {
+          const { error: updateInvoiceErr } = await supabase
+            .from('invoices')
+            .update({
+              joId: updatedJoId,
+              consolidatedJOs: updatedConsolidated,
+              notes: updatedNotes
+            })
+            .eq('id', inv.id);
+
+          if (updateInvoiceErr) throw updateInvoiceErr;
+        }
+      }
+    }
+
+    // 5. Update linked Purchase Orders (if any reference deleted JOs)
+    const { data: pos, error: fetchPOsErr } = await supabase
+      .from('purchase_orders')
+      .select('*');
+
+    if (!fetchPOsErr && pos && pos.length > 0) {
+      for (const po of pos) {
+        if (joIdsToDelete.includes(po.joId)) {
+          const { error: updatePOErr } = await supabase
+            .from('purchase_orders')
+            .update({ joId: primaryJoId })
+            .eq('id', po.id);
+          
+          if (updatePOErr) throw updatePOErr;
+        }
+      }
+    }
+
+    // 6. Delete secondary Job Orders
+    if (joIdsToDelete.length > 0) {
+      const { error: deleteJOErr } = await supabase
+        .from('job_orders')
+        .delete()
+        .in('id', joIdsToDelete);
+
+      if (deleteJOErr) throw deleteJOErr;
+    }
+
+    // 7. Clear caches
+    clearJobOrdersCache();
+
+    res.json({ success: true, primaryJoId });
+  } catch (err) {
+    console.error('Convert Legacy JO Error:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -147,7 +147,7 @@ const Accounting = () => {
   const [receivableSubTab, setReceivableSubTab] = useState('outstanding');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [costModal, setCostModal] = useState(null); // holds the JO being costed
-  const [costLines, setCostLines] = useState([{ vendorId: '', serviceIdx: '', qty: 1 }]);
+  const [costLines, setCostLines] = useState([{ vendorId: '', serviceIdx: '', qty: 1, customVendorName: '', customServiceDescription: '', customPrice: '', targetItemIdx: '' }]);
   const [searchTerm, setSearchTerm] = useState('');
   const [joSortBy, setJoSortBy] = useState('created_desc');
   const [invoiceSortBy, setInvoiceSortBy] = useState('inv_no_desc');
@@ -264,6 +264,34 @@ const Accounting = () => {
   const [selectedBankId, setSelectedBankId] = useState('');
   const [invoiceNotes, setInvoiceNotes] = useState('');
   const [expandedCompletedGroups, setExpandedCompletedGroups] = useState({});
+  const [expandedPLGroups, setExpandedPLGroups] = useState({});
+  const [expandedJOPL, setExpandedJOPL] = useState({});
+  const getResolvedDescription = (item, jo, idx) => {
+    if (item.description && item.description !== 'Freight Forwarding Services') {
+      return item.description;
+    }
+    if (jo.quotationId) {
+      const quot = (quotations || []).find(q => q.id === jo.quotationId);
+      if (quot) {
+        if (Array.isArray(quot.items) && quot.items[idx]) {
+          return quot.items[idx].description;
+        }
+        if (Array.isArray(quot.items) && quot.items[0]) {
+          return quot.items[0].description;
+        }
+        if (quot.subject) {
+          return quot.subject;
+        }
+      }
+    }
+    let rawInst = jo.instruction || '';
+    if (rawInst.includes('|||')) {
+      rawInst = rawInst.split('|||')[0].trim();
+    }
+    if (rawInst) return rawInst;
+    return 'Freight Forwarding Services';
+  };
+
 
   // Invoice Confirmation Modal
   const [invoiceConfirmData, setInvoiceConfirmData] = useState(null);
@@ -334,13 +362,29 @@ const Accounting = () => {
   const getAggregatedContainers = (associatedJOs) => {
     const counts = {};
     associatedJOs.forEach(jo => {
-      const cNo = jo.containerNo;
       let list = [];
-      if (Array.isArray(cNo)) {
-        list = cNo.filter(Boolean);
-      } else if (cNo && String(cNo).trim()) {
-        list = [String(cNo).trim()];
+      // 1. Try to get container numbers from jo.items (new scheme)
+      if (Array.isArray(jo.items) && jo.items.length > 0) {
+        jo.items.forEach(item => {
+          const cNo = item.containerNo;
+          if (Array.isArray(cNo)) {
+            list = [...list, ...cNo.filter(Boolean)];
+          } else if (cNo && String(cNo).trim()) {
+            list.push(String(cNo).trim());
+          }
+        });
       }
+      
+      // 2. If no containers found in items, fall back to root containerNo (legacy scheme)
+      if (list.length === 0) {
+        const cNo = jo.containerNo;
+        if (Array.isArray(cNo)) {
+          list = cNo.filter(Boolean);
+        } else if (cNo && String(cNo).trim()) {
+          list = [String(cNo).trim()];
+        }
+      }
+
       list.forEach(num => {
         const clean = String(num).trim();
         if (clean) {
@@ -810,9 +854,97 @@ const Accounting = () => {
     }, { cost: 0, revenue: 0 });
   }, [activeJOs, poMap, invoiceMap]);
 
+  const joInvoiceMap = React.useMemo(() => {
+    const map = {};
+    (invoices || []).forEach(inv => {
+      if (inv.joId) {
+        map[String(inv.joId)] = inv;
+      }
+      let consolidated = inv.consolidatedJOs;
+      if (typeof consolidated === 'string') {
+        try {
+          consolidated = JSON.parse(consolidated);
+        } catch (e) {
+          consolidated = null;
+        }
+      }
+      if (Array.isArray(consolidated)) {
+        consolidated.forEach(id => {
+          map[String(id)] = inv;
+        });
+      }
+    });
+    return map;
+  }, [invoices]);
+
+  const groupedPLData = React.useMemo(() => {
+    const groups = {};
+    sortedActiveJOs.forEach(jo => {
+      const invoice = joInvoiceMap[String(jo.id)];
+      let groupKey = '';
+      let groupType = 'single';
+      let groupName = '';
+
+      if (jo.quotationId) {
+        groupKey = `q_${jo.quotationId}`;
+        groupType = 'quotation';
+        groupName = jo.quotationId;
+      } else if (invoice) {
+        groupKey = `i_${invoice.id}`;
+        groupType = 'invoice';
+        groupName = invoice.id;
+      } else {
+        groupKey = `jo_${jo.id}`;
+        groupType = 'single';
+        groupName = jo.id;
+      }
+
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
+          key: groupKey,
+          type: groupType,
+          name: groupName,
+          customerName: jo.customerName || 'Direct Customer',
+          jobOrders: [],
+          invoice: invoice || null,
+        };
+      }
+      groups[groupKey].jobOrders.push(jo);
+    });
+    return Object.values(groups);
+  }, [sortedActiveJOs, joInvoiceMap]);
+
+  const plGroupFinancials = React.useMemo(() => {
+    const financials = {};
+    groupedPLData.forEach(group => {
+      let groupCost = 0;
+      let groupRevenue = 0;
+      const uniqueInvoices = new Set();
+
+      group.jobOrders.forEach(jo => {
+        const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + parseFloat(c.total || 0), 0) : 0;
+        const poCost = (poMap[jo.id] || []).reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
+        groupCost += (manualCost + poCost);
+
+        const invoice = joInvoiceMap[String(jo.id)];
+        if (invoice && !uniqueInvoices.has(invoice.id)) {
+          uniqueInvoices.add(invoice.id);
+          groupRevenue += parseFloat(invoice.amount || invoice.subtotal || 0);
+        }
+      });
+
+      financials[group.key] = {
+        cost: groupCost,
+        revenue: groupRevenue,
+        profitLoss: groupRevenue - groupCost
+      };
+    });
+    return financials;
+  }, [groupedPLData, poMap, joInvoiceMap]);
+
   const vendorList = vendors || [];
 
-  const addCostLine = () => setCostLines(prev => [...prev, { vendorId: '', serviceIdx: '', qty: 1, customVendorName: '', customServiceDescription: '', customPrice: '' }]);
+  const addCostLine = () => setCostLines(prev => [...prev, { vendorId: '', serviceIdx: '', qty: 1, customVendorName: '', customServiceDescription: '', customPrice: '', targetItemIdx: '' }]);
   const removeCostLine = (i) => setCostLines(prev => prev.filter((_, idx) => idx !== i));
   const updateCostLine = (i, field, val) => setCostLines(prev => {
     const n = [...prev];
@@ -1110,6 +1242,7 @@ const Accounting = () => {
     const newEntries = costLines
       .map(l => {
         const qty = parseFloat(l.qty) || 1;
+        const targetItemIdx = l.targetItemIdx !== undefined && l.targetItemIdx !== '' ? parseInt(l.targetItemIdx, 10) : null;
         if (l.vendorId === 'custom') {
           const unitPrice = parseFloat(l.customPrice) || 0;
           return {
@@ -1118,7 +1251,8 @@ const Accounting = () => {
             serviceDescription: l.customServiceDescription || 'Custom Service',
             unitPrice,
             qty,
-            total: unitPrice * qty
+            total: unitPrice * qty,
+            targetItemIdx
           };
         } else {
           const vendor = vendorList.find(v => v.id === l.vendorId);
@@ -1130,7 +1264,8 @@ const Accounting = () => {
               serviceDescription: l.customServiceDescription || 'Custom Service',
               unitPrice,
               qty,
-              total: unitPrice * qty
+              total: unitPrice * qty,
+              targetItemIdx
             };
           } else {
             const svc = vendor?.services?.[parseInt(l.serviceIdx)];
@@ -1141,7 +1276,8 @@ const Accounting = () => {
               serviceDescription: svc?.description || '',
               unitPrice,
               qty,
-              total: unitPrice * qty
+              total: unitPrice * qty,
+              targetItemIdx
             };
           }
         }
@@ -1149,7 +1285,7 @@ const Accounting = () => {
     const existingCosts = Array.isArray(costModal.costs) ? costModal.costs : [];
     await updateJOStatus(costModal.id, { costs: [...existingCosts, ...newEntries] });
     setCostModal(null);
-    setCostLines([{ vendorId: '', serviceIdx: '', qty: 1, customVendorName: '', customServiceDescription: '', customPrice: '' }]);
+    setCostLines([{ vendorId: '', serviceIdx: '', qty: 1, customVendorName: '', customServiceDescription: '', customPrice: '', targetItemIdx: '' }]);
   };
 
   const handleDeleteCost = async (jo, costIdx) => {
@@ -1317,24 +1453,41 @@ const Accounting = () => {
         return isNaN(parsed) ? 0 : parsed;
       };
 
-      const items = targetJOs.map(targetJo => {
-        let quoItems = [];
-        const quo = targetJo.quotationId
-          ? quotations.find(q => String(q.id) === String(targetJo.quotationId))
-          : null;
-        if (quo && quo.items) {
-          try { quoItems = typeof quo.items === 'string' ? JSON.parse(quo.items) : quo.items; } catch(e) { quoItems = []; }
+      const items = [];
+      targetJOs.forEach(targetJo => {
+        if (Array.isArray(targetJo.items) && targetJo.items.length > 0) {
+          // Multi-item job order
+          targetJo.items.forEach(item => {
+            if (item.status === 'done' || String(targetJo.id) === String(joId)) {
+              const qty = cleanNum(item.issueQuantity || item.quantity || 1);
+              const rate = cleanNum(item.rate);
+              items.push({
+                description: item.description || 'Freight Forwarding Services',
+                qty,
+                rate
+              });
+            }
+          });
+        } else {
+          // Legacy single-item job order
+          let quoItems = [];
+          const quo = targetJo.quotationId
+            ? quotations.find(q => String(q.id) === String(targetJo.quotationId))
+            : null;
+          if (quo && quo.items) {
+            try { quoItems = typeof quo.items === 'string' ? JSON.parse(quo.items) : quo.items; } catch(e) { quoItems = []; }
+          }
+          if (!Array.isArray(quoItems)) quoItems = [];
+          const targetDesc = (targetJo.instruction || targetJo.jobDescription || '').trim().toLowerCase();
+          const matchedItem = quoItems.find(i => (i.description || '').trim().toLowerCase() === targetDesc);
+          const rate = matchedItem ? cleanNum(matchedItem.rate) : cleanNum(targetJo.rate);
+          const qty = cleanNum(targetJo.issueQuantity || targetJo.quantity || 1);
+          items.push({
+            description: targetJo.instruction || targetJo.jobDescription || 'Freight Forwarding Services',
+            qty,
+            rate,
+          });
         }
-        if (!Array.isArray(quoItems)) quoItems = [];
-        const targetDesc = (targetJo.instruction || targetJo.jobDescription || '').trim().toLowerCase();
-        const matchedItem = quoItems.find(i => (i.description || '').trim().toLowerCase() === targetDesc);
-        const rate = matchedItem ? cleanNum(matchedItem.rate) : cleanNum(targetJo.rate);
-        const qty = cleanNum(targetJo.issueQuantity || targetJo.quantity || 1);
-        return {
-          description: targetJo.instruction || targetJo.jobDescription || 'Freight Forwarding Services',
-          qty,
-          rate,
-        };
       });
 
       const newInvoiceId = `INV-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
@@ -1374,15 +1527,23 @@ const Accounting = () => {
       const bank = companyBankAccounts.find(b => b.id === f.bankAccountId) || invoiceConfirmData.bankAccount;
 
       // Calculate totals from form
-      const allLines = [...(f.items || []), ...(f.extraCharges || [])];
       let subtotal = 0;
-      const extra_charges = allLines.map(line => {
+      const items = (f.items || []).map(line => {
         const qty = parseFloat(line.qty) || 1;
         const rate = parseFloat(line.rate) || 0;
         const amount = qty * rate;
         subtotal += amount;
         return { description: line.description, qty, rate, amount };
       });
+
+      const extra_charges = (f.extraCharges || []).map(line => {
+        const qty = parseFloat(line.qty) || 1;
+        const rate = parseFloat(line.rate) || 0;
+        const amount = qty * rate;
+        subtotal += amount;
+        return { description: line.description, qty, rate, amount };
+      });
+
       const tax = subtotal * ((parseFloat(f.taxPercent) || 0) / 100);
       const grandTotal = subtotal + tax;
 
@@ -1399,6 +1560,7 @@ const Accounting = () => {
         amount: grandTotal,
         subtotal,
         tax,
+        items,
         extra_charges,
         notes: f.notes || null,
       };
@@ -1460,7 +1622,7 @@ const Accounting = () => {
 
       // Calculations
       let subtotal = 0;
-      const extra_charges = items.map(item => {
+      const parsedItems = items.map(item => {
         const qty = parseFloat(item.qty) || 1;
         const rate = parseFloat(item.rate) || 0;
         const itemAmount = qty * rate;
@@ -1484,7 +1646,8 @@ const Accounting = () => {
         amount: grandTotal,
         subtotal,
         tax,
-        extra_charges,
+        items: parsedItems,
+        extra_charges: [],
         notes: notes || null
       };
 
@@ -1852,9 +2015,47 @@ const Accounting = () => {
   };
 
   const filteredIssuedInvoices = React.useMemo(() => {
+    // 1. Group completed JOs just like we do in the rendering code
+    const groups = {};
+    (completedJOs || []).forEach(jo => {
+      const qId = jo.quotationId || 'direct';
+      // If it's a direct job, only include it if it hasn't been invoiced yet!
+      if (!jo.quotationId) {
+        const hasInvoice = (invoices || []).some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.includes(jo.id)));
+        if (hasInvoice) return;
+      }
+      if (!groups[qId]) {
+        groups[qId] = { quotationId: qId, jobOrders: [] };
+      }
+      groups[qId].jobOrders.push(jo);
+    });
+
+    // 2. Filter quotation groups
+    const pendingJoIds = new Set();
+    Object.values(groups).forEach(group => {
+      if (group.quotationId === 'direct') {
+        group.jobOrders.forEach(jo => pendingJoIds.add(String(jo.id)));
+        return;
+      }
+      
+      const hasUninvoicedJO = group.jobOrders.some(jo => {
+        const hasInvoice = (invoices || []).some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.includes(jo.id)));
+        return !hasInvoice;
+      });
+
+      if (hasUninvoicedJO) {
+        group.jobOrders.forEach(jo => pendingJoIds.add(String(jo.id)));
+      }
+    });
+
     const list = (invoices || [])
       .filter(inv => filterByDate(inv.date))
       .filter(inv => {
+        // Exclude invoices that are linked to a completed JO currently displayed in the cascade
+        if (pendingJoIds.has(String(inv.joId))) {
+          return false;
+        }
+
         const id = inv.id || '';
         const name = inv.customerName || '';
         const term = searchTerm.toLowerCase();
@@ -2862,7 +3063,7 @@ const Accounting = () => {
       {costModal && (
         <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px' }}>
           <div className="glass-card" style={{ width:'100%',maxWidth:'700px',padding:'35px',maxHeight:'90vh',overflowY:'auto',position:'relative' }}>
-            <button onClick={() => { setCostModal(null); setCostLines([{vendorId:'',serviceIdx:'',qty:1,customVendorName:'',customServiceDescription:'',customPrice:''}]); }} style={{ position:'absolute',top:'15px',right:'15px',background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer' }}><X size={20}/></button>
+            <button onClick={() => { setCostModal(null); setCostLines([{vendorId:'',serviceIdx:'',qty:1,customVendorName:'',customServiceDescription:'',customPrice:'',targetItemIdx:''}]); }} style={{ position:'absolute',top:'15px',right:'15px',background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer' }}><X size={20}/></button>
             <h3 style={{ color:'var(--secondary)',marginBottom:'8px',fontSize:'1.3rem' }}>{isID ? 'Input Biaya' : 'Input Cost'} — {costModal.id}</h3>
             <p style={{ color:'var(--text-muted)',fontSize:'0.85rem',marginBottom:'25px' }}>{isID ? 'Pelanggan:' : 'Customer:'} <strong style={{color:'var(--text)'}}>{costModal.customerName}</strong></p>
 
@@ -2902,19 +3103,19 @@ const Accounting = () => {
                 const lineTotal = unitPrice * parseFloat(line.qty || 1);
                 return (
                   <div key={i} style={{ padding:'12px', background:'rgba(255,255,255,0.02)', border:'1px solid var(--glass-border)', borderRadius:'10px', marginBottom:'12px' }}>
-                    <div className="cost-input-grid">
+                    <div className="cost-input-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px', alignItems: 'center' }}>
                        <select value={line.vendorId} onChange={e=>updateCostLine(i,'vendorId',e.target.value)} style={{ padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--secondary)',fontWeight:'600',fontSize:'0.85rem',width:'100%' }}>
                         <option value="" style={{color:'var(--text-muted)', background:'var(--bg)'}}>-- {isID ? 'Pilih Vendor' : 'Select Vendor'} --</option>
                         {vendorList.map(v=><option key={v.id} value={v.id} style={{color:'var(--text)', background:'var(--bg)'}}>{v.name}</option>)}
-                        <option value="custom" style={{color:'var(--secondary)', background:'var(--bg)', fontWeight:'bold'}}>-- {isID ? 'Custom Vendor (Manual)' : 'Custom Vendor (Manual)'} --</option>
-                      </select>
+                        <option value="custom" style={{color:'var(--secondary)', background:'var(--bg)', fontWeight:'bold'}}>-- {isID ? 'Custom Vendor' : 'Custom Vendor'} --</option>
+                       </select>
 
-                      <select 
+                       <select 
                         value={line.serviceIdx} 
                         onChange={e=>updateCostLine(i,'serviceIdx',e.target.value)} 
                         disabled={!line.vendorId || line.vendorId === 'custom'} 
                         style={{ padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--secondary)',fontWeight:'600',fontSize:'0.85rem',width:'100%' }}
-                      >
+                       >
                         <option value="" style={{color:'var(--text-muted)', background:'var(--bg)'}}>-- {isID ? 'Pilih Layanan' : 'Select Service'} --</option>
                         {line.vendorId !== 'custom' && (selVendor?.services||[]).map((s,si)=>{
                           const optionTotal = parseFloat(s.price || 0) * parseFloat(line.qty || 1);
@@ -2925,17 +3126,32 @@ const Accounting = () => {
                           );
                         })}
                         {line.vendorId && line.vendorId !== 'custom' && (
-                          <option value="custom" style={{color:'var(--secondary)', background:'var(--bg)', fontWeight:'bold'}}>-- {isID ? 'Custom Layanan (Manual)' : 'Custom Service (Manual)'} --</option>
+                          <option value="custom" style={{color:'var(--secondary)', background:'var(--bg)', fontWeight:'bold'}}>-- {isID ? 'Custom Layanan' : 'Custom Service'} --</option>
                         )}
-                      </select>
+                       </select>
 
-                      <input type="number" min="1" step="any" value={line.qty} onChange={e=>updateCostLine(i,'qty',e.target.value)} placeholder="Qty" style={{ padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--text)',fontSize:'0.85rem',textAlign:'center',width:'100%' }}/>
+                       {Array.isArray(costModal?.items) && costModal.items.length > 0 && (
+                         <select 
+                           value={line.targetItemIdx || ''} 
+                           onChange={e=>updateCostLine(i,'targetItemIdx',e.target.value)} 
+                           style={{ padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--secondary)',fontWeight:'600',fontSize:'0.85rem',width:'100%' }}
+                         >
+                           <option value="" style={{color:'var(--text-muted)', background:'var(--bg)'}}>-- {isID ? 'Pilih Item JO' : 'Select JO Item'} --</option>
+                           {costModal.items.map((item, itemIdx) => (
+                             <option key={itemIdx} value={itemIdx} style={{color:'var(--text)', background:'var(--bg)'}}>
+                               {item.description}
+                             </option>
+                           ))}
+                         </select>
+                       )}
+
+                       <input type="number" min="1" step="any" value={line.qty} onChange={e=>updateCostLine(i,'qty',e.target.value)} placeholder="Qty" style={{ padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--text)',fontSize:'0.85rem',textAlign:'center',width:'100%' }}/>
                       
-                      <div style={{ fontSize:'0.85rem',color:'var(--secondary)',fontWeight:'600',padding:'9px',background:'rgba(255,255,255,0.03)',borderRadius:'8px',border:'1px solid var(--glass-border)',width:'100%',boxSizing:'border-box',textAlign:'center' }}>
+                       <div style={{ fontSize:'0.85rem',color:'var(--secondary)',fontWeight:'600',padding:'9px',background:'rgba(255,255,255,0.03)',borderRadius:'8px',border:'1px solid var(--glass-border)',width:'100%',boxSizing:'border-box',textAlign:'center' }}>
                         Rp {lineTotal.toLocaleString(isID ? 'id-ID' : 'en-US')}
-                      </div>
+                       </div>
                       
-                      <button onClick={()=>removeCostLine(i)} disabled={costLines.length===1} style={{ background:'var(--danger-bg)',color:'var(--danger)',border:'none',borderRadius:'8px',height:'36px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',width:'100%' }}><X size={14}/></button>
+                       <button onClick={()=>removeCostLine(i)} disabled={costLines.length===1} style={{ background:'var(--danger-bg)',color:'var(--danger)',border:'none',borderRadius:'8px',height:'36px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',width:'100%' }}><X size={14}/></button>
                     </div>
 
                     {/* Custom Fields Sub-row */}
@@ -2982,7 +3198,7 @@ const Accounting = () => {
               })}
               <button onClick={addCostLine} style={{ width:'100%',padding:'8px',background:'rgba(212,175,55,0.08)',color:'var(--secondary)',border:'1px dashed var(--secondary)',borderRadius:'8px',cursor:'pointer',fontSize:'0.85rem',marginBottom:'20px' }}>+ {isID ? 'Tambah Baris Biaya' : 'Add Cost Line'}</button>
               <div style={{ display:'flex',gap:'12px' }}>
-                <button onClick={()=>{ setCostModal(null); setCostLines([{vendorId:'',serviceIdx:'',qty:1,customVendorName:'',customServiceDescription:'',customPrice:''}]); }} className="btn" style={{ flex:1,background:'rgba(255,255,255,0.05)',border:'1px solid var(--border)',color:'var(--text)' }}>{isID ? 'Batal' : 'Cancel'}</button>
+                <button onClick={()=>{ setCostModal(null); setCostLines([{vendorId:'',serviceIdx:'',qty:1,customVendorName:'',customServiceDescription:'',customPrice:'',targetItemIdx:''}]); }} className="btn" style={{ flex:1,background:'rgba(255,255,255,0.05)',border:'1px solid var(--border)',color:'var(--text)' }}>{isID ? 'Batal' : 'Cancel'}</button>
                 <ButtonWithLoading onClick={handleSaveCosts} className="btn btn-gold" style={{ flex: 2 }}><CheckCircle size={16}/> {isID ? 'Simpan Biaya' : 'Save Cost'}</ButtonWithLoading>
               </div>
             </>
@@ -3258,50 +3474,491 @@ const Accounting = () => {
                 </tr>
               </thead>
               <tbody>
-                {sortedActiveJOs.map(jo => {
-                  const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s,c)=>s+parseFloat(c.total||0),0) : 0;
-                  const poCost = (poMap[jo.id] || []).reduce((s,p)=>s+parseFloat(p.grandTotal||0),0);
-                  const totalCost = manualCost + poCost;
+                {groupedPLData.map(group => {
+                  const isExpanded = expandedPLGroups[group.key] !== false;
+                  const groupFin = plGroupFinancials[group.key] || { cost: 0, revenue: 0, profitLoss: 0 };
                   
-                  const invoice = invoiceMap[String(jo.id)];
-                  const revenue = invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : 0;
-                  const profitLoss = revenue - totalCost;
+                  if (group.type === 'single') {
+                    const jo = group.jobOrders[0];
+                    const hasItems = Array.isArray(jo.items) && jo.items.length > 0;
 
+                    if (hasItems) {
+                      const manualCostTotal = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + parseFloat(c.total || 0), 0) : 0;
+                      const poCostTotal = (poMap[jo.id] || []).reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
+                      const totalCost = manualCostTotal + poCostTotal;
+
+                      const invoice = joInvoiceMap[String(jo.id)];
+                      const revenue = invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : jo.items.reduce((s, item) => s + parseFloat(item.rate || 0) * parseFloat(item.issueQuantity || item.quantity || 1), 0);
+                      const profitLoss = revenue - totalCost;
+                      const isJoExpanded = expandedJOPL[jo.id] !== false;
+
+                      return (
+                        <React.Fragment key={jo.id}>
+                          <tr 
+                            style={{ borderBottom: '1px solid var(--glass-border)', cursor: 'pointer' }} 
+                            className="table-row-hover"
+                            onClick={() => setExpandedJOPL({ ...expandedJOPL, [jo.id]: !isJoExpanded })}
+                          >
+                            <td style={{ padding: '12px', fontWeight: '700', color: 'var(--secondary)', fontSize: '0.85rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>{isJoExpanded ? '📂' : '📁'}</span>
+                                <span>{jo.id}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '12px', fontWeight: '600' }}>{jo.customerName}</td>
+                            <td style={{ padding: '12px', fontSize: '0.8rem', fontWeight: '700', color: 'var(--secondary)' }}>
+                              {invoice ? invoice.id : <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{isID ? 'Belum Ada' : 'None Yet'}</span>}
+                            </td>
+                            <td style={{ padding: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                              {invoice ? new Date(invoice.date).toLocaleDateString() : '—'}
+                            </td>
+                            <td style={{ padding: '12px' }}><span className={`badge badge-${jo.status}`} style={{ fontSize: '0.7rem' }}>{jo.status}</span></td>
+                            <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: revenue > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
+                              {revenue > 0 ? `Rp ${revenue.toLocaleString('id-ID')}` : '—'}
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: totalCost > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                              {totalCost > 0 ? `Rp ${totalCost.toLocaleString('id-ID')}` : '—'}
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800', color: profitLoss > 0 ? 'var(--success)' : profitLoss < 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                              {revenue > 0 || totalCost > 0 ? `Rp ${profitLoss.toLocaleString('id-ID')}` : '—'}
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
+                                {canWrite && (
+                                  <button className="btn" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px', background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px solid var(--secondary)' }} onClick={() => { setCostModal(jo); setCostLines([{ vendorId: '', serviceIdx: '', qty: 1, customVendorName: '', customServiceDescription: '', customPrice: '', targetItemIdx: '' }]); }}>
+                                    <Plus size={14} /> {isID ? 'Biaya' : 'Costs'}
+                                  </button>
+                                )}
+                                {!invoice && canWrite && (
+                                  <ButtonWithLoading className="btn btn-gold" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px' }} onClick={() => handleIssueInvoice(jo.id)}>
+                                    <Receipt size={14} /> {isID ? 'Invoice' : 'Invoice'}
+                                  </ButtonWithLoading>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+
+                          {isJoExpanded && (
+                            <tr style={{ background: 'rgba(255, 255, 255, 0.015)', borderBottom: '1px solid var(--glass-border)' }}>
+                              <td colSpan="9" style={{ padding: '15px 25px 20px 40px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '25px' }}>
+                                  {/* Left Column: Services & Revenue */}
+                                  <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '15px 20px' }}>
+                                    <div style={{ fontWeight: '800', color: 'var(--secondary)', fontSize: '0.85rem', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.5px' }}>
+                                      {isID ? 'Rincian Layanan & Pendapatan' : 'Services & Revenue Breakdown'}
+                                    </div>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                      <thead>
+                                        <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                          <th style={{ padding: '6px 0' }}>{isID ? 'Layanan' : 'Service'}</th>
+                                          <th style={{ padding: '6px 0', textAlign: 'center' }}>Qty</th>
+                                          <th style={{ padding: '6px 0', textAlign: 'right' }}>{isID ? 'Tarif' : 'Rate'}</th>
+                                          <th style={{ padding: '6px 0', textAlign: 'right' }}>Total</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {jo.items.map((item, idx) => {
+                                          const qty = parseFloat(item.issueQuantity || item.quantity || 1);
+                                          const subtotal = parseFloat(item.rate || 0) * qty;
+                                          return (
+                                            <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.78rem' }}>
+                                              <td style={{ padding: '8px 0', fontWeight: '500' }}>
+                                                <div>{getResolvedDescription(item, jo, idx)}</div>
+                                                {item.status && <span className={`badge badge-${item.status}`} style={{ fontSize: '0.58rem', padding: '1px 4px', marginTop: '3px', display: 'inline-block' }}>{item.status}</span>}
+                                              </td>
+                                              <td style={{ padding: '8px 0', textAlign: 'center' }}>{qty}</td>
+                                              <td style={{ padding: '8px 0', textAlign: 'right' }}>Rp {parseFloat(item.rate || 0).toLocaleString()}</td>
+                                              <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: '700', color: 'var(--secondary)' }}>Rp {subtotal.toLocaleString()}</td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+
+                                  {/* Right Column: Costs & Expenses */}
+                                  <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '15px 20px' }}>
+                                    <div style={{ fontWeight: '800', color: '#ef4444', fontSize: '0.85rem', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.5px' }}>
+                                      {isID ? 'Rincian Pengeluaran & Biaya' : 'Costs & Expenses Breakdown'}
+                                    </div>
+                                    {(() => {
+                                      const manualCostsList = Array.isArray(jo.costs) ? jo.costs : [];
+                                      const poCostsList = poMap[jo.id] || [];
+                                      
+                                      if (manualCostsList.length === 0 && poCostsList.length === 0) {
+                                        return (
+                                          <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem', fontStyle: 'italic' }}>
+                                            {isID ? 'Belum ada catatan biaya.' : 'No costing records registered.'}
+                                          </div>
+                                        );
+                                      }
+
+                                      return (
+                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                          <thead>
+                                            <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                              <th style={{ padding: '6px 0' }}>{isID ? 'Vendor / Jenis' : 'Vendor / Type'}</th>
+                                              <th style={{ padding: '6px 0' }}>{isID ? 'Deskripsi' : 'Description'}</th>
+                                              <th style={{ padding: '6px 0', textAlign: 'right' }}>{isID ? 'Biaya' : 'Amount'}</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {manualCostsList.map((c, cIdx) => (
+                                              <tr key={`mc-${cIdx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.78rem' }}>
+                                                <td style={{ padding: '8px 0', fontWeight: '500' }}>
+                                                  <div>{c.vendorName || c.customVendorName || (isID ? 'Vendor Kustom' : 'Custom Vendor')}</div>
+                                                  <span style={{ fontSize: '0.58rem', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px solid rgba(212, 175, 55, 0.25)', padding: '1px 4px', borderRadius: '3px', marginTop: '3px', display: 'inline-block' }}>
+                                                    Manual Cost
+                                                  </span>
+                                                </td>
+                                                <td style={{ padding: '8px 0', color: 'var(--text-muted)' }}>{c.serviceDescription || c.customServiceDescription || '—'}</td>
+                                                <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: '700', color: '#ef4444' }}>
+                                                  Rp {parseFloat(c.total || 0).toLocaleString()}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                            {poCostsList.map((p, pIdx) => (
+                                              <tr key={`po-${pIdx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.78rem' }}>
+                                                <td style={{ padding: '8px 0', fontWeight: '500' }}>
+                                                  <div>{p.vendorName || (isID ? 'Vendor PO' : 'PO Vendor')}</div>
+                                                  <span style={{ fontSize: '0.58rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '1px 4px', borderRadius: '3px', marginTop: '3px', display: 'inline-block' }}>
+                                                    PO: {p.poNumber || p.id}
+                                                  </span>
+                                                </td>
+                                                <td style={{ padding: '8px 0', color: 'var(--text-muted)' }}>
+                                                  {p.items?.map(pi => pi.serviceDescription).join(', ') || (isID ? 'Layanan PO' : 'PO Services')}
+                                                </td>
+                                                <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: '700', color: '#ef4444' }}>
+                                                  Rp {parseFloat(p.grandTotal || 0).toLocaleString()}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      );
+                                    })()}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    }
+
+                    const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + parseFloat(c.total || 0), 0) : 0;
+                    const poCost = (poMap[jo.id] || []).reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
+                    const totalCost = manualCost + poCost;
+                    
+                    const invoice = joInvoiceMap[String(jo.id)];
+                    const revenue = invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : 0;
+                    const profitLoss = revenue - totalCost;
+
+                    return (
+                      <tr key={jo.id} style={{ borderBottom: '1px solid var(--glass-border)' }} className="table-row-hover">
+                        <td style={{ padding: '12px', fontWeight: '700', color: 'var(--secondary)', fontSize: '0.85rem' }}>{jo.id}</td>
+                        <td style={{ padding: '12px', fontWeight: '600' }}>{jo.customerName}</td>
+                        <td style={{ padding: '12px', fontSize: '0.8rem', fontWeight: '700', color: 'var(--secondary)' }}>
+                          {invoice ? invoice.id : <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{isID ? 'Belum Ada' : 'None Yet'}</span>}
+                        </td>
+                        <td style={{ padding: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {invoice ? new Date(invoice.date).toLocaleDateString() : '—'}
+                        </td>
+                        <td style={{ padding: '12px' }}><span className={`badge badge-${jo.status}`} style={{ fontSize: '0.7rem' }}>{jo.status}</span></td>
+                        <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: revenue > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
+                          {revenue > 0 ? `Rp ${revenue.toLocaleString('id-ID')}` : '—'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: totalCost > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                          {totalCost > 0 ? `Rp ${totalCost.toLocaleString('id-ID')}` : '—'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800', color: profitLoss > 0 ? 'var(--success)' : profitLoss < 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                          {revenue > 0 || totalCost > 0 ? `Rp ${profitLoss.toLocaleString('id-ID')}` : '—'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                            {canWrite && (
+                              <button className="btn" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px', background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px solid var(--secondary)' }} onClick={() => { setCostModal(jo); setCostLines([{ vendorId: '', serviceIdx: '', qty: 1, customVendorName: '', customServiceDescription: '', customPrice: '', targetItemIdx: '' }]); }}>
+                                <Plus size={14} /> {isID ? 'Biaya' : 'Costs'}
+                              </button>
+                            )}
+                            {!invoice && canWrite && (
+                              <ButtonWithLoading className="btn btn-gold" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px' }} onClick={() => handleIssueInvoice(jo.id)}>
+                                <Receipt size={14} /> {isID ? 'Invoice' : 'Invoice'}
+                              </ButtonWithLoading>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  // Render Folder Group row and child rows
                   return (
-                    <tr key={jo.id} style={{ borderBottom:'1px solid var(--glass-border)' }} className="table-row-hover">
-                       <td style={{padding:'12px',fontWeight:'700',color:'var(--secondary)',fontSize:'0.85rem'}}>{jo.id}</td>
-                       <td style={{padding:'12px',fontWeight:'600'}}>{jo.customerName}</td>
-                       <td style={{padding:'12px',fontSize:'0.8rem',fontWeight:'700',color:'var(--secondary)'}}>
-                         {invoice ? invoice.id : <span style={{color:'var(--text-muted)', fontWeight:'400'}}>{isID ? 'Belum Ada' : 'None Yet'}</span>}
-                       </td>
-                       <td style={{padding:'12px',fontSize:'0.8rem',color:'var(--text-muted)'}}>
-                         {invoice ? new Date(invoice.date).toLocaleDateString() : '—'}
-                       </td>
-                       <td style={{padding:'12px'}}><span className={`badge badge-${jo.status}`} style={{fontSize:'0.7rem'}}>{jo.status}</span></td>
-                      <td style={{padding:'12px', textAlign:'right', fontWeight:'700', color: revenue > 0 ? 'var(--success)' : 'var(--text-muted)'}}>
-                        {revenue > 0 ? `Rp ${revenue.toLocaleString('id-ID')}` : '—'}
-                      </td>
-                      <td style={{padding:'12px',textAlign:'right',fontWeight:'700',color: totalCost>0 ? 'var(--danger)' : 'var(--text-muted)'}}>
-                        {totalCost>0 ? `Rp ${totalCost.toLocaleString('id-ID')}` : '—'}
-                      </td>
-                      <td style={{padding:'12px', textAlign:'right', fontWeight:'800', color: profitLoss > 0 ? 'var(--success)' : profitLoss < 0 ? 'var(--danger)' : 'var(--text-muted)'}}>
-                        {revenue > 0 || totalCost > 0 ? `Rp ${profitLoss.toLocaleString('id-ID')}` : '—'}
-                      </td>
-                      <td style={{padding:'12px', textAlign:'center'}}>
-                        <div style={{display:'flex', gap:'8px', justifyContent:'center'}}>
-                          {canWrite && (
-                            <button className="btn" style={{padding:'7px 14px',fontSize:'0.8rem',gap:'6px', background:'var(--secondary-bg)', color:'var(--secondary)', border:'1px solid var(--secondary)'}} onClick={()=>{ setCostModal(jo); setCostLines([{vendorId:'',serviceIdx:'',qty:1,customVendorName:'',customServiceDescription:'',customPrice:''}]); }}>
-                              <Plus size={14}/> {isID ? 'Biaya' : 'Costs'}
-                            </button>
+                    <React.Fragment key={group.key}>
+                      <tr 
+                        style={{ 
+                          background: 'rgba(212, 175, 55, 0.05)', 
+                          borderBottom: '2px solid var(--secondary)',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => setExpandedPLGroups({ ...expandedPLGroups, [group.key]: !isExpanded })}
+                      >
+                        <td style={{ padding: '12px', fontWeight: '800', color: 'var(--secondary)', fontSize: '0.85rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{isExpanded ? '📂' : '📁'}</span>
+                            <span>{group.type === 'quotation' ? 'Quo: ' + group.name : 'Inv: ' + group.name}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px', fontWeight: '800' }}>{group.customerName}</td>
+                        <td style={{ padding: '12px', fontSize: '0.8rem', fontWeight: '700', color: 'var(--secondary)' }}>
+                          {group.invoice ? group.invoice.id : <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{isID ? 'Belum Ada' : 'None Yet'}</span>}
+                        </td>
+                        <td style={{ padding: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {group.invoice ? new Date(group.invoice.date).toLocaleDateString() : '—'}
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)' }}>
+                            {group.jobOrders.length} {isID ? 'Pekerjaan' : 'Jobs'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: groupFin.revenue > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
+                          {groupFin.revenue > 0 ? `Rp ${groupFin.revenue.toLocaleString('id-ID')}` : '—'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: groupFin.cost > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                          {groupFin.cost > 0 ? `Rp ${groupFin.cost.toLocaleString('id-ID')}` : '—'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800', color: groupFin.profitLoss > 0 ? 'var(--success)' : groupFin.profitLoss < 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                          {groupFin.revenue > 0 || groupFin.cost > 0 ? `Rp ${groupFin.profitLoss.toLocaleString('id-ID')}` : '—'}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          <button className="btn" style={{ padding: '4px 8px', background: 'none', border: 'none', color: 'var(--secondary)', cursor: 'pointer' }}>
+                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </button>
+                        </td>
+                      </tr>
+
+                      {isExpanded && group.jobOrders.map(jo => {
+                        const hasItems = Array.isArray(jo.items) && jo.items.length > 0;
+                        
+                        if (hasItems) {
+                          const manualCostTotal = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + parseFloat(c.total || 0), 0) : 0;
+                          const poCostTotal = (poMap[jo.id] || []).reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
+                          const totalCost = manualCostTotal + poCostTotal;
+
+                          const invoice = joInvoiceMap[String(jo.id)];
+                          const revenue = invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : jo.items.reduce((s, item) => s + parseFloat(item.rate || 0) * parseFloat(item.issueQuantity || item.quantity || 1), 0);
+                          const profitLoss = revenue - totalCost;
+                          const isJoExpanded = expandedJOPL[jo.id] !== false;
+
+                          return (
+                            <React.Fragment key={jo.id}>
+                              <tr 
+                                style={{ 
+                                  borderBottom: '1px solid var(--glass-border)', 
+                                  background: 'rgba(255,255,255,0.02)',
+                                  cursor: 'pointer'
+                                }} 
+                                className="table-row-hover"
+                                onClick={() => setExpandedJOPL({ ...expandedJOPL, [jo.id]: !isJoExpanded })}
+                              >
+                                <td style={{ padding: '12px', paddingLeft: '30px', fontWeight: '700', color: 'var(--secondary)', fontSize: '0.85rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span>{isJoExpanded ? '📂' : '📁'}</span>
+                                    <span>{jo.id}</span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '12px', fontWeight: '600' }}>{jo.customerName}</td>
+                                <td style={{ padding: '12px', fontSize: '0.8rem', fontWeight: '700', color: 'var(--secondary)' }}>
+                                  {invoice ? invoice.id : <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{isID ? 'Belum Ada' : 'None Yet'}</span>}
+                                </td>
+                                <td style={{ padding: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                  {invoice ? new Date(invoice.date).toLocaleDateString() : '—'}
+                                </td>
+                                <td style={{ padding: '12px' }}>
+                                  <span className={`badge badge-${jo.status}`} style={{ fontSize: '0.7rem' }}>{jo.status}</span>
+                                </td>
+                                <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: revenue > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
+                                  {revenue > 0 ? `Rp ${revenue.toLocaleString('id-ID')}` : '—'}
+                                </td>
+                                <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: totalCost > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                                  {totalCost > 0 ? `Rp ${totalCost.toLocaleString('id-ID')}` : '—'}
+                                </td>
+                                <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800', color: profitLoss > 0 ? 'var(--success)' : profitLoss < 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                                  {revenue > 0 || totalCost > 0 ? `Rp ${profitLoss.toLocaleString('id-ID')}` : '—'}
+                                </td>
+                                <td style={{ padding: '12px', textAlign: 'center' }}>
+                                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
+                                    {canWrite && (
+                                      <button className="btn" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px', background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px solid var(--secondary)' }} onClick={() => { setCostModal(jo); setCostLines([{ vendorId: '', serviceIdx: '', qty: 1, customVendorName: '', customServiceDescription: '', customPrice: '', targetItemIdx: '' }]); }}>
+                                        <Plus size={14} /> {isID ? 'Biaya' : 'Costs'}
+                                      </button>
+                                    )}
+                                    {!invoice && canWrite && (
+                                      <ButtonWithLoading className="btn btn-gold" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px' }} onClick={() => handleIssueInvoice(jo.id)}>
+                                        <Receipt size={14} /> {isID ? 'Invoice' : 'Invoice'}
+                                      </ButtonWithLoading>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+
+                          {isJoExpanded && (
+                            <tr style={{ background: 'rgba(255, 255, 255, 0.015)', borderBottom: '1px solid var(--glass-border)' }}>
+                              <td colSpan="9" style={{ padding: '15px 25px 20px 40px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '25px' }}>
+                                  {/* Left Column: Services & Revenue */}
+                                  <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '15px 20px' }}>
+                                    <div style={{ fontWeight: '800', color: 'var(--secondary)', fontSize: '0.85rem', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.5px' }}>
+                                      {isID ? 'Rincian Layanan & Pendapatan' : 'Services & Revenue Breakdown'}
+                                    </div>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                      <thead>
+                                        <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                          <th style={{ padding: '6px 0' }}>{isID ? 'Layanan' : 'Service'}</th>
+                                          <th style={{ padding: '6px 0', textAlign: 'center' }}>Qty</th>
+                                          <th style={{ padding: '6px 0', textAlign: 'right' }}>{isID ? 'Tarif' : 'Rate'}</th>
+                                          <th style={{ padding: '6px 0', textAlign: 'right' }}>Total</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {jo.items.map((item, idx) => {
+                                          const qty = parseFloat(item.issueQuantity || item.quantity || 1);
+                                          const subtotal = parseFloat(item.rate || 0) * qty;
+                                          return (
+                                            <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.78rem' }}>
+                                              <td style={{ padding: '8px 0', fontWeight: '500' }}>
+                                                <div>{getResolvedDescription(item, jo, idx)}</div>
+                                                {item.status && <span className={`badge badge-${item.status}`} style={{ fontSize: '0.58rem', padding: '1px 4px', marginTop: '3px', display: 'inline-block' }}>{item.status}</span>}
+                                              </td>
+                                              <td style={{ padding: '8px 0', textAlign: 'center' }}>{qty}</td>
+                                              <td style={{ padding: '8px 0', textAlign: 'right' }}>Rp {parseFloat(item.rate || 0).toLocaleString()}</td>
+                                              <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: '700', color: 'var(--secondary)' }}>Rp {subtotal.toLocaleString()}</td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+
+                                  {/* Right Column: Costs & Expenses */}
+                                  <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '15px 20px' }}>
+                                    <div style={{ fontWeight: '800', color: '#ef4444', fontSize: '0.85rem', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.5px' }}>
+                                      {isID ? 'Rincian Pengeluaran & Biaya' : 'Costs & Expenses Breakdown'}
+                                    </div>
+                                    {(() => {
+                                      const manualCostsList = Array.isArray(jo.costs) ? jo.costs : [];
+                                      const poCostsList = poMap[jo.id] || [];
+                                      
+                                      if (manualCostsList.length === 0 && poCostsList.length === 0) {
+                                        return (
+                                          <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem', fontStyle: 'italic' }}>
+                                            {isID ? 'Belum ada catatan biaya.' : 'No costing records registered.'}
+                                          </div>
+                                        );
+                                      }
+
+                                      return (
+                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                          <thead>
+                                            <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                              <th style={{ padding: '6px 0' }}>{isID ? 'Vendor / Jenis' : 'Vendor / Type'}</th>
+                                              <th style={{ padding: '6px 0' }}>{isID ? 'Deskripsi' : 'Description'}</th>
+                                              <th style={{ padding: '6px 0', textAlign: 'right' }}>{isID ? 'Biaya' : 'Amount'}</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {manualCostsList.map((c, cIdx) => (
+                                              <tr key={`mc-${cIdx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.78rem' }}>
+                                                <td style={{ padding: '8px 0', fontWeight: '500' }}>
+                                                  <div>{c.vendorName || c.customVendorName || (isID ? 'Vendor Kustom' : 'Custom Vendor')}</div>
+                                                  <span style={{ fontSize: '0.58rem', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px solid rgba(212, 175, 55, 0.25)', padding: '1px 4px', borderRadius: '3px', marginTop: '3px', display: 'inline-block' }}>
+                                                    Manual Cost
+                                                  </span>
+                                                </td>
+                                                <td style={{ padding: '8px 0', color: 'var(--text-muted)' }}>{c.serviceDescription || c.customServiceDescription || '—'}</td>
+                                                <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: '700', color: '#ef4444' }}>
+                                                  Rp {parseFloat(c.total || 0).toLocaleString()}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                            {poCostsList.map((p, pIdx) => (
+                                              <tr key={`po-${pIdx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.78rem' }}>
+                                                <td style={{ padding: '8px 0', fontWeight: '500' }}>
+                                                  <div>{p.vendorName || (isID ? 'Vendor PO' : 'PO Vendor')}</div>
+                                                  <span style={{ fontSize: '0.58rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '1px 4px', borderRadius: '3px', marginTop: '3px', display: 'inline-block' }}>
+                                                    PO: {p.poNumber || p.id}
+                                                  </span>
+                                                </td>
+                                                <td style={{ padding: '8px 0', color: 'var(--text-muted)' }}>
+                                                  {p.items?.map(pi => pi.serviceDescription).join(', ') || (isID ? 'Layanan PO' : 'PO Services')}
+                                                </td>
+                                                <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: '700', color: '#ef4444' }}>
+                                                  Rp {parseFloat(p.grandTotal || 0).toLocaleString()}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      );
+                                    })()}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
                           )}
-                          {!invoice && canWrite && (
-                            <ButtonWithLoading className="btn btn-gold" style={{padding:'7px 14px',fontSize:'0.8rem',gap:'6px'}} onClick={() => handleIssueInvoice(jo.id)}>
-                              <Receipt size={14}/> {isID ? 'Invoice' : 'Invoice'}
-                            </ButtonWithLoading>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                            </React.Fragment>
+                          );
+                        }
+
+                        const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + parseFloat(c.total || 0), 0) : 0;
+                        const poCost = (poMap[jo.id] || []).reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
+                        const totalCost = manualCost + poCost;
+                        
+                        const invoice = joInvoiceMap[String(jo.id)];
+                        const isPrimaryJo = invoice && String(invoice.joId) === String(jo.id);
+                        const revenue = isPrimaryJo ? parseFloat(invoice.amount || invoice.subtotal || 0) : 0;
+                        const profitLoss = revenue - totalCost;
+
+                        return (
+                          <tr key={jo.id} style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.01)' }} className="table-row-hover">
+                            <td style={{ padding: '12px', paddingLeft: '30px', fontWeight: '700', color: 'var(--secondary)', fontSize: '0.85rem' }}>
+                              <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>📄</span> {jo.id}
+                            </td>
+                            <td style={{ padding: '12px', fontWeight: '600' }}>{jo.customerName}</td>
+                            <td style={{ padding: '12px', fontSize: '0.8rem', fontWeight: '700', color: 'var(--secondary)' }}>
+                              {invoice ? invoice.id : <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{isID ? 'Belum Ada' : 'None Yet'}</span>}
+                            </td>
+                            <td style={{ padding: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                              {invoice ? new Date(invoice.date).toLocaleDateString() : '—'}
+                            </td>
+                            <td style={{ padding: '12px' }}><span className={`badge badge-${jo.status}`} style={{ fontSize: '0.7rem' }}>{jo.status}</span></td>
+                            <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: revenue > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
+                              {revenue > 0 ? `Rp ${revenue.toLocaleString('id-ID')}` : (invoice ? <span style={{ fontSize: '0.75rem', fontStyle: 'italic', color: 'var(--text-muted)' }}>{isID ? '(Tercakup)' : '(Covered)'}</span> : '—')}
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', color: totalCost > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                              {totalCost > 0 ? `Rp ${totalCost.toLocaleString('id-ID')}` : '—'}
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'right', fontWeight: '800', color: isPrimaryJo ? (profitLoss > 0 ? 'var(--success)' : profitLoss < 0 ? 'var(--danger)' : 'var(--text-muted)') : 'var(--text-muted)' }}>
+                              {isPrimaryJo ? (revenue > 0 || totalCost > 0 ? `Rp ${profitLoss.toLocaleString('id-ID')}` : '—') : <span style={{ fontSize: '0.75rem', fontStyle: 'italic', color: 'var(--text-muted)' }}>{isID ? 'Lihat Folder' : 'See Folder'}</span>}
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                {canWrite && (
+                                  <button className="btn" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px', background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px solid var(--secondary)' }} onClick={() => { setCostModal(jo); setCostLines([{ vendorId: '', serviceIdx: '', qty: 1, customVendorName: '', customServiceDescription: '', customPrice: '', targetItemIdx: '' }]); }}>
+                                    <Plus size={14} /> {isID ? 'Biaya' : 'Costs'}
+                                  </button>
+                                )}
+                                {!invoice && canWrite && (
+                                  <ButtonWithLoading className="btn btn-gold" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px' }} onClick={() => handleIssueInvoice(jo.id)}>
+                                    <Receipt size={14} /> {isID ? 'Invoice' : 'Invoice'}
+                                  </ButtonWithLoading>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -3339,6 +3996,11 @@ const Accounting = () => {
                     const groups = {};
                     completedJOs.forEach(jo => {
                       const qId = jo.quotationId || 'direct';
+                      // If it's a direct job, only include it if it hasn't been invoiced yet!
+                      if (!jo.quotationId) {
+                        const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.includes(jo.id)));
+                        if (hasInvoice) return;
+                      }
                       if (!groups[qId]) {
                         groups[qId] = {
                           quotationId: qId,
@@ -3349,7 +4011,20 @@ const Accounting = () => {
                       groups[qId].jobOrders.push(jo);
                     });
 
-                    if (Object.keys(groups).length === 0) {
+                    // Filter out quotation groups where ALL completed job orders have already been invoiced
+                    const pendingGroups = Object.values(groups).filter(group => {
+                      if (group.quotationId === 'direct') {
+                        return group.jobOrders.length > 0;
+                      }
+                      // Check if any job order in this quotation group is NOT invoiced yet
+                      const hasUninvoicedJO = group.jobOrders.some(jo => {
+                        const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.includes(jo.id)));
+                        return !hasInvoice;
+                      });
+                      return hasUninvoicedJO;
+                    });
+
+                    if (pendingGroups.length === 0) {
                       return (
                         <tr>
                           <td colSpan="6" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -3359,7 +4034,7 @@ const Accounting = () => {
                       );
                     }
 
-                    return Object.values(groups).map(group => {
+                    return pendingGroups.map(group => {
                       const isGroupExpanded = expandedCompletedGroups[group.quotationId] !== false;
 
                       return (
@@ -3386,7 +4061,7 @@ const Accounting = () => {
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                   <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                                    {group.jobOrders.length} {isID ? 'Pekerjaan' : 'Jobs'}
+                                  {group.jobOrders.length} {isID ? 'Pekerjaan' : 'Jobs'}
                                   </span>
                                   {isGroupExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                 </div>
@@ -3396,98 +4071,299 @@ const Accounting = () => {
 
                           {/* Child Job Orders */}
                           {isGroupExpanded && group.jobOrders.map(jo => {
-                            const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id));
+                            const joInvoices = invoices.filter(inv => String(inv.joId) === String(jo.id));
+                            const hasInvoice = joInvoices.length > 0;
                             return (
-                              <tr key={jo.id} style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.01)' }}>
-                                <td style={{ padding: '15px', paddingLeft: '30px', fontWeight: 'bold', color: 'var(--secondary)' }}>
-                                  <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>📄</span> {jo.id}
-                                </td>
-                                <td style={{ padding: '15px' }}>
-                                  <div style={{ fontWeight: '600' }}>{jo.customerName}</div>
-                                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                    {jo.instruction || jo.jobDescription}
-                                  </div>
-                                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                    {isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}
-                                  </div>
-                                  {jo.containerNo && (() => {
-                                    const cNo = jo.containerNo;
-                                    let filtered = [];
-                                    if (Array.isArray(cNo)) {
-                                      filtered = cNo.filter(Boolean);
-                                    } else if (cNo && String(cNo).trim()) {
-                                      filtered = [String(cNo).trim()];
-                                    }
-                                    if (filtered.length === 0) return null;
-                                    return (
-                                      <div style={{ marginTop: '6px' }}>
-                                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px' }}>
-                                          {isID ? 'Kontainer:' : 'Containers:'}
-                                        </div>
-                                        <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '4px' }}>
-                                          {filtered.map((num, idx) => (
-                                            <span key={idx} style={{ 
-                                              fontFamily: 'monospace', 
-                                              fontSize: '0.7rem', 
-                                              background: 'rgba(212, 175, 55, 0.1)', 
-                                              color: 'var(--secondary)', 
-                                              border: '1px solid rgba(212, 175, 55, 0.25)', 
-                                              padding: '2px 6px', 
-                                              borderRadius: '4px',
-                                              width: 'fit-content',
-                                              whiteSpace: 'nowrap'
-                                            }}>
-                                              {num}
-                                            </span>
+                              <React.Fragment key={jo.id}>
+                                <tr style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.01)' }}>
+                                  <td style={{ padding: '15px', paddingLeft: '30px', fontWeight: 'bold', color: 'var(--secondary)' }}>
+                                    <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>📄</span> {jo.id}
+                                  </td>
+                                  <td style={{ padding: '15px' }}>
+                                    <div style={{ fontWeight: '600' }}>{jo.customerName}</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                      {Array.isArray(jo.items) && jo.items.length > 0 ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                          {jo.items.map((item, idx) => (
+                                            <div key={idx} style={{ marginTop: '4px' }}>
+                                              • {getResolvedDescription(item, jo, idx)} ({isID ? 'Jumlah:' : 'Qty:'} {item.issueQuantity || item.quantity || 1} | {isID ? 'Tarif:' : 'Rate:'} Rp {parseFloat(item.rate || 0).toLocaleString(isID ? 'id-ID' : 'en-US')}) 
+                                              {item.status && <span style={{ fontSize: '0.65rem', marginLeft: '6px' }} className={`badge badge-${item.status}`}>{item.status}</span>}
+                                              {item.containerNo?.some?.(Boolean) && (
+                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px', paddingLeft: '10px' }}>
+                                                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px' }}>
+                                                     {isID ? 'Kontainer:' : 'Containers:'}
+                                                   </span>
+                                                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                     {item.containerNo.filter(Boolean).map((num, cIdx) => (
+                                                       <span key={cIdx} style={{ 
+                                                         fontFamily: 'monospace', 
+                                                         fontSize: '0.7rem', 
+                                                         background: 'rgba(212, 175, 55, 0.1)', 
+                                                         color: 'var(--secondary)', 
+                                                         border: '1px solid rgba(212, 175, 55, 0.25)', 
+                                                         padding: '1px 5px', 
+                                                         borderRadius: '4px',
+                                                         whiteSpace: 'nowrap'
+                                                       }}>
+                                                         {num}
+                                                       </span>
+                                                     ))}
+                                                   </div>
+                                                 </div>
+                                               )}
+                                               {item.vehicleNo?.some?.(Boolean) && (
+                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px', paddingLeft: '10px' }}>
+                                                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px' }}>
+                                                     {isID ? 'Armada:' : 'Vehicles:'}
+                                                   </span>
+                                                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                     {item.vehicleNo.filter(Boolean).map((num, vIdx) => (
+                                                       <span key={vIdx} style={{ 
+                                                         fontFamily: 'monospace', 
+                                                         fontSize: '0.7rem', 
+                                                         background: 'rgba(59, 130, 246, 0.1)', 
+                                                         color: '#3b82f6', 
+                                                         border: '1px solid rgba(59, 130, 246, 0.25)', 
+                                                         padding: '1px 5px', 
+                                                         borderRadius: '4px',
+                                                         whiteSpace: 'nowrap'
+                                                       }}>
+                                                         {num}
+                                                       </span>
+                                                     ))}
+                                                   </div>
+                                                 </div>
+                                               )}
+                                               {item.driverName?.some?.(Boolean) && (
+                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px', paddingLeft: '10px' }}>
+                                                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px' }}>
+                                                     {isID ? 'Supir:' : 'Drivers:'}
+                                                   </span>
+                                                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                     {item.driverName.filter(Boolean).map((num, dIdx) => (
+                                                       <span key={dIdx} style={{ 
+                                                         fontFamily: 'monospace', 
+                                                         fontSize: '0.7rem', 
+                                                         background: 'rgba(16, 185, 129, 0.1)', 
+                                                         color: '#10b981', 
+                                                         border: '1px solid rgba(16, 185, 129, 0.25)', 
+                                                         padding: '1px 5px', 
+                                                         borderRadius: '4px',
+                                                         whiteSpace: 'nowrap'
+                                                       }}>
+                                                         {num}
+                                                       </span>
+                                                     ))}
+                                                   </div>
+                                                 </div>
+                                               )}
+                                            </div>
                                           ))}
                                         </div>
-                                      </div>
-                                    );
-                                  })()}
-                                </td>
-                                <td style={{ padding: '15px' }}>
-                                  <span className="badge badge-done">{isID ? 'Selesai' : 'Completed'}</span>
-                                </td>
-                                <td style={{ padding: '15px' }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.75rem' }}>
-                                    {jo.shipmentStatus && (
-                                      <div>
-                                        <span className={`badge ${jo.shipmentStatus === 'done' ? 'badge-done' : 'badge-dispatched'}`}>
-                                          {jo.shipmentStatus === 'done' ? (isID ? 'Selesai' : 'Done') : (isID ? 'Dalam Proses' : 'In Progress')}
-                                        </span>
-                                      </div>
+                                      ) : (
+                                        <>
+                                          <div>{jo.instruction || jo.jobDescription}</div>
+                                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                            {isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                    {(!jo.items || jo.items.length === 0) && jo.containerNo && (() => {
+                                      const cNo = jo.containerNo;
+                                      let filtered = [];
+                                      if (Array.isArray(cNo)) {
+                                        filtered = cNo.filter(Boolean);
+                                      } else if (cNo && String(cNo).trim()) {
+                                        filtered = [String(cNo).trim()];
+                                      }
+                                      if (filtered.length === 0) return null;
+                                      return (
+                                        <div style={{ marginTop: '6px' }}>
+                                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px' }}>
+                                            {isID ? 'Kontainer:' : 'Containers:'}
+                                          </div>
+                                          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '4px' }}>
+                                            {filtered.map((num, idx) => (
+                                              <span key={idx} style={{ 
+                                                fontFamily: 'monospace', 
+                                                fontSize: '0.7rem', 
+                                                background: 'rgba(212, 175, 55, 0.1)', 
+                                                color: 'var(--secondary)', 
+                                                border: '1px solid rgba(212, 175, 55, 0.25)', 
+                                                padding: '2px 6px', 
+                                                borderRadius: '4px',
+                                                width: 'fit-content',
+                                                whiteSpace: 'nowrap'
+                                              }}>
+                                                {num}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
+                                  </td>
+                                  <td style={{ padding: '15px' }}>
+                                    <span className="badge badge-done">{isID ? 'Selesai' : 'Completed'}</span>
+                                  </td>
+                                  <td style={{ padding: '15px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.75rem' }}>
+                                      {jo.shipmentStatus && (
+                                        <div>
+                                          <span className={`badge ${jo.shipmentStatus === 'done' ? 'badge-done' : 'badge-dispatched'}`}>
+                                            {jo.shipmentStatus === 'done' ? (isID ? 'Selesai' : 'Done') : (isID ? 'Dalam Proses' : 'In Progress')}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {jo.etd && <div><span style={{ color: 'var(--text-muted)' }}>ETD:</span> {formatDate(jo.etd)}</div>}
+                                      {jo.eta && <div><span style={{ color: 'var(--text-muted)' }}>ETA:</span> {formatDate(jo.eta)}</div>}
+                                      {!jo.shipmentStatus && !jo.etd && !jo.eta && (
+                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>-</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: '15px', textAlign: 'center' }}>
+                                    {jo.photos && jo.photos.length > 0 ? (
+                                      <button 
+                                        onClick={() => setPhotoViewer({ joId: jo.id, photos: jo.photos })}
+                                        style={{ background: 'var(--secondary-bg)', border: '1px solid var(--secondary)', borderRadius: '6px', padding: '5px 10px', color: 'var(--secondary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem' }}
+                                      >
+                                        <Image size={14} /> {jo.photos.length} {isID ? 'Foto' : 'Photos'}
+                                      </button>
+                                    ) : (
+                                      <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{isID ? 'Tidak Ada Foto' : 'No Photos'}</span>
                                     )}
-                                    {jo.etd && <div><span style={{ color: 'var(--text-muted)' }}>ETD:</span> {formatDate(jo.etd)}</div>}
-                                    {jo.eta && <div><span style={{ color: 'var(--text-muted)' }}>ETA:</span> {formatDate(jo.eta)}</div>}
-                                    {!jo.shipmentStatus && !jo.etd && !jo.eta && (
-                                      <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>-</span>
+                                  </td>
+                                  <td style={{ padding: '15px' }}>
+                                    {hasInvoice ? (
+                                      <span style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', fontWeight: '600' }}>
+                                        <CheckCircle size={16} /> {isID ? 'Sudah Di-invoice' : 'Invoiced'} ({joInvoices.length})
+                                      </span>
+                                    ) : (
+                                      <span style={{ color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', fontWeight: '600' }}>
+                                        {isID ? 'Siap Ditagih' : 'Ready to Invoice'}
+                                      </span>
                                     )}
-                                  </div>
-                                </td>
-                                <td style={{ padding: '15px', textAlign: 'center' }}>
-                                  {jo.photos && jo.photos.length > 0 ? (
-                                    <button 
-                                      onClick={() => setPhotoViewer({ joId: jo.id, photos: jo.photos })}
-                                      style={{ background: 'var(--secondary-bg)', border: '1px solid var(--secondary)', borderRadius: '6px', padding: '5px 10px', color: 'var(--secondary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem' }}
-                                    >
-                                      <Image size={14} /> {jo.photos.length} {isID ? 'Foto' : 'Photos'}
-                                    </button>
-                                  ) : (
-                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{isID ? 'Tidak Ada Foto' : 'No Photos'}</span>
-                                  )}
-                                </td>
-                                <td style={{ padding: '15px' }}>
-                                  {hasInvoice ? (
-                                    <span style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', fontWeight: '600' }}>
-                                      <CheckCircle size={16} /> {isID ? 'Sudah Di-invoice' : 'Invoiced'}
-                                    </span>
-                                  ) : (
-                                    <span style={{ color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', fontWeight: '600' }}>
-                                      {isID ? 'Siap Ditagih' : 'Ready to Invoice'}
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
+                                  </td>
+                                </tr>
+
+                                {/* Collapsible Nested Invoice Row */}
+                                {hasInvoice && (
+                                  <tr style={{ background: 'rgba(212, 175, 55, 0.02)', borderBottom: '1px solid var(--glass-border)' }}>
+                                    <td colSpan="6" style={{ padding: '10px 15px 15px 50px' }}>
+                                      <div style={{ fontSize: '0.72rem', color: 'var(--secondary)', fontWeight: '800', marginBottom: '8px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                                        {isID ? 'Invoice Terkait:' : 'Associated Invoices:'}
+                                      </div>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {joInvoices.map(inv => (
+                                          <div key={inv.id} style={{ 
+                                            display: 'flex', 
+                                            flexWrap: 'wrap', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'space-between', 
+                                            background: 'rgba(255,255,255,0.02)', 
+                                            border: '1px solid var(--glass-border)', 
+                                            borderRadius: '8px', 
+                                            padding: '10px 15px',
+                                            gap: '15px'
+                                          }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                              <div>
+                                                <div style={{ fontWeight: '800', color: 'var(--secondary)', fontSize: '0.85rem' }}>{inv.id}</div>
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                                  {isID ? 'Tanggal:' : 'Date:'} {inv.date || '-'} | {isID ? 'Total:' : 'Total:'} <span style={{ color: 'var(--secondary)', fontWeight: '700' }}>Rp {parseFloat(inv.amount || inv.subtotal || 0).toLocaleString()}</span>
+                                                </div>
+                                              </div>
+                                              <span className={`badge badge-${inv.status}`} style={{ fontSize: '0.65rem' }}>{inv.status}</span>
+                                            </div>
+                                            
+                                            {/* Upload Photos & Delivery Status */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                  {inv.signedInvoicePhoto ? (
+                                                    <button onClick={() => setPhotoViewer({ title: `Signed Invoice - ${inv.id}`, photos: [inv.signedInvoicePhoto] })} style={{ background:'none', border:'none', color:'#10b981', cursor:'pointer' }} title={isID ? 'Invoice TTD Diunggah' : 'Signed Invoice Uploaded'}><ShieldCheck size={16}/></button>
+                                                  ) : (
+                                                    <button onClick={() => setUploadSignedModal({ invId: inv.id, type: 'invoice' })} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }} title={isID ? 'Unggah Invoice TTD' : 'Upload Signed Invoice'}><Image size={16}/></button>
+                                                  )}
+                                                  {inv.signedReceiptPhoto ? (
+                                                    <button onClick={() => setPhotoViewer({ title: `Signed Delivery Receipt - ${inv.id}`, photos: [inv.signedReceiptPhoto] })} style={{ background:'none', border:'none', color:'#3b82f6', cursor:'pointer' }} title={isID ? 'STT TTD Diunggah' : 'Signed STT Uploaded'}><ShieldCheck size={16}/></button>
+                                                  ) : (
+                                                    <button onClick={() => setUploadSignedModal({ invId: inv.id, type: 'receipt' })} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }} title={isID ? 'Unggah STT TTD' : 'Upload Signed STT'}><FileText size={16}/></button>
+                                                  )}
+                                                </div>
+                                                <span style={{ fontSize:'0.6rem', color:'var(--text-muted)' }}>
+                                                  {isID ? 'Dok TTD' : 'Signed Docs'}
+                                                </span>
+                                              </div>
+
+                                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                <select 
+                                                  value={inv.deliveryStatus || 'not_sent'} 
+                                                  onChange={(e) => updateInvoice(inv.id, { deliveryStatus: e.target.value })}
+                                                  style={{ background:'var(--input-bg)', border:'1px solid var(--glass-border)', color:'var(--text)', fontSize:'0.7rem', padding:'2px 4px', borderRadius:'4px' }}
+                                                >
+                                                  <option value="not_sent" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{isID ? 'Belum Kirim' : 'Not Sent'}</option>
+                                                  <option value="on_process" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{isID ? 'Proses Kirim' : 'On Process'}</option>
+                                                  <option value="delivered" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{isID ? 'Diterima' : 'Delivered'}</option>
+                                                </select>
+                                                <span style={{ fontSize:'0.6rem', color:'var(--text-muted)', textAlign: 'center' }}>
+                                                  {isID ? 'Pengiriman' : 'Delivery'}
+                                                </span>
+                                              </div>
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div style={{ display: 'flex', gap: '6px' }}>
+                                              <button className="btn btn-primary" style={{ padding: '4px 8px', fontSize: '0.7rem', gap: '4px' }} onClick={() => handleDownloadInvoice(inv)}>
+                                                <Download size={12} /> {isID ? 'Lihat' : 'View'}
+                                              </button>
+                                              <button className="btn" style={{ padding: '4px 8px', fontSize: '0.7rem', gap: '4px', background: 'rgba(16, 185, 129, 0.75)', color: '#ffffff', border: '1px solid rgba(16, 185, 129, 0.8)' }} onClick={() => setEditingInvoice(inv)}>
+                                                <Edit3 size={12} /> Edit
+                                              </button>
+                                              <button className="btn" style={{ padding: '4px 8px', fontSize: '0.7rem', gap: '4px', background: 'rgba(59, 130, 246, 0.75)', color: '#ffffff', border: '1px solid rgba(59, 130, 246, 0.8)' }} onClick={() => {
+                                                const linkedJO = jobOrders.find(j => String(j.id) === String(inv.joId));
+                                                const linkedQuo = linkedJO ? quotations.find(q => String(q.id) === String(linkedJO.quotationId)) : null;
+                                                const consolidatedJOs = inv.consolidatedJOs ? jobOrders.filter(j => inv.consolidatedJOs.includes(j.id)) : linkedJO ? [linkedJO] : [];
+                                                localStorage.setItem('print_invoice_data_' + inv.id, JSON.stringify({ invoice: inv, jo: linkedJO, consolidatedJOs, quotation: linkedQuo }));
+                                                window.open('/print/invoice-delivery?id=' + inv.id, '_blank');
+                                              }}>
+                                                <FileText size={12} /> STT
+                                              </button>
+                                              <button className="btn" style={{ padding: '4px 8px', fontSize: '0.7rem', gap: '4px', background: 'rgba(212, 175, 55, 0.75)', color: '#030712', border: '1px solid var(--secondary)' }} onClick={() => {
+                                                const linkedJO = jobOrders.find(j => String(j.id) === String(inv.joId));
+                                                const allAtts = [
+                                                  ...(linkedJO?.photos || []),
+                                                  inv.signedInvoicePhoto,
+                                                  inv.signedReceiptPhoto,
+                                                  ...(Array.isArray(inv.paymentProofPhoto) ? inv.paymentProofPhoto : (inv.paymentProofPhoto ? [inv.paymentProofPhoto] : [])),
+                                                  ...(Array.isArray(inv.tax_deduction_proof) ? inv.tax_deduction_proof : (inv.tax_deduction_proof ? [inv.tax_deduction_proof] : []))
+                                                ].filter(Boolean);
+                                                if (allAtts.length > 0) {
+                                                  setPhotoViewer({ title: `Attachments - ${inv.id}`, photos: allAtts });
+                                                } else {
+                                                  alert(isID ? "Tidak ada lampiran." : "No attachments.");
+                                                }
+                                              }}>
+                                                <Image size={12} /> Ops
+                                              </button>
+                                              <button className="btn" style={{ padding: '4px 8px', fontSize: '0.7rem', gap: '4px', background: 'rgba(239, 68, 68, 0.75)', color: '#ffffff', border: '1px solid rgba(239, 68, 68, 0.8)' }} onClick={() => {
+                                                setDeleteConfirmModal(inv);
+                                                setVerifyStep(1);
+                                                setVerifyText('');
+                                                setOtpInput('');
+                                              }}>
+                                                <Trash2 size={12} /> {isID ? 'Hapus' : 'Delete'}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
                             );
                           })}
                         </React.Fragment>
@@ -3549,7 +4425,35 @@ const Accounting = () => {
                       </td>
                       <td style={{ padding: '15px' }}>
                         <div style={{ fontWeight: '800', color: 'var(--secondary)' }}>{inv.id}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>JO: {(() => { const ass = getAssociatedJOs(inv); return ass.length > 0 ? ass.map(j => j.id).join(', ') : inv.joId; })()}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                          <span>JO:</span>
+                          {(() => {
+                            const ass = getAssociatedJOs(inv);
+                            if (ass.length === 0) return <span>{inv.joId}</span>;
+                            return ass.map((j, i) => {
+                              const isLegacy = !j.items || j.items.length === 0;
+                              return (
+                                <span key={j.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  <strong>{j.id}</strong>
+                                  {isLegacy && (
+                                    <span style={{ 
+                                      fontSize: '0.65rem', 
+                                      background: 'rgba(239, 68, 68, 0.1)', 
+                                      color: '#ef4444', 
+                                      border: '1px solid rgba(239, 68, 68, 0.25)', 
+                                      padding: '1px 4px', 
+                                      borderRadius: '4px',
+                                      fontWeight: '600'
+                                    }} title={isID ? "Job Order belum dikonversi ke format baru!" : "Job Order not converted to new format!"}>
+                                      ⚠️ Legacy
+                                    </span>
+                                  )}
+                                  {i < ass.length - 1 && <span style={{ color: 'var(--text-muted)' }}>,</span>}
+                                </span>
+                              );
+                            });
+                          })()}
+                        </div>
                       </td>
                       <td style={{ padding: '15px' }}>
                         {(() => {

@@ -214,24 +214,46 @@ const Executor = () => {
         return isNaN(parsed) ? 0 : parsed;
       };
 
-      const items = targetJOs.map(targetJo => {
-        let quoItems = [];
-        const quo = targetJo.quotationId
-          ? quotations.find(q => String(q.id) === String(targetJo.quotationId))
-          : null;
-        if (quo && quo.items) {
-          try { quoItems = typeof quo.items === 'string' ? JSON.parse(quo.items) : quo.items; } catch(e) { quoItems = []; }
+      const items = [];
+      targetJOs.forEach(targetJo => {
+        if (Array.isArray(targetJo.items) && targetJo.items.length > 0) {
+          // Filter to items that are either done, dispatched or primary JO
+          const activeItems = targetJo.items.filter(item => item.status === 'done' || item.status === 'dispatched' || String(targetJo.id) === String(joId));
+          activeItems.forEach(item => {
+            const qty = cleanNum(item.issueQuantity || item.quantity || 1);
+            const rate = cleanNum(item.rate);
+            items.push({
+              description: item.description || 'Freight Forwarding Services',
+              qty,
+              rate,
+              containerNo: item.containerNo,
+              vehicleNo: item.vehicleNo,
+              driverName: item.driverName,
+            });
+          });
+        } else {
+          // Fallback to legacy single-item Job Order mapping
+          let quoItems = [];
+          const quo = targetJo.quotationId
+            ? quotations.find(q => String(q.id) === String(targetJo.quotationId))
+            : null;
+          if (quo && quo.items) {
+            try { quoItems = typeof quo.items === 'string' ? JSON.parse(quo.items) : quo.items; } catch(e) { quoItems = []; }
+          }
+          if (!Array.isArray(quoItems)) quoItems = [];
+          const targetDesc = (targetJo.instruction || targetJo.jobDescription || '').trim().toLowerCase();
+          const matchedItem = quoItems.find(i => (i.description || '').trim().toLowerCase() === targetDesc);
+          const rate = matchedItem ? cleanNum(matchedItem.rate) : cleanNum(targetJo.rate);
+          const qty = cleanNum(targetJo.issueQuantity || targetJo.quantity || 1);
+          items.push({
+            description: targetJo.instruction || targetJo.jobDescription || 'Freight Forwarding Services',
+            qty,
+            rate,
+            containerNo: targetJo.containerNo,
+            vehicleNo: targetJo.vehicleNo,
+            driverName: targetJo.driverName,
+          });
         }
-        if (!Array.isArray(quoItems)) quoItems = [];
-        const targetDesc = (targetJo.instruction || targetJo.jobDescription || '').trim().toLowerCase();
-        const matchedItem = quoItems.find(i => (i.description || '').trim().toLowerCase() === targetDesc);
-        const rate = matchedItem ? cleanNum(matchedItem.rate) : cleanNum(targetJo.rate);
-        const qty = cleanNum(targetJo.issueQuantity || targetJo.quantity || 1);
-        return {
-          description: targetJo.instruction || targetJo.jobDescription || 'Freight Forwarding Services',
-          qty,
-          rate,
-        };
       });
 
       const newInvoiceId = `INV-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
@@ -270,15 +292,31 @@ const Executor = () => {
     try {
       const bank = companyBankAccounts.find(b => b.id === f.bankAccountId) || invoiceConfirmData.bankAccount;
 
-      const allLines = [...(f.items || []), ...(f.extraCharges || [])];
       let subtotal = 0;
-      const extra_charges = allLines.map(line => {
+      const items = (f.items || []).map(line => {
+        const qty = parseFloat(line.qty) || 1;
+        const rate = parseFloat(line.rate) || 0;
+        const amount = qty * rate;
+        subtotal += amount;
+        return { 
+          description: line.description, 
+          qty, 
+          rate, 
+          amount,
+          containerNo: line.containerNo,
+          vehicleNo: line.vehicleNo,
+          driverName: line.driverName,
+        };
+      });
+
+      const extra_charges = (f.extraCharges || []).map(line => {
         const qty = parseFloat(line.qty) || 1;
         const rate = parseFloat(line.rate) || 0;
         const amount = qty * rate;
         subtotal += amount;
         return { description: line.description, qty, rate, amount };
       });
+
       const tax = subtotal * ((parseFloat(f.taxPercent) || 0) / 100);
       const grandTotal = subtotal + tax;
 
@@ -295,6 +333,7 @@ const Executor = () => {
         amount: grandTotal,
         subtotal,
         tax,
+        items,
         extra_charges,
         notes: f.notes || null,
       };
@@ -520,6 +559,59 @@ const Executor = () => {
     });
   };
 
+  const handleLocalItemListItemUpdate = (joId, itemIdx, field, index, value) => {
+    setLocalData(prev => {
+      const items = [...(prev[joId]?.items || [])];
+      const item = { ...items[itemIdx] };
+      const current = item[field] || [];
+      const updated = [...current];
+      updated[index] = value;
+      item[field] = updated;
+      items[itemIdx] = item;
+      return {
+        ...prev,
+        [joId]: {
+          ...(prev[joId] || {}),
+          items
+        }
+      };
+    });
+  };
+
+  const addLocalItemListItem = (joId, itemIdx, field) => {
+    setLocalData(prev => {
+      const items = [...(prev[joId]?.items || [])];
+      const item = { ...items[itemIdx] };
+      const current = item[field] || [''];
+      item[field] = [...current, ''];
+      items[itemIdx] = item;
+      return {
+        ...prev,
+        [joId]: {
+          ...(prev[joId] || {}),
+          items
+        }
+      };
+    });
+  };
+
+  const removeLocalItemListItem = (joId, itemIdx, field, index) => {
+    setLocalData(prev => {
+      const items = [...(prev[joId]?.items || [])];
+      const item = { ...items[itemIdx] };
+      const current = item[field] || [];
+      item[field] = current.filter((_, i) => i !== index);
+      items[itemIdx] = item;
+      return {
+        ...prev,
+        [joId]: {
+          ...(prev[joId] || {}),
+          items
+        }
+      };
+    });
+  };
+
   const toggleRow = (jo) => {
     if (uploadingForId === jo.id) {
       setUploadingForId(null);
@@ -532,6 +624,12 @@ const Executor = () => {
           containerNo: Array.isArray(jo.containerNo) && jo.containerNo.length > 0 ? [...jo.containerNo] : [jo.containerNo || ''],
           vehicleNo: Array.isArray(jo.vehicleNo) && jo.vehicleNo.length > 0 ? [...jo.vehicleNo] : [jo.vehicleNo || ''],
           driverName: Array.isArray(jo.driverName) && jo.driverName.length > 0 ? [...jo.driverName] : [jo.driverName || ''],
+          items: Array.isArray(jo.items) ? jo.items.map(item => ({
+            ...item,
+            containerNo: Array.isArray(item.containerNo) && item.containerNo.length > 0 ? [...item.containerNo] : [item.containerNo || ''],
+            vehicleNo: Array.isArray(item.vehicleNo) && item.vehicleNo.length > 0 ? [...item.vehicleNo] : [item.vehicleNo || ''],
+            driverName: Array.isArray(item.driverName) && item.driverName.length > 0 ? [...item.driverName] : [item.driverName || ''],
+          })) : [],
           activityStatus: jo.activityStatus || '',
           vesselName: jo.vesselName || '',
           dispatchedAtLocal: toDatetimeLocal(jo.dispatchedAt),
@@ -584,6 +682,12 @@ const Executor = () => {
       containerNo: jo.containerNo,
       vehicleNo: jo.vehicleNo,
       driverName: jo.driverName,
+      items: Array.isArray(jo.items) ? jo.items.map(item => ({
+        ...item,
+        containerNo: Array.isArray(item.containerNo) && item.containerNo.length > 0 ? [...item.containerNo] : [item.containerNo || ''],
+        vehicleNo: Array.isArray(item.vehicleNo) && item.vehicleNo.length > 0 ? [...item.vehicleNo] : [item.vehicleNo || ''],
+        driverName: Array.isArray(item.driverName) && item.driverName.length > 0 ? [...item.driverName] : [item.driverName || ''],
+      })) : [],
       activityStatus: jo.activityStatus,
       vesselName: jo.vesselName,
       dispatchedAtLocal: toDatetimeLocal(jo.dispatchedAt),
@@ -595,15 +699,53 @@ const Executor = () => {
     data.completedAt = toISOString(data.completedAtLocal);
     delete data.dispatchedAtLocal;
     delete data.completedAtLocal;
-    
-    // Basic validation for required fields
-    const hasContainer = Array.isArray(data.containerNo) ? data.containerNo.some(c => c && c.trim()) : (data.containerNo && data.containerNo.trim());
-    const hasVehicle = Array.isArray(data.vehicleNo) ? data.vehicleNo.some(v => v && v.trim()) : (data.vehicleNo && data.vehicleNo.trim());
-    const hasDriver = Array.isArray(data.driverName) ? data.driverName.some(d => d && d.trim()) : (data.driverName && data.driverName.trim());
 
-    if (!hasContainer || !hasVehicle || !hasDriver || !data.activityStatus) {
-      toast.error(isID ? 'Semua data wajib diisi: Container, Vehicle, Driver, dan Activity Status!' : 'All fields are required: Container, Vehicle, Driver, and Activity Status!');
+    if (!data.activityStatus) {
+      toast.error(isID ? 'Status Aktivitas wajib diisi!' : 'Activity Status is required!');
       return;
+    }
+
+    const hasItems = Array.isArray(jo.items) && jo.items.length > 0;
+    let updatedItems = data.items || [];
+
+    if (hasItems) {
+      // Validate that all dispatched items have containers, vehicles, drivers
+      const activeItems = updatedItems.filter(item => item.status === 'dispatched' || item.status === 'done');
+      for (const item of activeItems) {
+        const itemHasContainer = Array.isArray(item.containerNo) ? item.containerNo.some(c => c && c.trim()) : (item.containerNo && item.containerNo.trim());
+        const itemHasVehicle = Array.isArray(item.vehicleNo) ? item.vehicleNo.some(v => v && v.trim()) : (item.vehicleNo && item.vehicleNo.trim());
+        const itemHasDriver = Array.isArray(item.driverName) ? item.driverName.some(d => d && d.trim()) : (item.driverName && item.driverName.trim());
+        if (!itemHasContainer || !itemHasVehicle || !itemHasDriver) {
+          toast.error(isID 
+            ? `Item "${item.description}" wajib diisi: Container, Vehicle, dan Driver!` 
+            : `Item "${item.description}" is required to have Container, Vehicle, and Driver!`
+          );
+          return;
+        }
+      }
+
+      updatedItems = updatedItems.map(item => {
+        if (item.status === 'dispatched') {
+          return { ...item, status: 'done' };
+        }
+        return item;
+      });
+      data.items = updatedItems;
+
+      // Concatenate all to root level for backward compatibility
+      data.containerNo = [...new Set(updatedItems.flatMap(item => Array.isArray(item.containerNo) ? item.containerNo : [item.containerNo || '']))].filter(Boolean);
+      data.vehicleNo = [...new Set(updatedItems.flatMap(item => Array.isArray(item.vehicleNo) ? item.vehicleNo : [item.vehicleNo || '']))].filter(Boolean);
+      data.driverName = [...new Set(updatedItems.flatMap(item => Array.isArray(item.driverName) ? item.driverName : [item.driverName || '']))].filter(Boolean);
+    } else {
+      // Legacy JO validation
+      const hasContainer = Array.isArray(data.containerNo) ? data.containerNo.some(c => c && c.trim()) : (data.containerNo && data.containerNo.trim());
+      const hasVehicle = Array.isArray(data.vehicleNo) ? data.vehicleNo.some(v => v && v.trim()) : (data.vehicleNo && data.vehicleNo.trim());
+      const hasDriver = Array.isArray(data.driverName) ? data.driverName.some(d => d && d.trim()) : (data.driverName && data.driverName.trim());
+
+      if (!hasContainer || !hasVehicle || !hasDriver) {
+        toast.error(isID ? 'Semua data wajib diisi: Container, Vehicle, dan Driver!' : 'All fields are required: Container, Vehicle, and Driver!');
+        return;
+      }
     }
 
     // Sync to server before completing
@@ -618,6 +760,12 @@ const Executor = () => {
       containerNo: jo.containerNo,
       vehicleNo: jo.vehicleNo,
       driverName: jo.driverName,
+      items: Array.isArray(jo.items) ? jo.items.map(item => ({
+        ...item,
+        containerNo: Array.isArray(item.containerNo) && item.containerNo.length > 0 ? [...item.containerNo] : [item.containerNo || ''],
+        vehicleNo: Array.isArray(item.vehicleNo) && item.vehicleNo.length > 0 ? [...item.vehicleNo] : [item.vehicleNo || ''],
+        driverName: Array.isArray(item.driverName) && item.driverName.length > 0 ? [...item.driverName] : [item.driverName || ''],
+      })) : [],
       activityStatus: jo.activityStatus,
       vesselName: jo.vesselName,
       dispatchedAtLocal: toDatetimeLocal(jo.dispatchedAt),
@@ -630,9 +778,17 @@ const Executor = () => {
     delete data.dispatchedAtLocal;
     delete data.completedAtLocal;
 
+    const hasItems = Array.isArray(jo.items) && jo.items.length > 0;
+    if (hasItems) {
+      const items = data.items || [];
+      data.containerNo = [...new Set(items.flatMap(item => Array.isArray(item.containerNo) ? item.containerNo : [item.containerNo || '']))].filter(Boolean);
+      data.vehicleNo = [...new Set(items.flatMap(item => Array.isArray(item.vehicleNo) ? item.vehicleNo : [item.vehicleNo || '']))].filter(Boolean);
+      data.driverName = [...new Set(items.flatMap(item => Array.isArray(item.driverName) ? item.driverName : [item.driverName || '']))].filter(Boolean);
+    }
+
     try {
       await updateJOStatus(jo.id, data);
-      toast.error(isID ? 'Perubahan berhasil disimpan!' : 'Changes saved successfully!');
+      toast.success(isID ? 'Perubahan berhasil disimpan!' : 'Changes saved successfully!');
     } catch (err) {
       console.error(err);
       toast.error(isID ? 'Gagal menyimpan perubahan.' : 'Failed to save changes.');
@@ -840,6 +996,11 @@ const Executor = () => {
                 const groups = {};
                 completedJOs.forEach(jo => {
                   const qId = jo.quotationId || 'direct';
+                  // If it's a direct job, only include it if it hasn't been invoiced yet!
+                  if (!jo.quotationId) {
+                    const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.includes(jo.id)));
+                    if (hasInvoice) return;
+                  }
                   if (!groups[qId]) {
                     groups[qId] = {
                       quotationId: qId,
@@ -850,7 +1011,20 @@ const Executor = () => {
                   groups[qId].jobOrders.push(jo);
                 });
 
-                if (Object.keys(groups).length === 0) {
+                // Filter out quotation groups where ALL completed job orders have already been invoiced
+                const pendingGroups = Object.values(groups).filter(group => {
+                  if (group.quotationId === 'direct') {
+                    return group.jobOrders.length > 0;
+                  }
+                  // Check if any job order in this quotation group is NOT invoiced yet
+                  const hasUninvoicedJO = group.jobOrders.some(jo => {
+                    const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.includes(jo.id)));
+                    return !hasInvoice;
+                  });
+                  return hasUninvoicedJO;
+                });
+
+                if (pendingGroups.length === 0) {
                   return (
                     <tr>
                       <td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -860,9 +1034,9 @@ const Executor = () => {
                   );
                 }
 
-                return Object.values(groups).map(group => {
+                return pendingGroups.map(group => {
                   const isGroupExpanded = expandedCompletedGroups[group.quotationId] !== false;
-                  const uninvoicedJOs = group.jobOrders.filter(jo => !invoices.some(inv => String(inv.joId) === String(jo.id)));
+                  const uninvoicedJOs = group.jobOrders.filter(jo => !invoices.some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.includes(jo.id))));
                   const allInvoiced = uninvoicedJOs.length === 0;
 
                   return (
@@ -917,13 +1091,95 @@ const Executor = () => {
                             </td>
                             <td style={{ padding: '15px' }}>
                               <div style={{ fontWeight: '600' }}>{jo.customerName}</div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                {jo.instruction || jo.jobDescription}
+                               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                 {Array.isArray(jo.items) && jo.items.length > 0 ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    {jo.items.map((item, idx) => (
+                                      <div key={idx} style={{ marginTop: '4px' }}>
+                                        • {item.description} ({isID ? 'Jumlah:' : 'Qty:'} {item.issueQuantity || item.quantity || 1} | {isID ? 'Tarif:' : 'Rate:'} Rp {parseFloat(item.rate || 0).toLocaleString(isID ? 'id-ID' : 'en-US')}) 
+                                        {item.status && <span style={{ fontSize: '0.65rem', marginLeft: '6px' }} className={`badge badge-${item.status}`}>{item.status}</span>}
+                                        {item.containerNo?.some?.(Boolean) && (
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px', paddingLeft: '10px' }}>
+                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px' }}>
+                                              {isID ? 'Kontainer:' : 'Containers:'}
+                                            </span>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                              {item.containerNo.filter(Boolean).map((num, cIdx) => (
+                                                <span key={cIdx} style={{ 
+                                                  fontFamily: 'monospace', 
+                                                  fontSize: '0.7rem', 
+                                                  background: 'rgba(212, 175, 55, 0.1)', 
+                                                  color: 'var(--secondary)', 
+                                                  border: '1px solid rgba(212, 175, 55, 0.25)', 
+                                                  padding: '1px 5px', 
+                                                  borderRadius: '4px',
+                                                  whiteSpace: 'nowrap'
+                                                }}>
+                                                  {num}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        {item.vehicleNo?.some?.(Boolean) && (
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px', paddingLeft: '10px' }}>
+                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px' }}>
+                                              {isID ? 'Armada:' : 'Vehicles:'}
+                                            </span>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                              {item.vehicleNo.filter(Boolean).map((num, vIdx) => (
+                                                <span key={vIdx} style={{ 
+                                                  fontFamily: 'monospace', 
+                                                  fontSize: '0.7rem', 
+                                                  background: 'rgba(59, 130, 246, 0.1)', 
+                                                  color: '#3b82f6', 
+                                                  border: '1px solid rgba(59, 130, 246, 0.25)', 
+                                                  padding: '1px 5px', 
+                                                  borderRadius: '4px',
+                                                  whiteSpace: 'nowrap'
+                                                }}>
+                                                  {num}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        {item.driverName?.some?.(Boolean) && (
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px', paddingLeft: '10px' }}>
+                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px' }}>
+                                              {isID ? 'Supir:' : 'Drivers:'}
+                                            </span>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                              {item.driverName.filter(Boolean).map((num, dIdx) => (
+                                                <span key={dIdx} style={{ 
+                                                  fontFamily: 'monospace', 
+                                                  fontSize: '0.7rem', 
+                                                  background: 'rgba(16, 185, 129, 0.1)', 
+                                                  color: '#10b981', 
+                                                  border: '1px solid rgba(16, 185, 129, 0.25)', 
+                                                  padding: '1px 5px', 
+                                                  borderRadius: '4px',
+                                                  whiteSpace: 'nowrap'
+                                                }}>
+                                                  {num}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div>{jo.instruction || jo.jobDescription}</div>
+                                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                      {isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}
+                                    </div>
+                                  </>
+                                )}
                               </div>
-                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                {isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}
-                              </div>
-                              {jo.containerNo && (() => {
+                              {(!jo.items || jo.items.length === 0) && jo.containerNo && (() => {
                                 const cNo = jo.containerNo;
                                 let filtered = [];
                                 if (Array.isArray(cNo)) {
@@ -1145,7 +1401,86 @@ const Executor = () => {
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{isID ? 'Jumlah:' : 'Qty:'} {jo.quantity}</div>
                           </td>
                           <td style={{ padding: '15px', fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '250px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
-                            {jo.jobDescription || jo.instruction || '-'}
+                            {Array.isArray(jo.items) && jo.items.length > 0 ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {jo.items.map((item, idx) => (
+                                  <div key={idx} style={{ borderBottom: '1px dashed rgba(255,255,255,0.03)', paddingBottom: '4px', marginTop: '4px' }}>
+                                    • {item.description} ({isID ? 'Jumlah:' : 'Qty:'} {item.issueQuantity || item.quantity || 1})
+                                    {item.containerNo?.some?.(Boolean) && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px', paddingLeft: '8px' }}>
+                                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px' }}>
+                                            {isID ? 'Kontainer:' : 'Containers:'}
+                                          </span>
+                                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                            {item.containerNo.filter(Boolean).map((num, cIdx) => (
+                                              <span key={cIdx} style={{ 
+                                                fontFamily: 'monospace', 
+                                                fontSize: '0.7rem', 
+                                                background: 'rgba(212, 175, 55, 0.1)', 
+                                                color: 'var(--secondary)', 
+                                                border: '1px solid rgba(212, 175, 55, 0.25)', 
+                                                padding: '1px 5px', 
+                                                borderRadius: '4px',
+                                                whiteSpace: 'nowrap'
+                                              }}>
+                                                {num}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {item.vehicleNo?.some?.(Boolean) && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px', paddingLeft: '8px' }}>
+                                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px' }}>
+                                            {isID ? 'Armada:' : 'Vehicles:'}
+                                          </span>
+                                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                            {item.vehicleNo.filter(Boolean).map((num, vIdx) => (
+                                              <span key={vIdx} style={{ 
+                                                fontFamily: 'monospace', 
+                                                fontSize: '0.7rem', 
+                                                background: 'rgba(59, 130, 246, 0.1)', 
+                                                color: '#3b82f6', 
+                                                border: '1px solid rgba(59, 130, 246, 0.25)', 
+                                                padding: '1px 5px', 
+                                                borderRadius: '4px',
+                                                whiteSpace: 'nowrap'
+                                              }}>
+                                                {num}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {item.driverName?.some?.(Boolean) && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px', paddingLeft: '8px' }}>
+                                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px' }}>
+                                            {isID ? 'Supir:' : 'Drivers:'}
+                                          </span>
+                                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                            {item.driverName.filter(Boolean).map((num, dIdx) => (
+                                              <span key={dIdx} style={{ 
+                                                fontFamily: 'monospace', 
+                                                fontSize: '0.7rem', 
+                                                background: 'rgba(16, 185, 129, 0.1)', 
+                                                color: '#10b981', 
+                                                border: '1px solid rgba(16, 185, 129, 0.25)', 
+                                                padding: '1px 5px', 
+                                                borderRadius: '4px',
+                                                whiteSpace: 'nowrap'
+                                              }}>
+                                                {num}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              jo.jobDescription || jo.instruction || '-'
+                            )}
                           </td>
                           <td style={{ padding: '15px' }}>
                             <div style={{ fontSize: '0.85rem' }}>
@@ -1288,68 +1623,149 @@ const Executor = () => {
                                   style={{ overflow: 'hidden', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--secondary)' }}
                                 >
                                   <div className="grid-responsive-2" style={{ padding: '25px' }}>
-                                    <div style={{ display: 'grid', gap: '20px' }}>
-                                      <div className="grid-responsive-3">
-                                        {/* Multi Container */}
-                                        <div className="input-group">
-                                          <label>{isID ? 'Nomor Kontainer' : 'Container Number'} <span style={{ color: 'var(--danger)' }}>*</span></label>
-                                          {(localData[jo.id]?.containerNo || []).map((c, i, arr) => (
-                                            <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
-                                              <input disabled={!canWrite} type="text" value={c} onChange={e => handleLocalListItemUpdate(jo.id, 'containerNo', i, e.target.value)} placeholder="CONT-123456" />
-                                              {arr.length > 1 && canWrite && (
-                                                <button className="btn-icon" onClick={() => removeLocalListItem(jo.id, 'containerNo', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
-                                                  <X size={12} />
-                                                </button>
-                                              )}
-                                              {canWrite && (
-                                                <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'containerNo')} style={{ padding: '5px', height: 'auto', color: 'var(--success)', background: 'var(--success-bg)' }} title={isID ? "Tambah Kontainer" : "Add Container"}>
-                                                  <Plus size={12} />
-                                                </button>
-                                              )}
-                                            </div>
-                                          ))}
+                                    <div style={{ display: 'grid', gap: '25px' }}>
+                                      {Array.isArray(jo.items) && jo.items.length > 0 ? (
+                                        <div style={{ display: 'grid', gap: '25px' }}>
+                                          {jo.items.filter(item => item.status === 'dispatched' || item.status === 'done').map((item, itemIdx) => {
+                                            // Find the index of this item in the original jo.items array (since we filtered)
+                                            const origIdx = jo.items.findIndex(i => i.description === item.description && i.quantity === item.quantity);
+                                            if (origIdx === -1) return null;
+                                            
+                                            const itemLocal = localData[jo.id]?.items?.[origIdx] || { containerNo: [''], vehicleNo: [''], driverName: [''] };
+                                            
+                                            return (
+                                              <div key={origIdx} style={{ padding: '15px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '10px' }}>
+                                                <div style={{ fontWeight: '700', color: 'var(--secondary)', marginBottom: '15px', fontSize: '0.9rem', borderBottom: '1px dashed var(--glass-border)', paddingBottom: '8px' }}>
+                                                  {item.description} ({isID ? 'Jumlah Terkirim:' : 'Dispatched Qty:'} {item.issueQuantity || item.quantity || 1})
+                                                </div>
+                                                <div className="grid-responsive-3">
+                                                  {/* Item Multi Container */}
+                                                  <div className="input-group">
+                                                    <label>{isID ? 'Nomor Kontainer' : 'Container Number'} <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                                    {(itemLocal.containerNo || []).map((c, i, arr) => (
+                                                      <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
+                                                        <input disabled={!canWrite} type="text" value={c} onChange={e => handleLocalItemListItemUpdate(jo.id, origIdx, 'containerNo', i, e.target.value)} placeholder="CONT-123456" />
+                                                        {arr.length > 1 && canWrite && (
+                                                          <button className="btn-icon" onClick={() => removeLocalItemListItem(jo.id, origIdx, 'containerNo', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
+                                                            <X size={12} />
+                                                          </button>
+                                                        )}
+                                                        {canWrite && (
+                                                          <button className="btn-icon" onClick={() => addLocalItemListItem(jo.id, origIdx, 'containerNo')} style={{ padding: '5px', height: 'auto', color: 'var(--success)', background: 'var(--success-bg)' }} title={isID ? "Tambah Kontainer" : "Add Container"}>
+                                                            <Plus size={12} />
+                                                          </button>
+                                                        )}
+                                                      </div>
+                                                    ))}
+                                                  </div>
+
+                                                  {/* Item Multi Vehicle */}
+                                                  <div className="input-group">
+                                                    <label>{isID ? 'Nomor Kendaraan' : 'Vehicle Number'} <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                                    {(itemLocal.vehicleNo || []).map((v, i, arr) => (
+                                                      <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
+                                                        <input disabled={!canWrite} type="text" value={v} onChange={e => handleLocalItemListItemUpdate(jo.id, origIdx, 'vehicleNo', i, e.target.value)} placeholder="B 1234 ABC" />
+                                                        {arr.length > 1 && canWrite && (
+                                                          <button className="btn-icon" onClick={() => removeLocalItemListItem(jo.id, origIdx, 'vehicleNo', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
+                                                            <X size={12} />
+                                                          </button>
+                                                        )}
+                                                        {canWrite && (
+                                                          <button className="btn-icon" onClick={() => addLocalItemListItem(jo.id, origIdx, 'vehicleNo')} style={{ padding: '5px', height: 'auto', color: 'var(--success)', background: 'var(--success-bg)' }} title={isID ? "Tambah Kendaraan" : "Add Vehicle"}>
+                                                            <Plus size={12} />
+                                                          </button>
+                                                        )}
+                                                      </div>
+                                                    ))}
+                                                  </div>
+
+                                                  {/* Item Multi Driver */}
+                                                  <div className="input-group">
+                                                    <label>{isID ? 'Nama Sopir' : 'Driver Name'} <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                                    {(itemLocal.driverName || []).map((d, i, arr) => (
+                                                      <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
+                                                        <input disabled={!canWrite} type="text" value={d} onChange={e => handleLocalItemListItemUpdate(jo.id, origIdx, 'driverName', i, e.target.value)} placeholder={isID ? "Nama Sopir" : "Driver Name"} />
+                                                        {arr.length > 1 && canWrite && (
+                                                          <button className="btn-icon" onClick={() => removeLocalItemListItem(jo.id, origIdx, 'driverName', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
+                                                            <X size={12} />
+                                                          </button>
+                                                        )}
+                                                        {canWrite && (
+                                                          <button className="btn-icon" onClick={() => addLocalItemListItem(jo.id, origIdx, 'driverName')} style={{ padding: '5px', height: 'auto', color: 'var(--success)', background: 'var(--success-bg)' }} title={isID ? "Tambah Sopir" : "Add Driver"}>
+                                                            <Plus size={12} />
+                                                          </button>
+                                                        )}
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
                                         </div>
-                                        
-                                        {/* Multi Vehicle */}
-                                        <div className="input-group">
-                                          <label>{isID ? 'Nomor Kendaraan' : 'Vehicle Number'} <span style={{ color: 'var(--danger)' }}>*</span></label>
-                                          {(localData[jo.id]?.vehicleNo || []).map((v, i, arr) => (
-                                            <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
-                                              <input disabled={!canWrite} type="text" value={v} onChange={e => handleLocalListItemUpdate(jo.id, 'vehicleNo', i, e.target.value)} placeholder="B 1234 ABC" />
-                                              {arr.length > 1 && canWrite && (
-                                                <button className="btn-icon" onClick={() => removeLocalListItem(jo.id, 'vehicleNo', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
-                                                  <X size={12} />
-                                                </button>
-                                              )}
-                                              {canWrite && (
-                                                <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'vehicleNo')} style={{ padding: '5px', height: 'auto', color: 'var(--success)', background: 'var(--success-bg)' }} title={isID ? "Tambah Kendaraan" : "Add Vehicle"}>
-                                                  <Plus size={12} />
-                                                </button>
-                                              )}
-                                            </div>
-                                          ))}
+                                      ) : (
+                                        <div className="grid-responsive-3">
+                                          {/* Multi Container */}
+                                          <div className="input-group">
+                                            <label>{isID ? 'Nomor Kontainer' : 'Container Number'} <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                            {(localData[jo.id]?.containerNo || []).map((c, i, arr) => (
+                                              <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
+                                                <input disabled={!canWrite} type="text" value={c} onChange={e => handleLocalListItemUpdate(jo.id, 'containerNo', i, e.target.value)} placeholder="CONT-123456" />
+                                                {arr.length > 1 && canWrite && (
+                                                  <button className="btn-icon" onClick={() => removeLocalListItem(jo.id, 'containerNo', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
+                                                    <X size={12} />
+                                                  </button>
+                                                )}
+                                                {canWrite && (
+                                                  <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'containerNo')} style={{ padding: '5px', height: 'auto', color: 'var(--success)', background: 'var(--success-bg)' }} title={isID ? "Tambah Kontainer" : "Add Container"}>
+                                                    <Plus size={12} />
+                                                  </button>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
+                                          
+                                          {/* Multi Vehicle */}
+                                          <div className="input-group">
+                                            <label>{isID ? 'Nomor Kendaraan' : 'Vehicle Number'} <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                            {(localData[jo.id]?.vehicleNo || []).map((v, i, arr) => (
+                                              <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
+                                                <input disabled={!canWrite} type="text" value={v} onChange={e => handleLocalListItemUpdate(jo.id, 'vehicleNo', i, e.target.value)} placeholder="B 1234 ABC" />
+                                                {arr.length > 1 && canWrite && (
+                                                  <button className="btn-icon" onClick={() => removeLocalListItem(jo.id, 'vehicleNo', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
+                                                    <X size={12} />
+                                                  </button>
+                                                )}
+                                                {canWrite && (
+                                                  <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'vehicleNo')} style={{ padding: '5px', height: 'auto', color: 'var(--success)', background: 'var(--success-bg)' }} title={isID ? "Tambah Kendaraan" : "Add Vehicle"}>
+                                                    <Plus size={12} />
+                                                  </button>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
+                                          
+                                          {/* Multi Driver */}
+                                          <div className="input-group">
+                                            <label>{isID ? 'Nama Sopir' : 'Driver Name'} <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                            {(localData[jo.id]?.driverName || []).map((d, i, arr) => (
+                                              <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
+                                                <input disabled={!canWrite} type="text" value={d} onChange={e => handleLocalListItemUpdate(jo.id, 'driverName', i, e.target.value)} placeholder={isID ? "Nama Sopir" : "Driver Name"} />
+                                                {arr.length > 1 && canWrite && (
+                                                  <button className="btn-icon" onClick={() => removeLocalListItem(jo.id, 'driverName', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
+                                                    <X size={12} />
+                                                  </button>
+                                                )}
+                                                {canWrite && (
+                                                  <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'driverName')} style={{ padding: '5px', height: 'auto', color: 'var(--success)', background: 'var(--success-bg)' }} title={isID ? "Tambah Sopir" : "Add Driver"}>
+                                                    <Plus size={12} />
+                                                  </button>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
                                         </div>
-                                        
-                                        {/* Multi Driver */}
-                                        <div className="input-group">
-                                          <label>{isID ? 'Nama Sopir' : 'Driver Name'} <span style={{ color: 'var(--danger)' }}>*</span></label>
-                                          {(localData[jo.id]?.driverName || []).map((d, i, arr) => (
-                                            <div key={i} style={{ display: 'flex', gap: '5px', marginBottom: '5px' }}>
-                                              <input disabled={!canWrite} type="text" value={d} onChange={e => handleLocalListItemUpdate(jo.id, 'driverName', i, e.target.value)} placeholder={isID ? "Nama Sopir" : "Driver Name"} />
-                                              {arr.length > 1 && canWrite && (
-                                                <button className="btn-icon" onClick={() => removeLocalListItem(jo.id, 'driverName', i)} style={{ padding: '5px', height: 'auto', opacity: 0.5 }} title={isID ? "Hapus" : "Delete"}>
-                                                  <X size={12} />
-                                                </button>
-                                              )}
-                                              {canWrite && (
-                                                <button className="btn-icon" onClick={() => addLocalListItem(jo.id, 'driverName')} style={{ padding: '5px', height: 'auto', color: 'var(--success)', background: 'var(--success-bg)' }} title={isID ? "Tambah Sopir" : "Add Driver"}>
-                                                  <Plus size={12} />
-                                                </button>
-                                              )}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
+                                      )}
                                       <div className="input-group">
                                         <label>{isID ? 'Status Aktivitas' : 'Activity Status'} <span style={{ color: 'var(--danger)' }}>*</span></label>
                                         <input 
@@ -1413,7 +1829,27 @@ const Executor = () => {
                                       </div>
                                       
                                       <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', border: '1px solid var(--glass-border)', padding: '12px', borderRadius: '8px' }}>
-                                        <strong style={{ color: 'var(--text)' }}>{isID ? 'Instruksi Lengkap:' : 'Full Instruction:'}</strong> {jo.jobDescription || jo.instruction || '-'}
+                                        {Array.isArray(jo.items) && jo.items.length > 0 ? (
+                                          <div>
+                                            <strong style={{ color: 'var(--text)', display: 'block', marginBottom: '8px' }}>
+                                              {isID ? 'Daftar Aktivitas:' : 'Activities List:'}
+                                            </strong>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                              {jo.items.map((item, idx) => (
+                                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed rgba(255,255,255,0.05)', paddingBottom: '4px' }}>
+                                                  <span>• {item.description}</span>
+                                                  <span style={{ fontWeight: '700', color: 'var(--secondary)' }}>
+                                                    {isID ? 'Jumlah:' : 'Qty:'} {item.issueQuantity || item.quantity || 1}
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <>
+                                            <strong style={{ color: 'var(--text)' }}>{isID ? 'Instruksi Lengkap:' : 'Full Instruction:'}</strong> {jo.jobDescription || jo.instruction || '-'}
+                                          </>
+                                        )}
                                       </div>
                                       
                                       {canWrite && (

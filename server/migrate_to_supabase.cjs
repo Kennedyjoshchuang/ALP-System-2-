@@ -19,7 +19,7 @@ const tablesToMigrate = [
   { name: 'prospects', jsonCols: ['customData'] },
   { name: 'prospect_drafts' },
   { name: 'quotations', jsonCols: ['items'] },
-  { name: 'job_orders', jsonCols: ['photos', 'costs'] },
+  { name: 'job_orders', jsonCols: ['photos', 'costs', 'items'] },
   { name: 'invoices', jsonCols: ['extra_charges'] },
   { name: 'receivables', jsonCols: ['extra_charges'] },
   { name: 'vendors', jsonCols: ['services', 'assets'] },

@@ -34,8 +34,23 @@ const PrintInvoice = () => {
   );
 
   const { invoice, jo, consolidatedJOs, quotation, bankAccount } = data;
-  const extraCharges = Array.isArray(invoice?.extra_charges) ? invoice.extra_charges : [];
   const targetJOs = Array.isArray(consolidatedJOs) && consolidatedJOs.length > 0 ? consolidatedJOs : (jo ? [jo] : []);
+  let extraCharges = Array.isArray(invoice?.extra_charges) ? invoice.extra_charges : [];
+
+  // Deduplication safeguard for legacy invoices created before the multi-item refactoring
+  if ((!invoice?.items || invoice.items.length === 0) && extraCharges.length > 0) {
+    const fallbackItemsTotal = targetJOs.reduce((sum, j) => {
+      if (Array.isArray(j.items) && j.items.length > 0) {
+        return sum + j.items.reduce((s, it) => s + (parseFloat(it.rate || 0) * parseFloat(it.issueQuantity || it.quantity || 1)), 0);
+      } else {
+        return sum + (parseFloat(j.rate || 0) * parseFloat(j.issueQuantity || j.quantity || 1));
+      }
+    }, 0);
+    const ecTotal = extraCharges.reduce((sum, ec) => sum + parseFloat(ec.amount || ec.rate * ec.qty || 0), 0);
+    if (fallbackItemsTotal > 0 && Math.abs(fallbackItemsTotal - ecTotal) < 0.1) {
+      extraCharges = [];
+    }
+  }
   const photos = targetJOs.reduce((acc, currJo) => acc.concat(Array.isArray(currJo.photos) ? currJo.photos : []), []);
 
   const fmtDate = (d) => {
@@ -213,11 +228,17 @@ const PrintInvoice = () => {
               invoice.items.map((item, idx) => (
                 <tr key={`inv-item-${idx}`} style={{ borderBottom: '1px solid #e2e8f0' }}>
                   <td style={{ padding: '15px 14px' }}>
-                    <div style={{ fontWeight: '800', fontSize: '1rem' }}>{getItemTitle(item, idx)}</div>
-                    {targetJOs[idx] && (
+                    <div style={{ fontWeight: '800', fontSize: '1rem' }}>{item.description || 'Logistics Service'}</div>
+                    {((item.containerNo && (Array.isArray(item.containerNo) ? item.containerNo.some?.(Boolean) || item.containerNo.length > 0 : item.containerNo)) ||
+                      (item.vehicleNo && (Array.isArray(item.vehicleNo) ? item.vehicleNo.some?.(Boolean) || item.vehicleNo.length > 0 : item.vehicleNo))) && (
                       <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px', fontWeight: '600' }}>
-                        {targetJOs[idx].containerNo && (Array.isArray(targetJOs[idx].containerNo) ? targetJOs[idx].containerNo.length > 0 : targetJOs[idx].containerNo) && `Container: ${Array.isArray(targetJOs[idx].containerNo) ? targetJOs[idx].containerNo.join(', ') : targetJOs[idx].containerNo}`}
-                        {targetJOs[idx].vehicleNo && (Array.isArray(targetJOs[idx].vehicleNo) ? targetJOs[idx].vehicleNo.length > 0 : targetJOs[idx].vehicleNo) && ` | Vehicle: ${Array.isArray(targetJOs[idx].vehicleNo) ? targetJOs[idx].vehicleNo.join(', ') : targetJOs[idx].vehicleNo}`}
+                        {item.containerNo && (Array.isArray(item.containerNo) ? item.containerNo.some(Boolean) : item.containerNo) && `Container: ${Array.isArray(item.containerNo) ? item.containerNo.filter(Boolean).join(', ') : item.containerNo}`}
+                        {item.vehicleNo && (Array.isArray(item.vehicleNo) ? item.vehicleNo.some(Boolean) : item.vehicleNo) && ` | Vehicle: ${Array.isArray(item.vehicleNo) ? item.vehicleNo.filter(Boolean).join(', ') : item.vehicleNo}`}
+                      </div>
+                    )}
+                    {item.driverName && (Array.isArray(item.driverName) ? item.driverName.some(Boolean) : item.driverName) && (
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                        Driver: {Array.isArray(item.driverName) ? item.driverName.filter(Boolean).join(', ') : item.driverName}
                       </div>
                     )}
                   </td>
@@ -239,7 +260,7 @@ const PrintInvoice = () => {
                   return targetJo.items.map((item, idx) => (
                     <tr key={`jo-${targetJo.id}-item-${idx}`} style={{ borderBottom: '1px solid #e2e8f0' }}>
                       <td style={{ padding: '15px 14px' }}>
-                        <div style={{ fontWeight: '800', fontSize: '1rem' }}>{item.serviceType || 'Logistics Service'}</div>
+                        <div style={{ fontWeight: '800', fontSize: '1rem' }}>{item.description || 'Logistics Service'}</div>
                         <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px', fontWeight: '600' }}>
                           Container: {Array.isArray(item.containerNo) ? item.containerNo.join(', ') : (item.containerNo || '-')} | Vehicle: {Array.isArray(item.vehicleNo) ? item.vehicleNo.join(', ') : (item.vehicleNo || '-')}
                         </div>

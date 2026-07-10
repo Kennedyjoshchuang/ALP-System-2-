@@ -75,6 +75,7 @@ db.exec(`
     costs TEXT,  -- JSON string: [{vendorId, vendorName, serviceDescription, price, qty, total}]
     quoteValidity TEXT,
     date TEXT,
+    items TEXT DEFAULT '[]',
     FOREIGN KEY(quotationId) REFERENCES quotations(id)
   );
 
@@ -227,5 +228,31 @@ try {
   db.prepare("ALTER TABLE job_orders ADD COLUMN vesselName TEXT").run();
   console.log('Added vesselName to job_orders');
 } catch (e) { /* column likely exists */ }
+
+try {
+  db.prepare("ALTER TABLE job_orders ADD COLUMN items TEXT DEFAULT '[]'").run();
+  console.log('Added items to job_orders in SQLite');
+  
+  // Data migration: parse existing job_orders to populate items if empty
+  const jos = db.prepare("SELECT id, instruction, quantity, issueQuantity, items FROM job_orders").all();
+  const updateStmt = db.prepare("UPDATE job_orders SET items = ? WHERE id = ?");
+  for (const jo of jos) {
+    let parsedItems = [];
+    try {
+      if (jo.items) parsedItems = JSON.parse(jo.items);
+    } catch (e) {}
+    if (!Array.isArray(parsedItems) || parsedItems.length === 0) {
+      const itemsArray = [{
+        description: jo.instruction || 'Freight Forwarding Services',
+        rate: 0,
+        quantity: jo.quantity || 1,
+        issueQuantity: jo.issueQuantity || 0,
+        status: 'pending'
+      }];
+      updateStmt.run(JSON.stringify(itemsArray), jo.id);
+    }
+  }
+  console.log('Migrated existing SQLite job_orders to include items');
+} catch (e) { console.log('Items column already exists or migration failed: ' + e.message); }
 
 module.exports = db;

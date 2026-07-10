@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS job_orders (
     id TEXT PRIMARY KEY,
     quotationId TEXT REFERENCES quotations(id) ON DELETE SET NULL,
     customerName TEXT,
+    items JSONB DEFAULT '[]'::jsonb,
     instruction TEXT,
     status TEXT,
     quantity INTEGER,
