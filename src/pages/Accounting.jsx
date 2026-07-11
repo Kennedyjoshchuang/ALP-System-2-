@@ -3,7 +3,7 @@ import { useConfirm } from '../context/ConfirmContext';
 import React, { useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { CreditCard, Download, Receipt, Wallet, CheckCircle, Plus, X, XCircle, DollarSign, Search, FileSpreadsheet, RotateCcw, Edit3, Save, Image, ChevronDown, ChevronUp, User, Briefcase, Banknote, Calendar, FileText, Trash2, Settings, ExternalLink, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { CreditCard, Download, Receipt, Wallet, CheckCircle, Plus, X, XCircle, DollarSign, Search, FileSpreadsheet, RotateCcw, Edit3, Save, Image, ChevronDown, ChevronUp, User, Briefcase, Banknote, Calendar, FileText, Trash2, Settings, ExternalLink, ShieldCheck, ShieldAlert, GitMerge } from 'lucide-react';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
 
@@ -266,6 +266,448 @@ const Accounting = () => {
   const [expandedCompletedGroups, setExpandedCompletedGroups] = useState({});
   const [expandedPLGroups, setExpandedPLGroups] = useState({});
   const [expandedJOPL, setExpandedJOPL] = useState({});
+  const [splitModalData, setSplitModalData] = useState(null); // stores { jo, itemIdx, item } or null
+  const [mergeModalData, setMergeModalData] = useState(null); // stores { sourceJo } or null
+  const [mergeTargetJoId, setMergeTargetJoId] = useState('');
+  const [isProcessingMerge, setIsProcessingMerge] = useState(false);
+  const [splitForm, setSplitForm] = useState({
+    customerName: '',
+    quotationId: '',
+    description: '',
+    rate: 0,
+    quantity: 1,
+    issueQuantity: 0,
+    autoGenerateInvoice: false,
+    invoiceId: '',
+    invoiceDate: '',
+    taxPercent: 0,
+    bankAccountId: '',
+    invoiceNotes: '',
+    customerAddress: '',
+    customerPic: '',
+    customerPhone: '',
+    customerEmail: ''
+  });
+  const [isProcessingSplit, setIsProcessingSplit] = useState(false);
+
+  const handleOpenSplitModal = (jo, itemIdx) => {
+    const item = jo.items[itemIdx];
+    if (!item) return;
+
+    const parentInvoice = joInvoiceMap[String(jo.id)];
+    const linkedQuo = jo.quotationId ? quotations.find(q => String(q.id) === String(jo.quotationId)) : null;
+
+    const address = parentInvoice?.customerAddress || linkedQuo?.companyAddress || jo.address || '';
+    const pic = parentInvoice?.customerPic || linkedQuo?.pic || '';
+    const phone = parentInvoice?.customerPhone || linkedQuo?.phone || '';
+    const email = parentInvoice?.customerEmail || linkedQuo?.email || '';
+
+    let taxPercent = 0;
+    if (parentInvoice && parentInvoice.subtotal > 0) {
+      taxPercent = Math.round((parentInvoice.tax / parentInvoice.subtotal) * 100);
+    }
+
+    const initialBankAccountId = parentInvoice?.bankAccountId || (companyBankAccounts.length > 0 ? companyBankAccounts[0].id : '');
+    const generatedInvId = `INV-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+
+    setSplitModalData({ jo, itemIdx, item });
+    setSplitForm({
+      customerName: jo.customerName || '',
+      quotationId: jo.quotationId || '',
+      description: getResolvedDescription(item, jo, itemIdx) || 'Freight Forwarding Services',
+      rate: parseFloat(item.rate || 0),
+      quantity: parseInt(item.quantity || 1, 10),
+      issueQuantity: parseInt(item.issueQuantity || 0, 10),
+      autoGenerateInvoice: !!parentInvoice,
+      invoiceId: generatedInvId,
+      invoiceDate: new Date().toISOString().substring(0, 10),
+      taxPercent,
+      bankAccountId: initialBankAccountId,
+      invoiceNotes: '',
+      customerAddress: address,
+      customerPic: pic,
+      customerPhone: phone,
+      customerEmail: email
+    });
+  };
+
+  const handleProcessSplit = async () => {
+    if (!canWrite || !splitModalData) return;
+    const { jo, itemIdx, item } = splitModalData;
+
+    setIsProcessingSplit(true);
+    try {
+      // 1. Create the new standalone JO using splitForm values
+      const newJoPayload = {
+        quotationId: splitForm.quotationId,
+        customerName: splitForm.customerName,
+        phone: jo.phone || '',
+        email: jo.email || '',
+        quoteValidity: jo.quoteValidity || '',
+        rate: parseFloat(splitForm.rate || 0),
+        quantity: parseInt(splitForm.quantity || 1, 10),
+        issueQuantity: parseInt(splitForm.issueQuantity || 0, 10),
+        jobDescription: splitForm.description,
+        items: [{
+          description: splitForm.description,
+          rate: parseFloat(splitForm.rate || 0),
+          quantity: parseInt(splitForm.quantity || 1, 10),
+          issueQuantity: parseInt(splitForm.issueQuantity || 0, 10),
+          status: item.status || 'pending',
+          containerNo: item.containerNo || [],
+          vehicleNo: item.vehicleNo || [],
+          driverName: item.driverName || []
+        }]
+      };
+
+      const newJo = await createJO(newJoPayload);
+
+      // 2. Prepare remaining items for the original JO
+      const remainingItems = jo.items.filter((_, idx) => idx !== itemIdx);
+      const remainingQty = remainingItems.reduce((sum, it) => sum + parseInt(it.quantity || 0, 10), 0);
+      const remainingIssueQty = remainingItems.reduce((sum, it) => sum + parseInt(it.issueQuantity || 0, 10), 0);
+      const remainingInstruction = remainingItems.map(it => it.description).join(', ');
+
+      // 3. Migrate costs associated with this item index
+      const originalCosts = Array.isArray(jo.costs) ? jo.costs : [];
+      const movedCosts = [];
+      const remainingCosts = [];
+
+      originalCosts.forEach(cost => {
+        if (cost.targetItemIdx === itemIdx) {
+          movedCosts.push({
+            ...cost,
+            targetItemIdx: 0 // new JO has only 1 item at index 0
+          });
+        } else {
+          let newTargetIdx = cost.targetItemIdx;
+          if (cost.targetItemIdx !== null && cost.targetItemIdx !== undefined && cost.targetItemIdx > itemIdx) {
+            newTargetIdx = cost.targetItemIdx - 1;
+          }
+          remainingCosts.push({
+            ...cost,
+            targetItemIdx: newTargetIdx
+          });
+        }
+      });
+
+      // 4. Update the original JO status
+      await updateJOStatus(jo.id, {
+        items: remainingItems,
+        quantity: remainingQty,
+        issueQuantity: remainingIssueQty,
+        instruction: remainingInstruction,
+        costs: remainingCosts
+      });
+
+      // Update parent invoice if it exists
+      const parentInvoice = joInvoiceMap[String(jo.id)];
+      if (parentInvoice && Array.isArray(parentInvoice.items)) {
+        const splitDesc = (getResolvedDescription(item, jo, itemIdx) || item.description || 'Freight Forwarding Services').trim().toLowerCase();
+        const splitRate = parseFloat(item.rate || 0);
+        const splitQty = parseFloat(item.issueQuantity || item.quantity || 1);
+
+        let matchIdx = parentInvoice.items.findIndex(i => 
+          (i.description || '').trim().toLowerCase() === splitDesc &&
+          parseFloat(i.rate || 0) === splitRate &&
+          parseFloat(i.qty || 0) === splitQty
+        );
+        if (matchIdx === -1) {
+          matchIdx = parentInvoice.items.findIndex(i => 
+            (i.description || '').trim().toLowerCase() === splitDesc &&
+            parseFloat(i.rate || 0) === splitRate
+          );
+        }
+        if (matchIdx === -1) {
+          matchIdx = parentInvoice.items.findIndex(i => 
+            (i.description || '').trim().toLowerCase() === splitDesc
+          );
+        }
+
+        if (matchIdx !== -1) {
+          const updatedParentItems = parentInvoice.items.filter((_, idx) => idx !== matchIdx);
+          let subtotal = updatedParentItems.reduce((sum, i) => sum + (parseFloat(i.qty || 0) * parseFloat(i.rate || 0)), 0);
+          if (Array.isArray(parentInvoice.extra_charges)) {
+            subtotal += parentInvoice.extra_charges.reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
+          }
+          const oldSubtotal = parseFloat(parentInvoice.subtotal || 0);
+          const taxRate = oldSubtotal > 0 ? (parseFloat(parentInvoice.tax || 0) / oldSubtotal) : 0;
+          const tax = subtotal * taxRate;
+          const amount = subtotal + tax;
+
+          await updateInvoice(parentInvoice.id, {
+            items: updatedParentItems,
+            subtotal,
+            tax,
+            amount
+          });
+        }
+      }
+
+      // 5. Update the new JO with the migrated costs (if any)
+      if (movedCosts.length > 0) {
+        await updateJOStatus(newJo.id, {
+          costs: movedCosts
+        });
+      }
+
+      // 6. Automatically generate invoice if selected
+      if (splitForm.autoGenerateInvoice) {
+        const qty = parseFloat(splitForm.issueQuantity || splitForm.quantity || 1);
+        const subtotal = parseFloat(splitForm.rate || 0) * qty;
+        const tax = subtotal * ((parseFloat(splitForm.taxPercent) || 0) / 100);
+        const amount = subtotal + tax;
+
+        const invoiceData = {
+          id: splitForm.invoiceId.trim(),
+          joId: newJo.id,
+          consolidatedJOs: [newJo.id],
+          customerName: splitForm.customerName,
+          customerAddress: splitForm.customerAddress,
+          customerPic: splitForm.customerPic,
+          customerPhone: splitForm.customerPhone,
+          customerEmail: splitForm.customerEmail,
+          date: splitForm.invoiceDate,
+          amount,
+          subtotal,
+          tax,
+          items: [{
+            description: splitForm.description,
+            qty,
+            rate: parseFloat(splitForm.rate || 0),
+            amount: subtotal,
+            containerNo: item.containerNo || [],
+            vehicleNo: item.vehicleNo || [],
+            driverName: item.driverName || []
+          }],
+          extra_charges: [],
+          notes: splitForm.invoiceNotes || null
+        };
+
+        const newInv = await createCustomInvoice(invoiceData);
+        if (!newInv) throw new Error('Gagal menerbitkan invoice untuk JO baru.');
+      }
+
+      toast.success(isID 
+        ? `Berhasil memisahkan item ke JO baru: ${newJo.id}`
+        : `Successfully split item to new JO: ${newJo.id}`
+      );
+      setSplitModalData(null);
+    } catch (err) {
+      console.error('Split/Invoice process error:', err);
+      toast.error(isID 
+        ? `Gagal memproses pemisahan: ${err.message}`
+        : `Failed to process split: ${err.message}`
+      );
+    } finally {
+      setIsProcessingSplit(false);
+    }
+  };
+
+  const handleProcessMerge = async () => {
+    if (!canWrite || !mergeModalData || !mergeTargetJoId) return;
+    const { sourceJo } = mergeModalData;
+    const targetJo = jobOrders.find(j => String(j.id) === String(mergeTargetJoId));
+    if (!targetJo) return;
+
+    setIsProcessingMerge(true);
+    try {
+      // 1. Merge items
+      const mergedItems = [
+        ...(targetJo.items || []),
+        ...(sourceJo.items || [])
+      ];
+
+      // Update Target JO quantities and instructions
+      const updatedQty = mergedItems.reduce((sum, it) => sum + parseInt(it.quantity || 0, 10), 0);
+      const updatedIssueQty = mergedItems.reduce((sum, it) => sum + parseInt(it.issueQuantity || 0, 10), 0);
+      const updatedInstruction = mergedItems.map(it => it.description).join(', ');
+
+      // 2. Migrate costs
+      const targetItemsOffset = (targetJo.items || []).length;
+      const sourceCosts = Array.isArray(sourceJo.costs) ? sourceJo.costs : [];
+      const migratedCosts = sourceCosts.map(cost => {
+        let newIdx = cost.targetItemIdx;
+        if (cost.targetItemIdx !== null && cost.targetItemIdx !== undefined) {
+          newIdx = targetItemsOffset + cost.targetItemIdx;
+        }
+        return {
+          ...cost,
+          targetItemIdx: newIdx
+        };
+      });
+
+      const mergedCosts = [
+        ...(Array.isArray(targetJo.costs) ? targetJo.costs : []),
+        ...migratedCosts
+      ];
+
+      // 3. Invoice merging cases
+      const sourceInv = invoices.find(inv => {
+        const jIds = inv.consolidatedJOs || (inv.joId ? [inv.joId] : []);
+        return jIds.map(String).includes(String(sourceJo.id));
+      });
+      const targetInv = invoices.find(inv => {
+        const jIds = inv.consolidatedJOs || (inv.joId ? [inv.joId] : []);
+        return jIds.map(String).includes(String(targetJo.id));
+      });
+
+      if (sourceInv && targetInv) {
+        // Case A: Both have invoices -> merge source into target and delete source
+        const mergedInvoiceItems = [
+          ...(targetInv.items || []),
+          ...(sourceInv.items || [])
+        ];
+        const subtotal = parseFloat(targetInv.subtotal || 0) + parseFloat(sourceInv.subtotal || 0);
+        const tax = parseFloat(targetInv.tax || 0) + parseFloat(sourceInv.tax || 0);
+        const amount = parseFloat(targetInv.amount || 0) + parseFloat(sourceInv.amount || 0);
+        const consolidatedJOs = Array.from(new Set([
+          ...(targetInv.consolidatedJOs || [targetJo.id]),
+          ...(sourceInv.consolidatedJOs || [sourceJo.id])
+        ]));
+
+        await updateInvoice(targetInv.id, {
+          items: mergedInvoiceItems,
+          subtotal,
+          tax,
+          amount,
+          consolidatedJOs
+        });
+        await deleteInvoice(sourceInv.id);
+
+      } else if (sourceInv && !targetInv) {
+        // Case B: Only source has invoice -> transfer it to target JO and append target JO items
+        const sourceSubtotalBefore = parseFloat(sourceInv.subtotal || 0);
+        const sourceTaxBefore = parseFloat(sourceInv.tax || 0);
+        const taxRate = sourceSubtotalBefore > 0 ? (sourceTaxBefore / sourceSubtotalBefore) : 0;
+
+        let extraSubtotal = 0;
+        const newInvoiceItems = (targetJo.items || []).map(item => {
+          const qty = parseFloat(item.issueQuantity || item.quantity || 1);
+          const rate = parseFloat(item.rate || 0);
+          const amount = qty * rate;
+          extraSubtotal += amount;
+          return {
+            description: item.description || 'Freight Forwarding Services',
+            qty,
+            rate,
+            amount,
+            containerNo: item.containerNo || [],
+            vehicleNo: item.vehicleNo || [],
+            driverName: item.driverName || []
+          };
+        });
+
+        const mergedInvoiceItems = [
+          ...(sourceInv.items || []),
+          ...newInvoiceItems
+        ];
+
+        const subtotal = sourceSubtotalBefore + extraSubtotal;
+        const tax = subtotal * taxRate;
+        const amount = subtotal + tax;
+
+        const consolidatedJOs = Array.from(new Set([
+          ...(sourceInv.consolidatedJOs || [sourceJo.id]),
+          targetJo.id
+        ])).filter(id => String(id) !== String(sourceJo.id));
+
+        await updateInvoice(sourceInv.id, {
+          joId: targetJo.id,
+          items: mergedInvoiceItems,
+          subtotal,
+          tax,
+          amount,
+          consolidatedJOs
+        });
+
+      } else if (!sourceInv && targetInv) {
+        // Case C: Only target has invoice -> append source items to target invoice
+        const targetSubtotalBefore = parseFloat(targetInv.subtotal || 0);
+        const targetTaxBefore = parseFloat(targetInv.tax || 0);
+        const taxRate = targetSubtotalBefore > 0 ? (targetTaxBefore / targetSubtotalBefore) : 0;
+
+        let extraSubtotal = 0;
+        const newInvoiceItems = (sourceJo.items || []).map(item => {
+          const qty = parseFloat(item.issueQuantity || item.quantity || 1);
+          const rate = parseFloat(item.rate || 0);
+          const amount = qty * rate;
+          extraSubtotal += amount;
+          return {
+            description: item.description || 'Freight Forwarding Services',
+            qty,
+            rate,
+            amount,
+            containerNo: item.containerNo || [],
+            vehicleNo: item.vehicleNo || [],
+            driverName: item.driverName || []
+          };
+        });
+
+        const mergedInvoiceItems = [
+          ...(targetInv.items || []),
+          ...newInvoiceItems
+        ];
+
+        const subtotal = targetSubtotalBefore + extraSubtotal;
+        const tax = subtotal * taxRate;
+        const amount = subtotal + tax;
+        const consolidatedJOs = Array.from(new Set([
+          ...(targetInv.consolidatedJOs || [targetJo.id]),
+          targetJo.id
+        ]));
+
+        await updateInvoice(targetInv.id, {
+          items: mergedInvoiceItems,
+          subtotal,
+          tax,
+          amount,
+          consolidatedJOs
+        });
+      }
+
+      // 4. Update the target JO database record with combined items and costs
+      await updateJOStatus(targetJo.id, {
+        items: mergedItems,
+        quantity: updatedQty,
+        issueQuantity: updatedIssueQty,
+        instruction: updatedInstruction,
+        costs: mergedCosts
+      });
+
+      // 5. Delete source JO database record
+      await deleteJO(sourceJo.id);
+
+      toast.success(isID
+        ? `Berhasil menggabungkan JO ${sourceJo.id} ke JO ${targetJo.id}`
+        : `Successfully merged JO ${sourceJo.id} into JO ${targetJo.id}`
+      );
+      setMergeModalData(null);
+    } catch (err) {
+      console.error('Merge process error:', err);
+      toast.error(isID
+        ? `Gagal memproses penggabungan: ${err.message}`
+        : `Failed to process merge: ${err.message}`
+      );
+    } finally {
+      setIsProcessingMerge(false);
+    }
+  };
+
+  const handleOpenMergeModal = (jo) => {
+    setMergeModalData({ sourceJo: jo });
+    const candidates = jobOrders.filter(j => 
+      String(j.quotationId) === String(jo.quotationId) && 
+      String(j.id) !== String(jo.id) && 
+      j.customerName === jo.customerName
+    );
+    if (candidates.length > 0) {
+      setMergeTargetJoId(candidates[0].id);
+    } else {
+      setMergeTargetJoId('');
+    }
+  };
+
   const getResolvedDescription = (item, jo, idx) => {
     if (item.description && item.description !== 'Freight Forwarding Services') {
       return item.description;
@@ -310,7 +752,7 @@ const Accounting = () => {
   const fileInputRef = useRef(null);
 
   const { 
-    jobOrders = [], invoices = [], createInvoice, createCustomInvoice, settleInvoice, deleteInvoice, updateInvoice, 
+    jobOrders = [], invoices = [], createInvoice, createCustomInvoice, settleInvoice, deleteInvoice, updateInvoice, createJO, deleteJO, 
     receivables = [], vendors = [], purchaseOrders = [], updateJOStatus, updatePurchaseOrder, patchPurchaseOrderLocal,
     quotations = [],
     salaries = [], addSalary, deleteSalary, updateSalary,
@@ -329,7 +771,7 @@ const Accounting = () => {
     const primaryJo = jobOrders.find(j => String(j.id) === String(invoice.joId));
     const consolidated = invoice.consolidatedJOs || [];
     if (consolidated.length > 0) {
-      return jobOrders.filter(j => consolidated.includes(j.id));
+      return jobOrders.filter(j => consolidated.map(String).includes(String(j.id)));
     }
     return primaryJo ? [primaryJo] : [];
   };
@@ -1464,7 +1906,10 @@ const Accounting = () => {
               items.push({
                 description: item.description || 'Freight Forwarding Services',
                 qty,
-                rate
+                rate,
+                containerNo: item.containerNo || [],
+                vehicleNo: item.vehicleNo || [],
+                driverName: item.driverName || []
               });
             }
           });
@@ -1486,6 +1931,9 @@ const Accounting = () => {
             description: targetJo.instruction || targetJo.jobDescription || 'Freight Forwarding Services',
             qty,
             rate,
+            containerNo: Array.isArray(targetJo.containerNo) ? targetJo.containerNo : (targetJo.containerNo ? [targetJo.containerNo] : []),
+            vehicleNo: Array.isArray(targetJo.vehicleNo) ? targetJo.vehicleNo : (targetJo.vehicleNo ? [targetJo.vehicleNo] : []),
+            driverName: Array.isArray(targetJo.driverName) ? targetJo.driverName : (targetJo.driverName ? [targetJo.driverName] : [])
           });
         }
       });
@@ -1533,7 +1981,15 @@ const Accounting = () => {
         const rate = parseFloat(line.rate) || 0;
         const amount = qty * rate;
         subtotal += amount;
-        return { description: line.description, qty, rate, amount };
+        return { 
+          description: line.description, 
+          qty, 
+          rate, 
+          amount,
+          containerNo: line.containerNo || [],
+          vehicleNo: line.vehicleNo || [],
+          driverName: line.driverName || []
+        };
       });
 
       const extra_charges = (f.extraCharges || []).map(line => {
@@ -1786,7 +2242,7 @@ const Accounting = () => {
     const enrichedInv = { ...originalInv, ...inv };
     
     const consolidatedJOs = enrichedInv.consolidatedJOs 
-      ? jobOrders.filter(j => enrichedInv.consolidatedJOs.includes(j.id))
+      ? jobOrders.filter(j => enrichedInv.consolidatedJOs.map(String).includes(String(j.id)))
       : linkedJO ? [linkedJO] : [];
 
     localStorage.setItem('print_invoice_data_' + enrichedInv.id, JSON.stringify({ 
@@ -2021,7 +2477,7 @@ const Accounting = () => {
       const qId = jo.quotationId || 'direct';
       // If it's a direct job, only include it if it hasn't been invoiced yet!
       if (!jo.quotationId) {
-        const hasInvoice = (invoices || []).some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.includes(jo.id)));
+        const hasInvoice = (invoices || []).some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.map(String).includes(String(jo.id))));
         if (hasInvoice) return;
       }
       if (!groups[qId]) {
@@ -2039,7 +2495,7 @@ const Accounting = () => {
       }
       
       const hasUninvoicedJO = group.jobOrders.some(jo => {
-        const hasInvoice = (invoices || []).some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.includes(jo.id)));
+        const hasInvoice = (invoices || []).some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.map(String).includes(String(jo.id))));
         return !hasInvoice;
       });
 
@@ -3529,6 +3985,25 @@ const Accounting = () => {
                                     <Plus size={14} /> {isID ? 'Biaya' : 'Costs'}
                                   </button>
                                 )}
+                                {(() => {
+                                  const hasMergeCandidates = jo.quotationId && jobOrders.some(j => String(j.quotationId) === String(jo.quotationId) && String(j.id) !== String(jo.id) && j.customerName === jo.customerName);
+                                  return canWrite && hasMergeCandidates && (
+                                    <button 
+                                      className="btn" 
+                                      style={{ 
+                                        padding: '7px 14px', 
+                                        fontSize: '0.8rem', 
+                                        gap: '6px', 
+                                        background: 'rgba(52, 211, 153, 0.1)', 
+                                        color: '#34d399', 
+                                        border: '1px solid rgba(52, 211, 153, 0.25)' 
+                                      }} 
+                                      onClick={() => handleOpenMergeModal(jo)}
+                                    >
+                                      <GitMerge size={14} /> {isID ? 'Gabungkan' : 'Merge'}
+                                    </button>
+                                  );
+                                })()}
                                 {!invoice && canWrite && (
                                   <ButtonWithLoading className="btn btn-gold" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px' }} onClick={() => handleIssueInvoice(jo.id)}>
                                     <Receipt size={14} /> {isID ? 'Invoice' : 'Invoice'}
@@ -3554,6 +4029,7 @@ const Accounting = () => {
                                           <th style={{ padding: '6px 0', textAlign: 'center' }}>Qty</th>
                                           <th style={{ padding: '6px 0', textAlign: 'right' }}>{isID ? 'Tarif' : 'Rate'}</th>
                                           <th style={{ padding: '6px 0', textAlign: 'right' }}>Total</th>
+                                          {canWrite && <th style={{ padding: '6px 0', textAlign: 'center' }}>{isID ? 'Aksi' : 'Action'}</th>}
                                         </tr>
                                       </thead>
                                       <tbody>
@@ -3569,6 +4045,42 @@ const Accounting = () => {
                                               <td style={{ padding: '8px 0', textAlign: 'center' }}>{qty}</td>
                                               <td style={{ padding: '8px 0', textAlign: 'right' }}>Rp {parseFloat(item.rate || 0).toLocaleString()}</td>
                                               <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: '700', color: 'var(--secondary)' }}>Rp {subtotal.toLocaleString()}</td>
+                                              {canWrite && (
+                                                <td style={{ padding: '8px 0', textAlign: 'center' }}>
+                                                  {jo.items.length > 1 ? (
+                                                    <button
+                                                      className="btn"
+                                                      style={{
+                                                        padding: '4px 8px',
+                                                        fontSize: '0.7rem',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        background: 'rgba(212, 175, 55, 0.1)',
+                                                        color: 'var(--secondary)',
+                                                        border: '1px solid rgba(212, 175, 55, 0.25)',
+                                                        cursor: isProcessingSplit ? 'not-allowed' : 'pointer'
+                                                      }}
+                                                      disabled={isProcessingSplit}
+                                                      onClick={() => handleOpenSplitModal(jo, idx)}
+                                                      title={isID ? 'Pisahkan menjadi JO baru' : 'Split into a new JO'}
+                                                    >
+                                                      {isProcessingSplit && splitModalData?.jo?.id === jo.id && splitModalData?.itemIdx === idx ? (
+                                                        <span>...</span>
+                                                      ) : (
+                                                        <>
+                                                          <ExternalLink size={12} />
+                                                          <span>{isID ? 'Pisahkan' : 'Split'}</span>
+                                                        </>
+                                                      )}
+                                                    </button>
+                                                  ) : (
+                                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                                      —
+                                                    </span>
+                                                  )}
+                                                </td>
+                                              )}
                                             </tr>
                                           );
                                         })}
@@ -3681,6 +4193,25 @@ const Accounting = () => {
                                 <Plus size={14} /> {isID ? 'Biaya' : 'Costs'}
                               </button>
                             )}
+                            {(() => {
+                              const hasMergeCandidates = jo.quotationId && jobOrders.some(j => String(j.quotationId) === String(jo.quotationId) && String(j.id) !== String(jo.id) && j.customerName === jo.customerName);
+                              return canWrite && hasMergeCandidates && (
+                                <button 
+                                  className="btn" 
+                                  style={{ 
+                                    padding: '7px 14px', 
+                                    fontSize: '0.8rem', 
+                                    gap: '6px', 
+                                    background: 'rgba(52, 211, 153, 0.1)', 
+                                    color: '#34d399', 
+                                    border: '1px solid rgba(52, 211, 153, 0.25)' 
+                                  }} 
+                                  onClick={() => handleOpenMergeModal(jo)}
+                                >
+                                  <GitMerge size={14} /> {isID ? 'Gabungkan' : 'Merge'}
+                                </button>
+                              );
+                            })()}
                             {!invoice && canWrite && (
                               <ButtonWithLoading className="btn btn-gold" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px' }} onClick={() => handleIssueInvoice(jo.id)}>
                                 <Receipt size={14} /> {isID ? 'Invoice' : 'Invoice'}
@@ -3793,6 +4324,25 @@ const Accounting = () => {
                                         <Plus size={14} /> {isID ? 'Biaya' : 'Costs'}
                                       </button>
                                     )}
+                                    {(() => {
+                                      const hasMergeCandidates = jo.quotationId && jobOrders.some(j => String(j.quotationId) === String(jo.quotationId) && String(j.id) !== String(jo.id) && j.customerName === jo.customerName);
+                                      return canWrite && hasMergeCandidates && (
+                                        <button 
+                                          className="btn" 
+                                          style={{ 
+                                            padding: '7px 14px', 
+                                            fontSize: '0.8rem', 
+                                            gap: '6px', 
+                                            background: 'rgba(52, 211, 153, 0.1)', 
+                                            color: '#34d399', 
+                                            border: '1px solid rgba(52, 211, 153, 0.25)' 
+                                          }} 
+                                          onClick={() => handleOpenMergeModal(jo)}
+                                        >
+                                          <GitMerge size={14} /> {isID ? 'Gabungkan' : 'Merge'}
+                                        </button>
+                                      );
+                                    })()}
                                     {!invoice && canWrite && (
                                       <ButtonWithLoading className="btn btn-gold" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px' }} onClick={() => handleIssueInvoice(jo.id)}>
                                         <Receipt size={14} /> {isID ? 'Invoice' : 'Invoice'}
@@ -3818,6 +4368,7 @@ const Accounting = () => {
                                           <th style={{ padding: '6px 0', textAlign: 'center' }}>Qty</th>
                                           <th style={{ padding: '6px 0', textAlign: 'right' }}>{isID ? 'Tarif' : 'Rate'}</th>
                                           <th style={{ padding: '6px 0', textAlign: 'right' }}>Total</th>
+                                          {canWrite && <th style={{ padding: '6px 0', textAlign: 'center' }}>{isID ? 'Aksi' : 'Action'}</th>}
                                         </tr>
                                       </thead>
                                       <tbody>
@@ -3833,6 +4384,42 @@ const Accounting = () => {
                                               <td style={{ padding: '8px 0', textAlign: 'center' }}>{qty}</td>
                                               <td style={{ padding: '8px 0', textAlign: 'right' }}>Rp {parseFloat(item.rate || 0).toLocaleString()}</td>
                                               <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: '700', color: 'var(--secondary)' }}>Rp {subtotal.toLocaleString()}</td>
+                                              {canWrite && (
+                                                <td style={{ padding: '8px 0', textAlign: 'center' }}>
+                                                  {jo.items.length > 1 ? (
+                                                    <button
+                                                      className="btn"
+                                                      style={{
+                                                        padding: '4px 8px',
+                                                        fontSize: '0.7rem',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        background: 'rgba(212, 175, 55, 0.1)',
+                                                        color: 'var(--secondary)',
+                                                        border: '1px solid rgba(212, 175, 55, 0.25)',
+                                                        cursor: isProcessingSplit ? 'not-allowed' : 'pointer'
+                                                      }}
+                                                      disabled={isProcessingSplit}
+                                                      onClick={() => handleOpenSplitModal(jo, idx)}
+                                                      title={isID ? 'Pisahkan menjadi JO baru' : 'Split into a new JO'}
+                                                    >
+                                                      {isProcessingSplit && splitModalData?.jo?.id === jo.id && splitModalData?.itemIdx === idx ? (
+                                                        <span>...</span>
+                                                      ) : (
+                                                        <>
+                                                          <ExternalLink size={12} />
+                                                          <span>{isID ? 'Pisahkan' : 'Split'}</span>
+                                                        </>
+                                                      )}
+                                                    </button>
+                                                  ) : (
+                                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                                      —
+                                                    </span>
+                                                  )}
+                                                </td>
+                                              )}
                                             </tr>
                                           );
                                         })}
@@ -3948,6 +4535,25 @@ const Accounting = () => {
                                     <Plus size={14} /> {isID ? 'Biaya' : 'Costs'}
                                   </button>
                                 )}
+                                {(() => {
+                                  const hasMergeCandidates = jo.quotationId && jobOrders.some(j => String(j.quotationId) === String(jo.quotationId) && String(j.id) !== String(jo.id) && j.customerName === jo.customerName);
+                                  return canWrite && hasMergeCandidates && (
+                                    <button 
+                                      className="btn" 
+                                      style={{ 
+                                        padding: '7px 14px', 
+                                        fontSize: '0.8rem', 
+                                        gap: '6px', 
+                                        background: 'rgba(52, 211, 153, 0.1)', 
+                                        color: '#34d399', 
+                                        border: '1px solid rgba(52, 211, 153, 0.25)' 
+                                      }} 
+                                      onClick={() => handleOpenMergeModal(jo)}
+                                    >
+                                      <GitMerge size={14} /> {isID ? 'Gabungkan' : 'Merge'}
+                                    </button>
+                                  );
+                                })()}
                                 {!invoice && canWrite && (
                                   <ButtonWithLoading className="btn btn-gold" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px' }} onClick={() => handleIssueInvoice(jo.id)}>
                                     <Receipt size={14} /> {isID ? 'Invoice' : 'Invoice'}
@@ -3998,7 +4604,7 @@ const Accounting = () => {
                       const qId = jo.quotationId || 'direct';
                       // If it's a direct job, only include it if it hasn't been invoiced yet!
                       if (!jo.quotationId) {
-                        const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.includes(jo.id)));
+                        const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.map(String).includes(String(jo.id))));
                         if (hasInvoice) return;
                       }
                       if (!groups[qId]) {
@@ -4018,7 +4624,7 @@ const Accounting = () => {
                       }
                       // Check if any job order in this quotation group is NOT invoiced yet
                       const hasUninvoicedJO = group.jobOrders.some(jo => {
-                        const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.includes(jo.id)));
+                        const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.map(String).includes(String(jo.id))));
                         return !hasInvoice;
                       });
                       return hasUninvoicedJO;
@@ -4325,7 +4931,7 @@ const Accounting = () => {
                                               <button className="btn" style={{ padding: '4px 8px', fontSize: '0.7rem', gap: '4px', background: 'rgba(59, 130, 246, 0.75)', color: '#ffffff', border: '1px solid rgba(59, 130, 246, 0.8)' }} onClick={() => {
                                                 const linkedJO = jobOrders.find(j => String(j.id) === String(inv.joId));
                                                 const linkedQuo = linkedJO ? quotations.find(q => String(q.id) === String(linkedJO.quotationId)) : null;
-                                                const consolidatedJOs = inv.consolidatedJOs ? jobOrders.filter(j => inv.consolidatedJOs.includes(j.id)) : linkedJO ? [linkedJO] : [];
+                                                const consolidatedJOs = inv.consolidatedJOs ? jobOrders.filter(j => inv.consolidatedJOs.map(String).includes(String(j.id))) : linkedJO ? [linkedJO] : [];
                                                 localStorage.setItem('print_invoice_data_' + inv.id, JSON.stringify({ invoice: inv, jo: linkedJO, consolidatedJOs, quotation: linkedQuo }));
                                                 window.open('/print/invoice-delivery?id=' + inv.id, '_blank');
                                               }}>
@@ -4573,7 +5179,7 @@ const Accounting = () => {
                               const linkedJO = jobOrders.find(j => String(j.id) === String(inv.joId));
                               const linkedQuo = linkedJO ? quotations.find(q => String(q.id) === String(linkedJO.quotationId)) : null;
                               const consolidatedJOs = inv.consolidatedJOs
-                                ? jobOrders.filter(j => inv.consolidatedJOs.includes(j.id))
+                                ? jobOrders.filter(j => inv.consolidatedJOs.map(String).includes(String(j.id)))
                                 : linkedJO ? [linkedJO] : [];
                               localStorage.setItem('print_invoice_data_' + inv.id, JSON.stringify({ invoice: inv, jo: linkedJO, consolidatedJOs, quotation: linkedQuo }));
                               window.open('/print/invoice-delivery?id=' + inv.id, '_blank');
@@ -8188,6 +8794,354 @@ const Accounting = () => {
           </div>
         );
       })()}
+
+      {/* Merge Job Order Modal */}
+      {mergeModalData && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:9999, display:'flex', alignItems:'center', justifyContent: 'center', padding:'20px' }}>
+          <div className="glass-card" style={{ width:'100%', maxWidth:'550px', padding:'30px', maxHeight:'90vh', overflowY:'auto', position:'relative' }}>
+            <button 
+              onClick={() => setMergeModalData(null)} 
+              style={{ position:'absolute', top:'15px', right:'15px', background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}
+            >
+              <X size={20}/>
+            </button>
+            <h3 style={{ color:'var(--secondary)', marginBottom:'5px', fontSize:'1.25rem' }}>
+              {isID ? 'Gabungkan Job Order' : 'Merge Job Order'}
+            </h3>
+            <p style={{ color:'var(--text-muted)', fontSize:'0.82rem', marginBottom:'20px' }}>
+              {isID ? 'Gabungkan rincian item, biaya, dan invoice dari JO ini ke JO lainnya.' : 'Combine items, costs, and invoices of this JO into another.'}
+            </p>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:'15px' }}>
+              {/* SOURCE INFO */}
+              <div>
+                <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>
+                  {isID ? 'JO Asal (Akan Dihapus)' : 'Source JO (To Be Deleted)'}
+                </label>
+                <div style={{ padding:'10px', background:'rgba(255,255,255,0.02)', border:'1px solid var(--glass-border)', borderRadius:'6px', fontSize:'0.85rem' }}>
+                  <strong>JO #{mergeModalData.sourceJo.id}</strong> - {mergeModalData.sourceJo.customerName}
+                  <div style={{ fontSize:'0.75rem', color:'var(--text-muted)', marginTop:'4px' }}>
+                    {mergeModalData.sourceJo.items?.map(it => it.description).join(', ')}
+                  </div>
+                </div>
+              </div>
+
+              {/* TARGET SELECTION */}
+              <div>
+                <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>
+                  {isID ? 'Pilih JO Tujuan' : 'Select Target JO'}
+                </label>
+                <select 
+                  className="form-control"
+                  style={{ width:'100%', padding:'10px', background:'var(--bg)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
+                  value={mergeTargetJoId}
+                  onChange={e => setMergeTargetJoId(e.target.value)}
+                >
+                  {jobOrders.filter(j => 
+                    String(j.quotationId) === String(mergeModalData.sourceJo.quotationId) && 
+                    String(j.id) !== String(mergeModalData.sourceJo.id) && 
+                    j.customerName === mergeModalData.sourceJo.customerName
+                  ).map(j => (
+                    <option key={j.id} value={j.id}>
+                      JO #{j.id} ({j.items?.map(it => it.description).join(', ') || 'No Description'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* INVOICE RECONCILIATION SUMMARY */}
+              {(() => {
+                const sourceJo = mergeModalData.sourceJo;
+                const targetJo = jobOrders.find(j => String(j.id) === String(mergeTargetJoId));
+                if (!targetJo) return null;
+
+                const sourceInv = invoices.find(inv => {
+                  const jIds = inv.consolidatedJOs || (inv.joId ? [inv.joId] : []);
+                  return jIds.map(String).includes(String(sourceJo.id));
+                });
+                const targetInv = invoices.find(inv => {
+                  const jIds = inv.consolidatedJOs || (inv.joId ? [inv.joId] : []);
+                  return jIds.map(String).includes(String(targetJo.id));
+                });
+
+                let reconcText = '';
+                let alertColor = 'rgba(52, 211, 153, 0.1)';
+                let borderColor = 'rgba(52, 211, 153, 0.2)';
+                let textColor = '#34d399';
+
+                if (sourceInv && targetInv) {
+                  reconcText = isID 
+                    ? `Kedua JO memiliki invoice. Invoice JO asal (${sourceInv.id}) akan digabungkan ke invoice JO tujuan (${targetInv.id}), dan invoice JO asal akan dihapus.` 
+                    : `Both JOs have invoices. The source invoice (${sourceInv.id}) will be merged into the target invoice (${targetInv.id}), and the source invoice will be deleted.`;
+                  alertColor = 'rgba(239, 68, 68, 0.1)';
+                  borderColor = 'rgba(239, 68, 68, 0.2)';
+                  textColor = '#f87171';
+                } else if (sourceInv && !targetInv) {
+                  reconcText = isID
+                    ? `Hanya JO asal yang memiliki invoice (${sourceInv.id}). Invoice ini akan dialihkan untuk menunjuk ke JO tujuan.`
+                    : `Only the source JO has an invoice (${sourceInv.id}). This invoice will be transferred to point to the target JO.`;
+                  alertColor = 'rgba(217, 119, 6, 0.1)';
+                  borderColor = 'rgba(217, 119, 6, 0.2)';
+                  textColor = '#f59e0b';
+                } else if (!sourceInv && targetInv) {
+                  reconcText = isID
+                    ? `Hanya JO tujuan yang memiliki invoice (${targetInv.id}). Layanan dari JO asal akan ditambahkan sebagai item baru pada invoice JO tujuan.`
+                    : `Only the target JO has an invoice (${targetInv.id}). Services from the source JO will be appended as new items to the target invoice.`;
+                  alertColor = 'rgba(217, 119, 6, 0.1)';
+                  borderColor = 'rgba(217, 119, 6, 0.2)';
+                  textColor = '#f59e0b';
+                } else {
+                  reconcText = isID
+                    ? `Kedua JO tidak memiliki invoice. Item dan biaya akan digabungkan tanpa perubahan invoice.`
+                    : `Neither JO has an invoice. Items and costs will be merged without invoice adjustments.`;
+                }
+
+                return (
+                  <div style={{ background: alertColor, border: `1px solid ${borderColor}`, borderRadius:'8px', padding:'12px', fontSize:'0.8rem', color: textColor }}>
+                    <strong>{isID ? 'Penyelarasan Invoice:' : 'Invoice Reconciliation:'}</strong> {reconcText}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* BUTTONS */}
+            <div style={{ display:'flex', gap:'15px', marginTop:'25px' }}>
+              <button 
+                className="btn" 
+                onClick={() => setMergeModalData(null)}
+                style={{ flex:1, background:'rgba(255,255,255,0.05)', color:'var(--text)' }}
+                disabled={isProcessingMerge}
+              >
+                {isID ? 'Batal' : 'Cancel'}
+              </button>
+              <ButtonWithLoading
+                className="btn btn-gold"
+                loading={isProcessingMerge}
+                style={{ flex:1 }}
+                onClick={handleProcessMerge}
+              >
+                {isID ? 'Proses Penggabungan' : 'Process Merge'}
+              </ButtonWithLoading>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Split Job Order Item Modal */}
+      {splitModalData && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:9999, display:'flex', alignItems:'center', justifyContent: 'center', padding:'20px' }}>
+          <div className="glass-card" style={{ width:'100%', maxWidth:'650px', padding:'30px', maxHeight:'90vh', overflowY:'auto', position:'relative' }}>
+            <button 
+              onClick={() => setSplitModalData(null)} 
+              style={{ position:'absolute', top:'15px', right:'15px', background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}
+            >
+              <X size={20}/>
+            </button>
+            <h3 style={{ color:'var(--secondary)', marginBottom:'5px', fontSize:'1.25rem' }}>
+              {isID ? 'Pisahkan Item menjadi JO Baru' : 'Split Item into New JO'}
+            </h3>
+            <p style={{ color:'var(--text-muted)', fontSize:'0.82rem', marginBottom:'20px' }}>
+              {isID ? 'Pecah rincian layanan ini menjadi Job Order terpisah.' : 'Split this service item into a standalone Job Order.'}
+            </p>
+
+            {/* Warning if parent JO is already invoiced */}
+            {joInvoiceMap[String(splitModalData.jo.id)] && (
+              <div style={{ background:'rgba(217, 119, 6, 0.1)', border:'1px solid rgba(217, 119, 6, 0.25)', borderRadius:'8px', padding:'12px', marginBottom:'20px', color:'#f59e0b', fontSize:'0.8rem', display:'flex', gap:'8px', alignItems:'flex-start' }}>
+                <ShieldAlert size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <strong>{isID ? 'Peringatan:' : 'Warning:'}</strong> {isID 
+                    ? 'Job Order asal sudah memiliki invoice. Memisahkan item ini tidak akan mengubah data invoice asal. Anda harus menyesuaikan invoice asal secara manual.' 
+                    : 'The original Job Order is already invoiced. Splitting this item will not automatically modify the original invoice. You must adjust the original invoice manually.'}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display:'flex', flexDirection:'column', gap:'15px' }}>
+              {/* JO FIELDS */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' }}>
+                <div>
+                  <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>{isID ? 'Pelanggan' : 'Customer'}</label>
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
+                    value={splitForm.customerName}
+                    onChange={e => setSplitForm({ ...splitForm, customerName: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>{isID ? 'Ref Penawaran' : 'Quotation Ref'}</label>
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
+                    value={splitForm.quotationId}
+                    onChange={e => setSplitForm({ ...splitForm, quotationId: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>{isID ? 'Deskripsi Layanan' : 'Service Description'}</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
+                  value={splitForm.description}
+                  onChange={e => setSplitForm({ ...splitForm, description: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'12px' }}>
+                <div>
+                  <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>{isID ? 'Tarif (Rp)' : 'Rate (Rp)'}</label>
+                  <input 
+                    type="number" 
+                    className="form-control" 
+                    style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
+                    value={splitForm.rate}
+                    onChange={e => setSplitForm({ ...splitForm, rate: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>Qty</label>
+                  <input 
+                    type="number" 
+                    className="form-control" 
+                    style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
+                    value={splitForm.quantity}
+                    onChange={e => setSplitForm({ ...splitForm, quantity: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>{isID ? 'Qty Realisasi' : 'Issue Qty'}</label>
+                  <input 
+                    type="number" 
+                    className="form-control" 
+                    style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
+                    value={splitForm.issueQuantity}
+                    onChange={e => setSplitForm({ ...splitForm, issueQuantity: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+
+              {/* AUTO GENERATE INVOICE OPTION */}
+              <div style={{ margin:'10px 0', padding:'12px', background:'rgba(255,255,255,0.02)', border:'1px solid var(--glass-border)', borderRadius:'8px' }}>
+                <label style={{ display:'flex', alignItems:'center', gap:'10px', cursor:'pointer', fontWeight:'700', color:'var(--secondary)', fontSize:'0.9rem' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={splitForm.autoGenerateInvoice}
+                    onChange={e => setSplitForm({ ...splitForm, autoGenerateInvoice: e.target.checked })}
+                    style={{ width:'16px', height:'16px', accentColor:'var(--secondary)' }}
+                  />
+                  <span>{isID ? 'Terbitkan Invoice Otomatis untuk JO Baru' : 'Auto-Generate Invoice for New JO'}</span>
+                </label>
+              </div>
+
+              {splitForm.autoGenerateInvoice && (
+                <div style={{ padding:'15px', background:'rgba(255,255,255,0.02)', border:'1px solid var(--glass-border)', borderRadius:'10px', display:'flex', flexDirection:'column', gap:'12px' }}>
+                  <div style={{ fontSize:'0.75rem', color:'var(--secondary)', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'5px' }}>
+                    {isID ? 'Rincian Invoice Baru' : 'New Invoice Details'}
+                  </div>
+
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' }}>
+                    <div>
+                      <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>{isID ? 'No Invoice' : 'Invoice ID'}</label>
+                      <input 
+                        type="text" 
+                        className="form-control" 
+                        style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
+                        value={splitForm.invoiceId}
+                        onChange={e => setSplitForm({ ...splitForm, invoiceId: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>{isID ? 'Tgl Invoice' : 'Invoice Date'}</label>
+                      <input 
+                        type="date" 
+                        className="form-control" 
+                        style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
+                        value={splitForm.invoiceDate}
+                        onChange={e => setSplitForm({ ...splitForm, invoiceDate: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' }}>
+                    <div>
+                      <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>{isID ? 'Rekening Bank Perusahaan' : 'Company Bank Account'}</label>
+                      <select 
+                        className="form-control" 
+                        style={{ width:'100%', padding:'8px 12px', background:'var(--bg)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
+                        value={splitForm.bankAccountId}
+                        onChange={e => setSplitForm({ ...splitForm, bankAccountId: e.target.value })}
+                      >
+                        {companyBankAccounts.map(bank => (
+                          <option key={bank.id} value={bank.id}>{bank.bankName} - {bank.accountNumber} ({bank.accountName})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>{isID ? 'Pajak (%)' : 'Tax (%)'}</label>
+                      <input 
+                        type="number" 
+                        className="form-control" 
+                        style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
+                        value={splitForm.taxPercent}
+                        onChange={e => setSplitForm({ ...splitForm, taxPercent: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>{isID ? 'Catatan Invoice' : 'Invoice Notes'}</label>
+                    <textarea 
+                      className="form-control" 
+                      rows="2"
+                      style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px', resize:'vertical' }}
+                      value={splitForm.invoiceNotes}
+                      onChange={e => setSplitForm({ ...splitForm, invoiceNotes: e.target.value })}
+                    />
+                  </div>
+
+                  {/* PREVIEW AMOUNT */}
+                  <div style={{ marginTop:'10px', padding:'10px', background:'rgba(212, 175, 55, 0.05)', border:'1px solid rgba(212, 175, 55, 0.15)', borderRadius:'6px', display:'flex', justifyContent:'space-between', fontSize:'0.85rem' }}>
+                    <span style={{ color:'var(--text-muted)' }}>{isID ? 'Total Tagihan (Estimasi):' : 'Billing Total (Estimated):'}</span>
+                    <span style={{ color:'var(--secondary)', fontWeight:'800' }}>
+                      {(() => {
+                        const qty = parseFloat(splitForm.issueQuantity || splitForm.quantity || 1);
+                        const sub = parseFloat(splitForm.rate || 0) * qty;
+                        const tx = sub * (parseFloat(splitForm.taxPercent || 0) / 100);
+                        return `Rp ${(sub + tx).toLocaleString(isID ? 'id-ID' : 'en-US')}`;
+                      })()}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* BUTTONS */}
+            <div style={{ display:'flex', gap:'15px', marginTop:'25px' }}>
+              <button 
+                className="btn" 
+                onClick={() => setSplitModalData(null)}
+                style={{ flex:1, background:'rgba(255,255,255,0.05)', color:'var(--text)' }}
+                disabled={isProcessingSplit}
+              >
+                {isID ? 'Batal' : 'Cancel'}
+              </button>
+              <ButtonWithLoading
+                className="btn btn-gold"
+                loading={isProcessingSplit}
+                style={{ flex:1 }}
+                onClick={handleProcessSplit}
+              >
+                {isID ? 'Proses Pemisahan' : 'Process Split'}
+              </ButtonWithLoading>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Invoice Verification Modal */}
       {deleteConfirmModal && (

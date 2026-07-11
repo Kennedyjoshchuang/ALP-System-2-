@@ -124,7 +124,7 @@ const Executor = () => {
     const primaryJo = jobOrders.find(j => String(j.id) === String(invoice.joId));
     const consolidated = invoice.consolidatedJOs || [];
     if (consolidated.length > 0) {
-      return jobOrders.filter(j => consolidated.includes(j.id));
+      return jobOrders.filter(j => consolidated.map(String).includes(String(j.id)));
     }
     return primaryJo ? [primaryJo] : [];
   };
@@ -1560,7 +1560,7 @@ const Executor = () => {
                                       const linkedJO = jobOrders.find(j => String(j.id) === String(existingInvoice.joId));
                                       const linkedQuo = linkedJO ? quotations.find(q => String(q.id) === String(linkedJO.quotationId)) : null;
                                       const consolidatedJOs = existingInvoice.consolidatedJOs 
-                                        ? jobOrders.filter(j => existingInvoice.consolidatedJOs.includes(j.id))
+                                        ? jobOrders.filter(j => existingInvoice.consolidatedJOs.map(String).includes(String(j.id)))
                                         : linkedJO ? [linkedJO] : [];
                                       
                                       localStorage.setItem('print_invoice_data', JSON.stringify({ 

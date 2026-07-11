@@ -53,14 +53,18 @@ else
   read -p "SUPABASE_SERVICE_KEY: " supabase_service_key
   read -p "SUPABASE_ANON_KEY: " supabase_anon_key
 
+  # Generate a secure random JWT_SECRET
+  jwt_secret=$(openssl rand -hex 32 2>/dev/null || node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 2>/dev/null || echo "a5e3f1c2b4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1")
+
   cat > $APP_DIR/.env << EOF
 SUPABASE_URL=$supabase_url
 SUPABASE_SERVICE_KEY=$supabase_service_key
 SUPABASE_ANON_KEY=$supabase_anon_key
 PORT=5000
 NODE_ENV=production
+JWT_SECRET=$jwt_secret
 EOF
-  echo ".env file created."
+  echo ".env file created with generated JWT_SECRET."
 fi
 
 # Step 6: Build frontend

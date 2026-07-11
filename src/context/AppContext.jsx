@@ -550,7 +550,10 @@ export const AppProvider = ({ children }) => {
             items.push({
               description: item.description || 'Freight Forwarding Services',
               qty,
-              rate
+              rate,
+              containerNo: item.containerNo || [],
+              vehicleNo: item.vehicleNo || [],
+              driverName: item.driverName || []
             });
           }
         });
@@ -582,7 +585,10 @@ export const AppProvider = ({ children }) => {
         items.push({
           description: targetJo.instruction || targetJo.jobDescription || 'Freight Forwarding Services',
           qty,
-          rate
+          rate,
+          containerNo: Array.isArray(targetJo.containerNo) ? targetJo.containerNo : (targetJo.containerNo ? [targetJo.containerNo] : []),
+          vehicleNo: Array.isArray(targetJo.vehicleNo) ? targetJo.vehicleNo : (targetJo.vehicleNo ? [targetJo.vehicleNo] : []),
+          driverName: Array.isArray(targetJo.driverName) ? targetJo.driverName : (targetJo.driverName ? [targetJo.driverName] : [])
         });
       }
     });
@@ -635,7 +641,7 @@ export const AppProvider = ({ children }) => {
       
       // Update all consolidated JOs to 'invoiced'
       setJobOrders(prev => prev.map(j => 
-        consolidatedJOs.includes(j.id) ? { ...j, status: 'invoiced' } : j
+        consolidatedJOs.map(String).includes(String(j.id)) ? { ...j, status: 'invoiced' } : j
       ));
       
       return finalInvoice;
@@ -700,7 +706,7 @@ export const AppProvider = ({ children }) => {
       // Mark ALL consolidated JOs as invoiced
       if (consolidatedJOs.length > 0) {
         setJobOrders(prev => prev.map(j =>
-          consolidatedJOs.includes(j.id) ? { ...j, status: 'invoiced' } : j
+          consolidatedJOs.map(String).includes(String(j.id)) ? { ...j, status: 'invoiced' } : j
         ));
       }
       

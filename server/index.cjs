@@ -22,6 +22,9 @@ app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 // --- SECURITY & TOKEN MODULES ---
 const crypto = require('crypto');
+if (!process.env.JWT_SECRET) {
+  console.warn('⚠️ WARNING: JWT_SECRET is not set in environment variables. Falling back to a random secret generated at startup. User sessions will not persist across server restarts.');
+}
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 
 function generateToken(payload) {
