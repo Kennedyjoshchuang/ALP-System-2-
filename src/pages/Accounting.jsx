@@ -297,7 +297,8 @@ const Accounting = () => {
     const parentInvoice = joInvoiceMap[String(jo.id)];
     const linkedQuo = jo.quotationId ? quotations.find(q => String(q.id) === String(jo.quotationId)) : null;
 
-    const address = parentInvoice?.customerAddress || linkedQuo?.companyAddress || jo.address || '';
+    const customerObj = customers.find(c => c.name === (jo?.customerName || ''));
+    const address = parentInvoice?.customerAddress || linkedQuo?.companyAddress || jo.address || customerObj?.address || '';
     const pic = parentInvoice?.customerPic || linkedQuo?.pic || '';
     const phone = parentInvoice?.customerPhone || linkedQuo?.phone || '';
     const email = parentInvoice?.customerEmail || linkedQuo?.email || '';
@@ -1948,7 +1949,7 @@ const Accounting = () => {
         form: {
           id: newInvoiceId,
           customerName: linkedJO.customerName || '',
-          customerAddress: linkedQuo?.companyAddress || linkedJO?.address || '',
+          customerAddress: linkedQuo?.companyAddress || linkedJO?.address || customers.find(c => c.name === (linkedJO?.customerName || ''))?.address || '',
           customerPic: linkedQuo?.pic || '',
           customerPhone: linkedQuo?.phone || '',
           customerEmail: linkedQuo?.email || '',
@@ -2029,8 +2030,12 @@ const Accounting = () => {
       const linkedQuo = linkedJO?.quotationId
         ? quotations.find(q => String(q.id) === String(linkedJO.quotationId))
         : null;
+      const customerObj = customers.find(c => c.name === (linkedJO?.customerName || ''));
       const printData = {
-        invoice: newInv,
+        invoice: {
+          ...newInv,
+          customerAddress: newInv.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customerObj?.address || ''
+        },
         jo: linkedJO || null,
         consolidatedJOs: linkedJOs || [],
         quotation: linkedQuo || null,
@@ -2245,8 +2250,12 @@ const Accounting = () => {
       ? jobOrders.filter(j => enrichedInv.consolidatedJOs.map(String).includes(String(j.id)))
       : linkedJO ? [linkedJO] : [];
 
+    const customerObj = customers.find(c => c.name === (enrichedInv.customerName || ''));
     localStorage.setItem('print_invoice_data_' + enrichedInv.id, JSON.stringify({ 
-      invoice: enrichedInv, 
+      invoice: {
+        ...enrichedInv,
+        customerAddress: enrichedInv.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customerObj?.address || ''
+      }, 
       jo: linkedJO, 
       consolidatedJOs: consolidatedJOs,
       quotation: linkedQuo 
@@ -3125,7 +3134,7 @@ const Accounting = () => {
                       <div>
                         <p style={{ margin: '0 0 6px 0', fontSize: '0.65rem', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase' }}>DITAGIHKAN KEPADA:</p>
                         <p style={{ margin: '0 0 4px 0', fontSize: '1.4rem', fontWeight: '900', color: '#1e293b' }}>{inv.customerName}</p>
-                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569' }}>{linkedQuo?.companyAddress || linkedJO?.address || 'Indonesia'}</p>
+                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569' }}>{inv.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customers.find(c => c.name === (inv.customerName || ''))?.address || 'Indonesia'}</p>
                       </div>
                       <div style={{ textAlign: 'right', fontSize:'0.85rem' }}>
                          <p style={{ margin:0 }}><strong>Tanggal:</strong> {formatDate(inv.date)}</p>
@@ -4932,7 +4941,16 @@ const Accounting = () => {
                                                 const linkedJO = jobOrders.find(j => String(j.id) === String(inv.joId));
                                                 const linkedQuo = linkedJO ? quotations.find(q => String(q.id) === String(linkedJO.quotationId)) : null;
                                                 const consolidatedJOs = inv.consolidatedJOs ? jobOrders.filter(j => inv.consolidatedJOs.map(String).includes(String(j.id))) : linkedJO ? [linkedJO] : [];
-                                                localStorage.setItem('print_invoice_data_' + inv.id, JSON.stringify({ invoice: inv, jo: linkedJO, consolidatedJOs, quotation: linkedQuo }));
+                                                const customerObj = customers.find(c => c.name === (inv.customerName || ''));
+                                                localStorage.setItem('print_invoice_data_' + inv.id, JSON.stringify({ 
+                                                  invoice: {
+                                                    ...inv,
+                                                    customerAddress: inv.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customerObj?.address || ''
+                                                  }, 
+                                                  jo: linkedJO, 
+                                                  consolidatedJOs, 
+                                                  quotation: linkedQuo 
+                                                }));
                                                 window.open('/print/invoice-delivery?id=' + inv.id, '_blank');
                                               }}>
                                                 <FileText size={12} /> STT
@@ -5181,7 +5199,16 @@ const Accounting = () => {
                               const consolidatedJOs = inv.consolidatedJOs
                                 ? jobOrders.filter(j => inv.consolidatedJOs.map(String).includes(String(j.id)))
                                 : linkedJO ? [linkedJO] : [];
-                              localStorage.setItem('print_invoice_data_' + inv.id, JSON.stringify({ invoice: inv, jo: linkedJO, consolidatedJOs, quotation: linkedQuo }));
+                              const customerObj = customers.find(c => c.name === (inv.customerName || ''));
+                              localStorage.setItem('print_invoice_data_' + inv.id, JSON.stringify({ 
+                                invoice: {
+                                  ...inv,
+                                  customerAddress: inv.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customerObj?.address || ''
+                                }, 
+                                jo: linkedJO, 
+                                consolidatedJOs, 
+                                quotation: linkedQuo 
+                              }));
                               window.open('/print/invoice-delivery?id=' + inv.id, '_blank');
                             }}
                           >

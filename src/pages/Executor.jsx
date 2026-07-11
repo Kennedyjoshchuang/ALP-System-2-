@@ -56,7 +56,7 @@ const formatDuration = (dispatchedAt, completedAt, t, language) => {
 };
 
 const Executor = () => {
-  const { jobOrders, invoices = [], quotations = [], createInvoice, createCustomInvoice, deleteInvoice, updateJOStatus, completeJO, deleteJO, companyBankAccounts = [], t, language, hasAccess } = useApp();
+  const { jobOrders, invoices = [], quotations = [], createInvoice, createCustomInvoice, deleteInvoice, updateJOStatus, completeJO, deleteJO, companyBankAccounts = [], t, language, hasAccess, customers = [] } = useApp();
   const isID = language === 'id';
   const canWrite = hasAccess ? hasAccess('executor', true) : false;
   const navigate = useNavigate();
@@ -266,7 +266,7 @@ const Executor = () => {
         form: {
           id: newInvoiceId,
           customerName: linkedJO.customerName || '',
-          customerAddress: linkedQuo?.companyAddress || linkedJO?.address || '',
+          customerAddress: linkedQuo?.companyAddress || linkedJO?.address || customers.find(c => c.name === (linkedJO?.customerName || ''))?.address || '',
           customerPic: linkedQuo?.pic || '',
           customerPhone: linkedQuo?.phone || '',
           customerEmail: linkedQuo?.email || '',
@@ -345,8 +345,12 @@ const Executor = () => {
       const linkedQuo = linkedJO?.quotationId
         ? quotations.find(q => String(q.id) === String(linkedJO.quotationId))
         : null;
+      const customerObj = customers.find(c => c.name === (linkedJO?.customerName || ''));
       const printData = {
-        invoice: newInv,
+        invoice: {
+          ...newInv,
+          customerAddress: newInv.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customerObj?.address || ''
+        },
         jo: linkedJO || null,
         consolidatedJOs: linkedJOs || [],
         quotation: linkedQuo || null,
@@ -1562,9 +1566,12 @@ const Executor = () => {
                                       const consolidatedJOs = existingInvoice.consolidatedJOs 
                                         ? jobOrders.filter(j => existingInvoice.consolidatedJOs.map(String).includes(String(j.id)))
                                         : linkedJO ? [linkedJO] : [];
-                                      
+                                      const customerObj = customers.find(c => c.name === (existingInvoice.customerName || ''));
                                       localStorage.setItem('print_invoice_data', JSON.stringify({ 
-                                        invoice: existingInvoice, 
+                                        invoice: {
+                                          ...existingInvoice,
+                                          customerAddress: existingInvoice.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customerObj?.address || ''
+                                        }, 
                                         jo: linkedJO, 
                                         consolidatedJOs: consolidatedJOs,
                                         quotation: linkedQuo 

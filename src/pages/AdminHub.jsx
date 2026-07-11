@@ -17,6 +17,16 @@ const AdminHub = () => {
   const [selectedDispatchItems, setSelectedDispatchItems] = useState({});
   const [dispatchQuantities, setDispatchQuantities] = useState({});
   const [showModal, setShowModal] = useState(false);
+  const [showDirectJOModal, setShowDirectJOModal] = useState(false);
+  const [directJOForm, setDirectJOForm] = useState({
+    customerId: '',
+    customerName: '',
+    phone: '',
+    email: '',
+    companyAddress: '',
+    jobDescription: '',
+    items: [{ description: '', rate: '', quantity: 1 }]
+  });
   const [selectedQuoteId, setSelectedQuoteId] = useState('');
   const [selectedActivityIndex, setSelectedActivityIndex] = useState(0);
   const [selectedActivities, setSelectedActivities] = useState({});
@@ -49,7 +59,7 @@ const AdminHub = () => {
   const [selectedGroupKeys, setSelectedGroupKeys] = useState(new Set());
 
   if (!context) return null;
-  const { quotations = [], jobOrders = [], createJO, dispatchJO, vendors = [], purchaseOrders = [], invoices = [], createPurchaseOrder, updatePurchaseOrder, issuePurchaseOrder, deletePurchaseOrder, user, t, loading, language, hasAccess, convertLegacyJOs, convertBatchLegacyJOs } = context;
+  const { quotations = [], jobOrders = [], createJO, dispatchJO, vendors = [], purchaseOrders = [], invoices = [], createPurchaseOrder, updatePurchaseOrder, issuePurchaseOrder, deletePurchaseOrder, user, t, loading, language, hasAccess, convertLegacyJOs, convertBatchLegacyJOs, customers = [], theme } = context;
   
   const legacyGroups = React.useMemo(() => {
     const groups = {};
@@ -475,6 +485,59 @@ const AdminHub = () => {
     }
   };
 
+  const handleDirectJOSubmit = async (e) => {
+    e.preventDefault();
+    if (!canWrite) return;
+
+    if (!directJOForm.customerName.trim()) {
+      toast.error(isID ? 'Nama pelanggan harus diisi!' : 'Customer name is required!');
+      return;
+    }
+    if (!directJOForm.jobDescription.trim()) {
+      toast.error(isID ? 'Deskripsi pekerjaan harus diisi!' : 'Job description is required!');
+      return;
+    }
+
+    const joItems = directJOForm.items.map(item => ({
+      description: item.description,
+      rate: parseFloat(item.rate) || 0,
+      quantity: parseInt(item.quantity) || 1,
+      issueQuantity: 0,
+      status: 'pending'
+    }));
+
+    const totalQty = joItems.reduce((acc, it) => acc + it.quantity, 0);
+    const primaryRate = joItems[0]?.rate || 0;
+
+    try {
+      await createJO({
+        quotationId: null,
+        customerName: directJOForm.customerName,
+        jobDescription: directJOForm.jobDescription,
+        phone: directJOForm.phone || 'N/A',
+        email: directJOForm.email || 'N/A',
+        rate: primaryRate,
+        quantity: totalQty,
+        quoteValidity: 'N/A',
+        items: joItems
+      });
+      toast.success(isID ? 'Job Order berhasil dibuat!' : 'Job Order successfully created!');
+      setShowDirectJOModal(false);
+      setDirectJOForm({
+        customerId: '',
+        customerName: '',
+        phone: '',
+        email: '',
+        companyAddress: '',
+        jobDescription: '',
+        items: [{ description: '', rate: '', quantity: 1 }]
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error(isID ? 'Gagal membuat Job Order.' : 'Failed to create Job Order.');
+    }
+  };
+
   const handleDispatch = async (joId) => {
     if (!canWrite) return;
     const jo = jobOrders.find(j => j.id === joId);
@@ -850,6 +913,27 @@ const AdminHub = () => {
               {isID ? 'Buat Job Order' : 'Create Job Order'}
             </button>
             <button 
+              className="btn" 
+              style={{ 
+                background: theme === 'light' ? 'rgba(6, 95, 70, 0.08)' : 'rgba(255, 255, 255, 0.05)', 
+                color: 'var(--text)', 
+                border: theme === 'light' ? '1px solid rgba(6, 95, 70, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)', 
+                padding: '10px 22px', 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                alignItems: 'center', 
+                gap: '8px', 
+                borderRadius: '12px', 
+                fontWeight: '700' 
+              }} 
+              onClick={() => {
+                setShowDirectJOModal(true);
+              }}
+            >
+              <Plus size={18} />
+              {isID ? 'JO Tanpa Penawaran' : 'JO (No Quotation)'}
+            </button>
+            <button 
               className="btn btn-danger" 
               style={{ padding: '10px 22px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', borderRadius: '12px', fontWeight: '700' }}
               onClick={() => {
@@ -1130,6 +1214,222 @@ const AdminHub = () => {
                     {isID ? 'Batal' : 'Cancel'}
                   </button>
                   <ButtonWithLoading type="submit" className="btn btn-gold" style={{ flex: 1 }} disabled={!selectedQuoteId} onClick={handleModalSubmit}>
+                    {isID ? 'Buat Form JO' : 'Generate JO Form'}
+                  </ButtonWithLoading>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {showDirectJOModal && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.8)', zIndex: 1000,
+            display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center',
+            padding: '20px'
+          }}>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="glass-card" style={{ width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto', padding: '40px', position: 'relative', overflowX: 'auto' }}
+            >
+              <button onClick={() => setShowDirectJOModal(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+
+              <h3 style={{ marginBottom: '25px', color: 'var(--secondary)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px' }}>
+                <FileText size={24} />
+                {isID ? 'Job Order Baru (Tanpa Penawaran)' : 'New Job Order (No Quotation)'}
+              </h3>
+
+              <form onSubmit={handleDirectJOSubmit}>
+                <div className="input-group" style={{ marginBottom: '20px' }}>
+                  <label>{isID ? 'Pilih Pelanggan' : 'Select Customer'}</label>
+                  <select
+                    value={directJOForm.customerId}
+                    onChange={e => {
+                      const custId = e.target.value;
+                      if (custId === '') {
+                        setDirectJOForm(prev => ({
+                          ...prev,
+                          customerId: '',
+                          customerName: '',
+                          phone: '',
+                          email: '',
+                          companyAddress: ''
+                        }));
+                      } else {
+                        const selectedCust = customers.find(c => c.id === custId);
+                        if (selectedCust) {
+                          setDirectJOForm(prev => ({
+                            ...prev,
+                            customerId: custId,
+                            customerName: selectedCust.name || '',
+                            phone: selectedCust.phone || '',
+                            email: selectedCust.email || '',
+                            companyAddress: selectedCust.address || ''
+                          }));
+                        }
+                      }
+                    }}
+                    style={{ 
+                      width: '100%', 
+                      padding: '10px 15px', 
+                      borderRadius: '10px', 
+                      background: 'var(--input-bg)', 
+                      border: '1px solid var(--border)', 
+                      color: 'var(--text)',
+                      fontSize: '0.9rem',
+                      marginBottom: '15px'
+                    }}
+                  >
+                    <option value="">-- {isID ? 'Pilih Pelanggan Terdaftar / Input Manual' : 'Select Registered Customer / Manual Input'} --</option>
+                    {customers.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="input-group" style={{ marginBottom: '20px' }}>
+                  <label>{isID ? 'Nama Pelanggan' : 'Customer Name'} *</label>
+                  <input
+                    type="text"
+                    required
+                    value={directJOForm.customerName}
+                    onChange={e => setDirectJOForm(prev => ({ ...prev, customerName: e.target.value }))}
+                    style={{ width: '100%', padding: '10px 15px', borderRadius: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.9rem' }}
+                  />
+                </div>
+
+                <div className="grid-responsive-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+                  <div className="input-group">
+                    <label>{isID ? 'Telepon' : 'Phone'}</label>
+                    <input
+                      type="text"
+                      value={directJOForm.phone}
+                      onChange={e => setDirectJOForm(prev => ({ ...prev, phone: e.target.value }))}
+                      style={{ width: '100%', padding: '10px 15px', borderRadius: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.9rem' }}
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label>{isID ? 'Email' : 'Email'}</label>
+                    <input
+                      type="email"
+                      value={directJOForm.email}
+                      onChange={e => setDirectJOForm(prev => ({ ...prev, email: e.target.value }))}
+                      style={{ width: '100%', padding: '10px 15px', borderRadius: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.9rem' }}
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group" style={{ marginBottom: '20px' }}>
+                  <label>{isID ? 'Alamat Perusahaan' : 'Company Address'}</label>
+                  <textarea
+                    value={directJOForm.companyAddress}
+                    onChange={e => setDirectJOForm(prev => ({ ...prev, companyAddress: e.target.value }))}
+                    rows="2"
+                    style={{ width: '100%', padding: '10px 15px', borderRadius: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.9rem', resize: 'vertical' }}
+                  />
+                </div>
+
+                <div className="input-group" style={{ marginBottom: '20px' }}>
+                  <label>{isID ? 'Instruksi Pekerjaan / Deskripsi' : 'Job Instruction / Description'} *</label>
+                  <textarea
+                    required
+                    value={directJOForm.jobDescription}
+                    onChange={e => setDirectJOForm(prev => ({ ...prev, jobDescription: e.target.value }))}
+                    rows="3"
+                    style={{ width: '100%', padding: '10px 15px', borderRadius: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.9rem', resize: 'vertical' }}
+                    placeholder={isID ? "Masukkan rincian pekerjaan..." : "Enter job details..."}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '25px' }}>
+                  <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>{isID ? 'Item Pekerjaan' : 'Job Items'}</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {directJOForm.items.map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                        <div style={{ flex: 2, minWidth: '150px' }}>
+                          <input
+                            type="text"
+                            required
+                            placeholder={isID ? "Deskripsi Item" : "Item Description"}
+                            value={item.description}
+                            onChange={e => {
+                              const newItems = [...directJOForm.items];
+                              newItems[idx].description = e.target.value;
+                              setDirectJOForm(prev => ({ ...prev, items: newItems }));
+                            }}
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div style={{ flex: 1, minWidth: '100px' }}>
+                          <input
+                            type="number"
+                            required
+                            min="0"
+                            placeholder={isID ? "Harga Satuan" : "Unit Rate"}
+                            value={item.rate}
+                            onChange={e => {
+                              const newItems = [...directJOForm.items];
+                              newItems[idx].rate = e.target.value;
+                              setDirectJOForm(prev => ({ ...prev, items: newItems }));
+                            }}
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div style={{ width: '80px' }}>
+                          <input
+                            type="number"
+                            required
+                            min="1"
+                            placeholder={isID ? "Jumlah" : "Qty"}
+                            value={item.quantity}
+                            onChange={e => {
+                              const newItems = [...directJOForm.items];
+                              newItems[idx].quantity = parseInt(e.target.value) || 1;
+                              setDirectJOForm(prev => ({ ...prev, items: newItems }));
+                            }}
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        {directJOForm.items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newItems = directJOForm.items.filter((_, i) => i !== idx);
+                              setDirectJOForm(prev => ({ ...prev, items: newItems }));
+                            }}
+                            style={{ padding: '8px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDirectJOForm(prev => ({
+                        ...prev,
+                        items: [...prev.items, { description: '', rate: '', quantity: 1 }]
+                      }));
+                    }}
+                    className="btn"
+                    style={{ marginTop: '10px', background: 'rgba(255,255,255,0.05)', border: '1px dashed var(--border)', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', width: '100%', justifyContent: 'center', padding: '8px' }}
+                  >
+                    <Plus size={16} /> {isID ? 'Tambah Item' : 'Add Item'}
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px' }}>
+                  <button type="button" onClick={() => setShowDirectJOModal(false)} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)' }}>
+                    {isID ? 'Batal' : 'Cancel'}
+                  </button>
+                  <ButtonWithLoading type="submit" className="btn btn-gold" style={{ flex: 1 }}>
                     {isID ? 'Buat Form JO' : 'Generate JO Form'}
                   </ButtonWithLoading>
                 </div>
