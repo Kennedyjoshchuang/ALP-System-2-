@@ -2380,7 +2380,9 @@ const Accounting = () => {
       amount: subtotal + extraChargesTotal,
       subtotal: subtotal,
       tax: 0, // Reset old tax field if used
-      extra_charges: editingInvoice.extra_charges || []
+      extra_charges: editingInvoice.extra_charges || [],
+      consolidatedJOs: editingInvoice.consolidatedJOs || [],
+      items: editingInvoice.items
     });
     setEditingInvoice(null);
     toast.success('Invoice updated successfully!');
@@ -3941,7 +3943,7 @@ const Accounting = () => {
               </thead>
               <tbody>
                 {groupedPLData.map(group => {
-                  const isExpanded = expandedPLGroups[group.key] !== false;
+                  const isExpanded = expandedPLGroups[group.key] === true;
                   const groupFin = plGroupFinancials[group.key] || { cost: 0, revenue: 0, profitLoss: 0 };
                   
                   if (group.type === 'single') {
@@ -3956,7 +3958,7 @@ const Accounting = () => {
                       const invoice = joInvoiceMap[String(jo.id)];
                       const revenue = invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : jo.items.reduce((s, item) => s + parseFloat(item.rate || 0) * parseFloat(item.issueQuantity || item.quantity || 1), 0);
                       const profitLoss = revenue - totalCost;
-                      const isJoExpanded = expandedJOPL[jo.id] !== false;
+                      const isJoExpanded = expandedJOPL[jo.id] === true;
 
                       return (
                         <React.Fragment key={jo.id}>
@@ -4289,7 +4291,7 @@ const Accounting = () => {
                           const invoice = joInvoiceMap[String(jo.id)];
                           const revenue = invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : jo.items.reduce((s, item) => s + parseFloat(item.rate || 0) * parseFloat(item.issueQuantity || item.quantity || 1), 0);
                           const profitLoss = revenue - totalCost;
-                          const isJoExpanded = expandedJOPL[jo.id] !== false;
+                          const isJoExpanded = expandedJOPL[jo.id] === true;
 
                           return (
                             <React.Fragment key={jo.id}>
@@ -5022,17 +5024,14 @@ const Accounting = () => {
                       onChange={() => toggleAllIssued(filteredIssuedInvoices)}
                     />
                   </th>
-                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'ID Inv / JO' : 'Inv ID / JO'}</th>
+                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'ID Inv / JO / Tgl' : 'Inv ID / JO / Date'}</th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'No. Kontainer' : 'Container No.'}</th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Info Pengiriman' : 'Shipment Info'}</th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Pelanggan' : 'Customer'}</th>
-                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Tanggal' : 'Date'}</th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'right' }}>{isID ? 'Pendapatan (INV)' : 'Revenue (INV)'}</th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'right' }}>{isID ? 'Total Biaya' : 'Total Cost'}</th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'right' }}>{isID ? 'Laba/Rugi' : 'Profit/Loss'}</th>
-                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'center' }}>{isID ? 'Dok TTD' : 'Signed Doc'}</th>
-                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'center' }}>{isID ? 'Pengiriman' : 'Delivery'}</th>
-                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'center' }}>{isID ? 'Status' : 'Status'}</th>
+                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'center' }}>{isID ? 'Status & Dokumen' : 'Status & Docs'}</th>
                   <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'center' }}>{isID ? 'Aksi' : 'Action'}</th>
                 </tr>
               </thead>
@@ -5079,6 +5078,10 @@ const Accounting = () => {
                             });
                           })()}
                         </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <strong>{isID ? 'Tgl: ' : 'Date: '}</strong>
+                          <span>{new Date(inv.date).toLocaleDateString()}</span>
+                        </div>
                       </td>
                       <td style={{ padding: '15px' }}>
                         {(() => {
@@ -5110,7 +5113,6 @@ const Accounting = () => {
                         {renderShipmentInfo(getAssociatedJOs(inv))}
                       </td>
                       <td style={{ padding: '15px', fontWeight: '600' }}>{inv.customerName}</td>
-                      <td style={{ padding: '15px', fontSize: '0.85rem' }}>{new Date(inv.date).toLocaleDateString()}</td>
                       <td 
                         style={{ padding: '15px', textAlign: 'right', fontWeight: '700', color: 'var(--success)', fontSize: '1rem', cursor: 'pointer' }}
                         onClick={() => { setActiveTab('costing'); setSearchTerm(inv.joId); }}
@@ -5138,44 +5140,46 @@ const Accounting = () => {
                           const revenue = inv.amount || inv.subtotal;
                           const profit = revenue - totalCost;
                           return (
-                            <span style={{ color: profit > 0 ? 'var(--success)' : profit < 0 ? 'var(--danger)' : 'inherit' }}>
-                              Rp {profit.toLocaleString('id-ID')}
-                            </span>
+                              <span style={{ color: profit > 0 ? 'var(--success)' : profit < 0 ? 'var(--danger)' : 'inherit' }}>
+                                Rp {profit.toLocaleString('id-ID')}
+                              </span>
                           );
                         })()}
                       </td>
                       <td style={{ padding: '15px', textAlign: 'center' }}>
-                         <div style={{ display:'flex', flexDirection:'column', gap:'5px', alignItems:'center' }}>
-                           <div style={{ display:'flex', gap:'8px' }}>
-                             {inv.signedInvoicePhoto ? (
-                               <button onClick={() => setPhotoViewer({ title: `Signed Invoice - ${inv.id}`, photos: [inv.signedInvoicePhoto] })} style={{ background:'none', border:'none', color:'var(--success)', cursor:'pointer' }} title={isID ? 'Invoice TTD Diunggah' : 'Signed Invoice Uploaded'}><ShieldCheck size={18}/></button>
-                             ) : (
-                               <button onClick={() => setUploadSignedModal({ invId: inv.id, type: 'invoice' })} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }} title={isID ? 'Unggah Invoice TTD' : 'Upload Signed Invoice'}><Image size={18}/></button>
-                             )}
-                             {inv.signedReceiptPhoto ? (
-                               <button onClick={() => setPhotoViewer({ title: `Signed Delivery Receipt - ${inv.id}`, photos: [inv.signedReceiptPhoto] })} style={{ background:'none', border:'none', color:'var(--info)', cursor:'pointer' }} title={isID ? 'STT TTD Diunggah' : 'Signed STT Uploaded'}><ShieldCheck size={18}/></button>
-                             ) : (
-                               <button onClick={() => setUploadSignedModal({ invId: inv.id, type: 'receipt' })} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }} title={isID ? 'Unggah STT TTD' : 'Upload Signed STT'}><FileText size={18}/></button>
-                             )}
+                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+                           <div>
+                             <span className={`badge badge-${inv.status}`} style={{ fontSize: '0.7rem' }}>{inv.status}</span>
                            </div>
-                           <span style={{ fontSize:'0.65rem', color:'var(--text-muted)' }}>
-                             {!inv.signedInvoicePhoto && !inv.signedReceiptPhoto ? (isID ? 'Tertunda' : 'Pending') : (isID ? 'Sebagian/Lengkap' : 'Partial/Complete')}
-                           </span>
+                           <div>
+                             <select 
+                               value={inv.deliveryStatus || 'not_sent'} 
+                               onChange={(e) => updateInvoice(inv.id, { deliveryStatus: e.target.value })}
+                               style={{ background:'var(--input-bg)', border:'1px solid var(--glass-border)', color:'var(--text)', fontSize:'0.7rem', padding:'4px', borderRadius:'4px' }}
+                             >
+                               <option value="not_sent" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{isID ? 'Belum Dikirim' : 'Not Sent'}</option>
+                               <option value="on_process" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{isID ? 'Proses Kirim' : 'On Process'}</option>
+                               <option value="delivered" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{isID ? 'Diterima' : 'Delivered'}</option>
+                             </select>
+                           </div>
+                           <div style={{ display:'flex', flexDirection:'column', gap:'5px', alignItems:'center' }}>
+                             <div style={{ display:'flex', gap:'8px' }}>
+                               {inv.signedInvoicePhoto ? (
+                                 <button onClick={() => setPhotoViewer({ title: `Signed Invoice - ${inv.id}`, photos: [inv.signedInvoicePhoto] })} style={{ background:'none', border:'none', color:'var(--success)', cursor:'pointer' }} title={isID ? 'Invoice TTD Diunggah' : 'Signed Invoice Uploaded'}><ShieldCheck size={18}/></button>
+                               ) : (
+                                 <button onClick={() => setUploadSignedModal({ invId: inv.id, type: 'invoice' })} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }} title={isID ? 'Unggah Invoice TTD' : 'Upload Signed Invoice'}><Image size={18}/></button>
+                               )}
+                               {inv.signedReceiptPhoto ? (
+                                 <button onClick={() => setPhotoViewer({ title: `Signed Delivery Receipt - ${inv.id}`, photos: [inv.signedReceiptPhoto] })} style={{ background:'none', border:'none', color:'var(--info)', cursor:'pointer' }} title={isID ? 'STT TTD Diunggah' : 'Signed STT Uploaded'}><ShieldCheck size={18}/></button>
+                               ) : (
+                                 <button onClick={() => setUploadSignedModal({ invId: inv.id, type: 'receipt' })} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }} title={isID ? 'Unggah STT TTD' : 'Upload Signed STT'}><FileText size={18}/></button>
+                               )}
+                             </div>
+                             <span style={{ fontSize:'0.65rem', color:'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                               {!inv.signedInvoicePhoto && !inv.signedReceiptPhoto ? (isID ? 'Dokumen: Tertunda' : 'Docs: Pending') : (isID ? 'Dokumen: Sebagian/Lengkap' : 'Docs: Partial/Complete')}
+                             </span>
+                           </div>
                          </div>
-                      </td>
-                      <td style={{ padding: '15px', textAlign: 'center' }}>
-                         <select 
-                           value={inv.deliveryStatus || 'not_sent'} 
-                           onChange={(e) => updateInvoice(inv.id, { deliveryStatus: e.target.value })}
-                           style={{ background:'var(--input-bg)', border:'1px solid var(--glass-border)', color:'var(--text)', fontSize:'0.7rem', padding:'4px', borderRadius:'4px' }}
-                         >
-                           <option value="not_sent" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{isID ? 'Belum Dikirim' : 'Not Sent'}</option>
-                           <option value="on_process" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{isID ? 'Proses Kirim' : 'On Process'}</option>
-                           <option value="delivered" style={{ background: 'var(--bg)', color: 'var(--text)' }}>{isID ? 'Diterima' : 'Delivered'}</option>
-                         </select>
-                      </td>
-                      <td style={{ padding: '15px', textAlign: 'center' }}>
-                        <span className={`badge badge-${inv.status}`} style={{ fontSize: '0.7rem' }}>{inv.status}</span>
                       </td>
                       <td style={{ padding: '15px', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
@@ -6748,7 +6752,7 @@ const Accounting = () => {
       {/* Edit Invoice Modal */}
       {editingInvoice && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:10000, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }}>
-          <div className="glass-card" style={{ width:'100%', maxWidth:'500px', padding:'30px', position:'relative' }}>
+          <div className="glass-card" style={{ width:'100%', maxWidth: editingInvoice.items ? '750px' : '500px', padding:'30px', position:'relative' }}>
             <button onClick={() => setEditingInvoice(null)} style={{ position:'absolute', top:'15px', right:'15px', background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer' }}><X size={20}/></button>
             <h3 style={{ color:'var(--secondary)', marginBottom:'5px' }}>Edit Invoice Details</h3>
             <p style={{ color:'var(--text-muted)', fontSize:'0.85rem', marginBottom:'25px' }}>Revision for <strong style={{color:'var(--text)'}}>{editingInvoice.id}</strong></p>
@@ -6763,10 +6767,113 @@ const Accounting = () => {
                     step="any" 
                     value={editingInvoice.subtotal || editingInvoice.amount} 
                     onChange={e => setEditingInvoice({...editingInvoice, subtotal: e.target.value})}
-                    style={{ width:'100%', padding:'12px 15px 12px 45px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'10px', color:'var(--text)', fontSize:'1.1rem', fontWeight:'700' }}
+                    disabled={Array.isArray(editingInvoice.items)}
+                    style={{ width:'100%', padding:'12px 15px 12px 45px', background: Array.isArray(editingInvoice.items) ? 'rgba(255,255,255,0.02)' : 'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'10px', color: Array.isArray(editingInvoice.items) ? 'var(--text-muted)' : 'var(--text)', fontSize:'1.1rem', fontWeight:'700', cursor: Array.isArray(editingInvoice.items) ? 'not-allowed' : 'auto' }}
                   />
                 </div>
               </div>
+
+              {Array.isArray(editingInvoice.items) && (
+                <div>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' }}>
+                    <label style={{ fontSize:'0.75rem', color:'var(--text-muted)', textTransform:'uppercase', fontWeight:'700' }}>
+                      {isID ? 'Item Invoice (Per Item)' : 'Invoice Items'}
+                    </label>
+                    <button 
+                      onClick={() => {
+                        const newItems = [...(editingInvoice.items || []), { description: 'Freight Forwarding Services', qty: 1, rate: 0, amount: 0 }];
+                        const newSubtotal = newItems.reduce((sum, item) => sum + (parseFloat(item.qty || 0) * parseFloat(item.rate || 0)), 0);
+                        setEditingInvoice({
+                          ...editingInvoice,
+                          items: newItems,
+                          subtotal: newSubtotal
+                        });
+                      }}
+                      style={{ background:'var(--secondary-bg)', color:'var(--secondary)', border:'1px solid var(--secondary)', borderRadius:'6px', padding:'4px 10px', fontSize:'0.7rem', cursor:'pointer' }}
+                    >
+                      + {isID ? 'Tambah Item' : 'Add Item'}
+                    </button>
+                  </div>
+
+                  <div style={{ display:'grid', gap:'12px', maxHeight:'200px', overflowY:'auto', paddingRight:'5px', marginBottom: '10px' }}>
+                    {(editingInvoice.items || []).map((item, idx) => (
+                      <div key={idx} style={{ display:'grid', gridTemplateColumns:'2.2fr 0.8fr 1.2fr 1fr 32px', gap:'8px', alignItems:'center' }}>
+                        <div>
+                          <input 
+                            type="text" 
+                            placeholder={isID ? "Deskripsi" : "Description"}
+                            value={item.description || ''} 
+                            onChange={e => {
+                              const newItems = [...editingInvoice.items];
+                              newItems[idx] = { ...newItems[idx], description: e.target.value };
+                              setEditingInvoice({...editingInvoice, items: newItems});
+                            }}
+                            style={{ width: '100%', padding:'6px 10px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.8rem' }}
+                          />
+                        </div>
+                        <div>
+                          <input 
+                            type="number" 
+                            placeholder="Qty" 
+                            value={item.qty || 0} 
+                            onChange={e => {
+                              const val = parseFloat(e.target.value || 0);
+                              const newItems = [...editingInvoice.items];
+                              const newRate = parseFloat(newItems[idx].rate || 0);
+                              newItems[idx] = { 
+                                ...newItems[idx], 
+                                qty: val,
+                                amount: val * newRate
+                              };
+                              const newSubtotal = newItems.reduce((sum, it) => sum + (parseFloat(it.qty || 0) * parseFloat(it.rate || 0)), 0);
+                              setEditingInvoice({...editingInvoice, items: newItems, subtotal: newSubtotal});
+                            }}
+                            style={{ width: '100%', padding:'6px 10px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.8rem', fontWeight:'600' }}
+                          />
+                        </div>
+                        <div>
+                          <input 
+                            type="number" 
+                            placeholder="Rate" 
+                            value={item.rate || 0} 
+                            onChange={e => {
+                              const val = parseFloat(e.target.value || 0);
+                              const newItems = [...editingInvoice.items];
+                              const newQty = parseFloat(newItems[idx].qty || 0);
+                              newItems[idx] = { 
+                                ...newItems[idx], 
+                                rate: val,
+                                amount: newQty * val
+                              };
+                              const newSubtotal = newItems.reduce((sum, it) => sum + (parseFloat(it.qty || 0) * parseFloat(it.rate || 0)), 0);
+                              setEditingInvoice({...editingInvoice, items: newItems, subtotal: newSubtotal});
+                            }}
+                            style={{ width: '100%', padding:'6px 10px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.8rem', fontWeight:'600' }}
+                          />
+                        </div>
+                        <div style={{ padding:'6px 10px', color:'var(--text)', fontSize:'0.8rem', fontWeight:'700', textAlign: 'right' }}>
+                          Rp {((item.qty || 0) * (item.rate || 0)).toLocaleString()}
+                        </div>
+                        <button 
+                          onClick={() => {
+                            const newItems = (editingInvoice.items || []).filter((_, i) => i !== idx);
+                            const newSubtotal = newItems.reduce((sum, it) => sum + (parseFloat(it.qty || 0) * parseFloat(it.rate || 0)), 0);
+                            setEditingInvoice({...editingInvoice, items: newItems, subtotal: newSubtotal});
+                          }}
+                          style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'none', borderRadius:'6px', height:'32px', width: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor:'pointer' }}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    {(editingInvoice.items || []).length === 0 && (
+                      <p style={{ textAlign:'center', color:'var(--text-muted)', fontSize:'0.8rem', padding:'10px', background:'rgba(255,255,255,0.02)', borderRadius:'8px' }}>
+                        {isID ? 'Tidak ada item' : 'No items'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' }}>
