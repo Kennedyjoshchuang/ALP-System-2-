@@ -89,6 +89,7 @@ db.exec(`
     date TEXT,
     status TEXT,
     notes TEXT,
+    paidDate TEXT,
     FOREIGN KEY(joId) REFERENCES job_orders(id)
   );
 
@@ -101,6 +102,7 @@ db.exec(`
     tax REAL,
     balance REAL,
     status TEXT,
+    paidDate TEXT,
     FOREIGN KEY(invoiceId) REFERENCES invoices(id)
   );
 
@@ -254,5 +256,15 @@ try {
   }
   console.log('Migrated existing SQLite job_orders to include items');
 } catch (e) { console.log('Items column already exists or migration failed: ' + e.message); }
+
+try {
+  db.prepare("ALTER TABLE invoices ADD COLUMN paidDate TEXT").run();
+  console.log('Added paidDate to invoices');
+} catch (e) { /* column likely exists */ }
+
+try {
+  db.prepare("ALTER TABLE receivables ADD COLUMN paidDate TEXT").run();
+  console.log('Added paidDate to receivables');
+} catch (e) { /* column likely exists */ }
 
 module.exports = db;

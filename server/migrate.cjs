@@ -28,6 +28,18 @@ try {
     console.log('✅ Added "generalNotes" column to quotations table.');
   } catch (e) { console.log('ℹ️ "generalNotes" column in quotations already exists.'); }
 
+  // --- INVOICES TABLE ---
+  try {
+    db.exec("ALTER TABLE invoices ADD COLUMN paidDate TEXT;");
+    console.log('✅ Added "paidDate" column to invoices table.');
+  } catch (e) { console.log('ℹ️ "paidDate" column in invoices already exists.'); }
+
+  // --- RECEIVABLES TABLE ---
+  try {
+    db.exec("ALTER TABLE receivables ADD COLUMN paidDate TEXT;");
+    console.log('✅ Added "paidDate" column to receivables table.');
+  } catch (e) { console.log('ℹ️ "paidDate" column in receivables already exists.'); }
+
   console.log('🎉 Migration finished successfully!');
 } catch (err) {
   console.error('❌ Migration failed:', err);

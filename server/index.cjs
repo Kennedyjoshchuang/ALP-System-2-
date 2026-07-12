@@ -888,6 +888,42 @@ app.delete('/api/job-orders/:id', async (req, res) => {
 });
 
 // --- INVOICES ---
+const ROMAN_MONTHS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+
+async function getNextInvoiceId(supabase, projectCode) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const monthRoman = ROMAN_MONTHS[now.getMonth()];
+  const suffix = `/${projectCode}-INV/${monthRoman}/${year}`;
+
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('id')
+    .like('id', `%/${projectCode}-INV/%/${year}`);
+
+  if (error) {
+    console.error('Error fetching invoices for sequence:', error);
+    return `001${suffix}`;
+  }
+
+  let maxSeq = 0;
+  if (data && data.length > 0) {
+    for (const inv of data) {
+      const parts = inv.id.split('/');
+      if (parts.length >= 4) {
+        const seqNum = parseInt(parts[0], 10);
+        if (!isNaN(seqNum) && seqNum > maxSeq) {
+          maxSeq = seqNum;
+        }
+      }
+    }
+  }
+
+  const nextSeq = maxSeq + 1;
+  const seqStr = String(nextSeq).padStart(3, '0');
+  return `${seqStr}${suffix}`;
+}
+
 app.get('/api/invoices', async (req, res) => {
   const { data, error } = await supabase.from('invoices').select('*');
   if (error) return handleError(res, error, 'GET invoices');
@@ -895,9 +931,17 @@ app.get('/api/invoices', async (req, res) => {
 });
 
 app.post('/api/invoices', async (req, res) => {
-  const { id, joId, customerName, amount, subtotal, tax, extra_charges, date, status, notes, consolidatedJOs } = req.body;
+  let { id, joId, customerName, amount, subtotal, tax, extra_charges, date, status, notes, consolidatedJOs } = req.body;
   
   try {
+    // Generate sequential ID if the incoming ID is a client-side temporary ID or missing
+    const tempIdPattern = /^INV-(?:CUST-)?\d{10,15}-\d{3}$/;
+    if (!id || tempIdPattern.test(id)) {
+      const originalId = id;
+      id = await getNextInvoiceId(supabase, 'ALP');
+      console.log(`[POST /invoices] Replaced temporary ID ${originalId} with sequential ID: ${id}`);
+    }
+
     // 1. Create Invoice — try with all columns, fallback if schema is old
     const invoiceData = {
       id, joId, customerName,
@@ -1025,7 +1069,7 @@ app.put('/api/invoices/:id', async (req, res) => {
 });
 
 app.put('/api/invoices/:id/settle', async (req, res) => {
-  const { paymentProofPhoto, taxesDeducted, taxDeductionProof } = req.body;
+  const { paymentProofPhoto, taxesDeducted, taxDeductionProof, paidDate } = req.body;
   
   // Calculate total tax from the array
   const taxesArr = Array.isArray(taxesDeducted) ? taxesDeducted : [];
@@ -1038,12 +1082,13 @@ app.put('/api/invoices/:id/settle', async (req, res) => {
       status: 'paid',
       tax_deduction: totalTax,
       taxes_deducted: taxesJson,
-      tax_deduction_proof: taxDeductionProof
+      tax_deduction_proof: taxDeductionProof,
+      paidDate
     }).eq('id', req.params.id);
     
     if (invErr) {
       console.warn(`[SETTLE] Invoice update failed for ${req.params.id}: ${invErr.message}`);
-      // Fallback if taxes_deducted column is missing
+      // Fallback if columns are missing
       if (invErr.message.includes('column') || invErr.code === '42703') {
         await supabase.from('invoices').update({ 
           status: 'paid', 
@@ -1059,7 +1104,8 @@ app.put('/api/invoices/:id/settle', async (req, res) => {
       paymentProofPhoto,
       tax_deduction: totalTax,
       taxes_deducted: taxesJson,
-      tax_deduction_proof: taxDeductionProof
+      tax_deduction_proof: taxDeductionProof,
+      paidDate
     }).eq('invoiceId', req.params.id);
     
     if (recErr) {

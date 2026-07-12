@@ -320,7 +320,7 @@ const Accounting = () => {
       quantity: parseInt(item.quantity || 1, 10),
       issueQuantity: parseInt(item.issueQuantity || 0, 10),
       autoGenerateInvoice: !!parentInvoice,
-      invoiceId: generatedInvId,
+      invoiceId: '',
       invoiceDate: new Date().toISOString().substring(0, 10),
       taxPercent,
       bankAccountId: initialBankAccountId,
@@ -1947,7 +1947,7 @@ const Accounting = () => {
         consolidatedJOIds: targetJOs.map(j => j.id),
         linkedJOs: targetJOs,
         form: {
-          id: newInvoiceId,
+          id: '',
           customerName: linkedJO.customerName || '',
           customerAddress: linkedQuo?.companyAddress || linkedJO?.address || customers.find(c => c.name === (linkedJO?.customerName || ''))?.address || '',
           customerPic: linkedQuo?.pic || '',
@@ -2294,7 +2294,8 @@ const Accounting = () => {
     setSettleForm({ 
       paymentProof: getInitialPhotos(inv.paymentProofPhoto), 
       taxes: existingTaxes, 
-      taxProof: getInitialPhotos(inv.tax_deduction_proof) 
+      taxProof: getInitialPhotos(inv.tax_deduction_proof),
+      paymentDate: new Date().toLocaleDateString('sv-SE')
     });
   };
 
@@ -2302,7 +2303,7 @@ const Accounting = () => {
     if (!canWrite) return;
     if (!settleModal) return;
     try {
-      await settleInvoice(settleModal.id, settleForm.paymentProof, settleForm.taxes, settleForm.taxProof);
+      await settleInvoice(settleModal.id, settleForm.paymentProof, settleForm.taxes, settleForm.taxProof, settleForm.paymentDate);
       setSettleModal(null);
       toast.error('Payment settled! Invoice moved to Lunas Records.');
     } catch (err) {
@@ -3813,7 +3814,7 @@ const Accounting = () => {
             onClick={() => {
               const dateVal = new Date().toISOString().substring(0, 10);
               setCustomInvoiceForm({
-                id: `INV-CUST-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+                id: '',
                 joId: '',
                 customerName: '',
                 date: dateVal,
@@ -5401,6 +5402,11 @@ const Accounting = () => {
                       </td>
                       <td style={{ padding: '15px', fontWeight: 'bold' }}>
                         Rp {(item.balance || item.amount).toLocaleString()}
+                        {receivableSubTab === 'lunas' && item.paidDate && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--success)', fontWeight: 'normal', marginTop: '4px' }}>
+                            {isID ? 'Lunas: ' : 'Paid: '}{item.paidDate}
+                          </div>
+                        )}
                       </td>
                       {receivableSubTab === 'lunas' && (
                         <td style={{ padding: '15px' }}>
@@ -6904,9 +6910,8 @@ const Accounting = () => {
                     type="text" 
                     value={customInvoiceForm.id} 
                     onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, id: e.target.value })}
-                    placeholder="INV-CUST-XXXX"
+                    placeholder={isID ? '(Otomatis - Sequential)' : '(Auto-generated Sequential)'}
                     style={{ width:'100%', padding:'10px 12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontSize:'0.9rem' }}
-                    required
                   />
                 </div>
                 <div>
@@ -8229,6 +8234,28 @@ const Accounting = () => {
             <p style={{ color:'var(--text-muted)', fontSize:'0.85rem', marginBottom:'25px' }}>Invoice: <strong>{settleModal.id}</strong> - {settleModal.customerName}</p>
             
             <div style={{ marginBottom:'20px' }}>
+              <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>
+                {isID ? 'Tanggal Pembayaran' : 'Payment Date'}
+              </label>
+              <input 
+                type="date"
+                required
+                value={settleForm.paymentDate || ''}
+                onChange={e => setSettleForm({...settleForm, paymentDate: e.target.value})}
+                style={{ 
+                  padding:'10px', 
+                  background:'var(--input-bg)', 
+                  border:'1px solid var(--border)', 
+                  borderRadius:'8px', 
+                  color:'var(--text)', 
+                  fontSize:'0.9rem',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom:'20px' }}>
               <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Bukti Pembayaran' : 'Bukti Pembayaran (Payment Proof)'}</label>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(70px, 1fr))', gap:'10px', marginBottom:'10px' }}>
                 {(settleForm.paymentProof || []).map((p, i) => (
@@ -8651,7 +8678,7 @@ const Accounting = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
                 <div>
                   <label style={labelStyle}>{isID ? 'No. Invoice' : 'Invoice No.'}</label>
-                  <input style={inputStyle} value={f.id} onChange={e => setF({ id: e.target.value })} placeholder="INV-..." />
+                  <input style={inputStyle} value={f.id} onChange={e => setF({ id: e.target.value })} placeholder={isID ? '(Otomatis - Sequential)' : '(Auto-generated Sequential)'} />
                 </div>
                 <div>
                   <label style={labelStyle}>{isID ? 'Tanggal Invoice' : 'Invoice Date'}</label>
@@ -9080,6 +9107,7 @@ const Accounting = () => {
                         style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
                         value={splitForm.invoiceId}
                         onChange={e => setSplitForm({ ...splitForm, invoiceId: e.target.value })}
+                        placeholder={isID ? '(Otomatis - Sequential)' : '(Auto-generated Sequential)'}
                       />
                     </div>
                     <div>

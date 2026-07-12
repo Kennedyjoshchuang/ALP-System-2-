@@ -264,7 +264,7 @@ const Executor = () => {
         consolidatedJOIds: targetJOs.map(j => j.id),
         linkedJOs: targetJOs,
         form: {
-          id: newInvoiceId,
+          id: '',
           customerName: linkedJO.customerName || '',
           customerAddress: linkedQuo?.companyAddress || linkedJO?.address || customers.find(c => c.name === (linkedJO?.customerName || ''))?.address || '',
           customerPic: linkedQuo?.pic || '',
@@ -2044,7 +2044,7 @@ const Executor = () => {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '24px' }}>
                 <div>
                   <label style={labelStyle}>{isID ? 'No. Invoice' : 'Invoice No.'}</label>
-                  <input type="text" value={f.id} onChange={(e) => setF({ id: e.target.value })} style={inputStyle} />
+                  <input type="text" value={f.id} onChange={(e) => setF({ id: e.target.value })} placeholder={isID ? '(Otomatis - Sequential)' : '(Auto-generated Sequential)'} style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>{isID ? 'Tanggal Invoice' : 'Invoice Date'}</label>

@@ -114,7 +114,8 @@ CREATE TABLE IF NOT EXISTS invoices (
     "currentRate" NUMERIC DEFAULT 1,
     "usedRate" NUMERIC DEFAULT 1,
     "disableCascade" BOOLEAN DEFAULT false,
-    "consolidatedJOs" JSONB DEFAULT '[]'::jsonb
+    "consolidatedJOs" JSONB DEFAULT '[]'::jsonb,
+    "paidDate" TEXT
 );
 
 -- 7. Receivables
@@ -128,7 +129,8 @@ CREATE TABLE IF NOT EXISTS receivables (
     extra_charges JSONB DEFAULT '[]'::jsonb,
     balance NUMERIC,
     status TEXT,
-    paymentProofPhoto TEXT
+    paymentProofPhoto TEXT,
+    "paidDate" TEXT
 );
 
 -- 8. Vendors
