@@ -600,10 +600,6 @@ export const AppProvider = ({ children }) => {
     const newInvoiceId = `INV-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
     const consolidatedJOs = targetJOs.map(j => j.id);
 
-    const packedNotes = notes
-      ? `${notes} ||| ${JSON.stringify({ consolidatedJOs, items })}`
-      : `||| ${JSON.stringify({ consolidatedJOs, items })}`;
-
     const newInvoice = {
       id: newInvoiceId,
       joId, // Primary JO reference
@@ -614,7 +610,7 @@ export const AppProvider = ({ children }) => {
       tax: 0,
       date: new Date().toISOString(),
       status: 'unpaid',
-      notes: packedNotes,
+      notes: notes || null,
       extra_charges: [],
       signedReceiptPhoto: null,
       signedInvoicePhoto: null,
@@ -660,10 +656,6 @@ export const AppProvider = ({ children }) => {
       : invoiceData.joId ? [invoiceData.joId] : [];
 
     const items = invoiceData.items || [];
-    const packedNotes = invoiceData.notes
-      ? `${invoiceData.notes} ||| ${JSON.stringify({ consolidatedJOs, items })}`
-      : `||| ${JSON.stringify({ consolidatedJOs, items })}`;
-
     const newInvoice = {
       id: newInvoiceId,
       joId: invoiceData.joId || null,
@@ -678,7 +670,7 @@ export const AppProvider = ({ children }) => {
       tax: cleanNumber(invoiceData.tax || 0),
       date: invoiceData.date || new Date().toISOString(),
       status: invoiceData.status || 'unpaid',
-      notes: packedNotes,
+      notes: invoiceData.notes || null,
       extra_charges: invoiceData.extra_charges || [],
       signedReceiptPhoto: null,
       signedInvoicePhoto: null,
@@ -890,23 +882,9 @@ export const AppProvider = ({ children }) => {
     setReceivables(prev => prev.filter(r => r.invoiceId !== id));
   };
   const updateInvoice = async (id, updates) => {
-    const { consolidatedJOs, items, ...cleanUpdates } = updates;
-    const originalInv = invoices.find(inv => inv.id === id);
-    
-    if (consolidatedJOs !== undefined || items !== undefined || updates.notes !== undefined) {
-      const targetConsolidated = consolidatedJOs !== undefined ? consolidatedJOs : (originalInv ? originalInv.consolidatedJOs : []);
-      const targetItems = items !== undefined ? items : (originalInv ? originalInv.items : []);
-      const targetNotes = updates.notes !== undefined ? updates.notes : (originalInv ? originalInv.notes : '');
-      const notesString = targetNotes || '';
-      
-      cleanUpdates.notes = notesString
-        ? `${notesString} ||| ${JSON.stringify({ consolidatedJOs: targetConsolidated, items: targetItems })}`
-        : `||| ${JSON.stringify({ consolidatedJOs: targetConsolidated, items: targetItems })}`;
-    }
-
     await apiRequest(`invoices/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(cleanUpdates)
+      body: JSON.stringify(updates)
     });
     setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, ...updates } : inv));
     // Also update receivable if it exists
