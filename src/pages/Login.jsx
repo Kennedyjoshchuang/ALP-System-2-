@@ -129,23 +129,25 @@ const Login = () => {
 
           <form onSubmit={handleSubmit}>
             <div className="input-group" style={{ textAlign: 'left' }}>
-              <label>{t('accessPortal')}</label>
+              <label htmlFor="login-role">{t('accessPortal')}</label>
               <div style={{ position: 'relative' }}>
                 <input 
+                  id="login-role"
                   type="text" 
                   value={role} 
                   onChange={e => setRole(e.target.value)}
                   placeholder="Username / Department"
                   style={{ paddingLeft: '48px', background: 'var(--input-bg)', color: 'var(--text)', border: '1px solid var(--border)' }}
                 />
-                <UserCircle size={18} color="var(--secondary)" style={{ position: 'absolute', left: '18px', top: '50%', transform: 'translateY(-50%)', opacity: 0.6 }} />
+                <UserCircle size={18} color="var(--secondary)" aria-hidden="true" style={{ position: 'absolute', left: '18px', top: '50%', transform: 'translateY(-50%)', opacity: 0.6 }} />
               </div>
             </div>
 
             <div className="input-group" style={{ textAlign: 'left' }}>
-              <label>{t('securityKey')}</label>
+              <label htmlFor="login-password">{t('securityKey')}</label>
               <div style={{ position: 'relative' }}>
                 <input 
+                  id="login-password"
                   type="password" 
                   value={password} 
                   onChange={e => {
@@ -155,7 +157,7 @@ const Login = () => {
                   placeholder={t('enterKey')}
                   style={{ paddingLeft: '48px', background: 'var(--input-bg)', color: 'var(--text)', border: '1px solid var(--border)' }}
                 />
-                <Lock size={18} color="var(--secondary)" style={{ position: 'absolute', left: '18px', top: '50%', transform: 'translateY(-50%)', opacity: 0.6 }} />
+                <Lock size={18} color="var(--secondary)" aria-hidden="true" style={{ position: 'absolute', left: '18px', top: '50%', transform: 'translateY(-50%)', opacity: 0.6 }} />
               </div>
               {error && <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '10px' }}>{error}</p>}
             </div>

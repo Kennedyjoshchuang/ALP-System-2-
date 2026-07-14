@@ -440,6 +440,8 @@ const CostApplications = () => {
             <div className="search-bar" style={{ display: 'flex', alignItems: 'center', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '5px 15px', width: '100%', maxWidth: '350px' }}>
               <Search size={18} style={{ color: 'var(--text-muted)', marginRight: '10px' }} />
               <input 
+                id="cost-search"
+                aria-label={isID ? "Cari pengajuan" : "Search applications"}
                 type="text" 
                 placeholder={isID ? "Cari pengajuan..." : "Search applications..."} 
                 value={searchTerm}
@@ -449,6 +451,8 @@ const CostApplications = () => {
             </div>
 
             <select 
+              id="cost-status-filter"
+              aria-label={isID ? "Filter Status" : "Filter Status"}
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
               style={{ padding: '9px 15px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)', fontSize: '0.85rem', cursor: 'pointer' }}

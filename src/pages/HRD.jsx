@@ -481,6 +481,7 @@ const HRD = () => {
                         <div style={{ display: 'flex', gap: '10px' }}>
                           <button 
                             className="btn-icon" 
+                            aria-label={isID ? `Edit Karyawan: ${emp.name}` : `Edit Employee: ${emp.name}`}
                             onClick={() => {
                               setSelectedEmployee(emp);
                               setFormData({ ...emp });
@@ -491,6 +492,7 @@ const HRD = () => {
                           </button>
                           <button 
                             className="btn-icon" 
+                            aria-label={isID ? `Hapus Karyawan: ${emp.name}` : `Delete Employee: ${emp.name}`}
                             style={{ color: 'var(--danger)', background: 'var(--danger-bg)' }}
                             onClick={async () => {
                               const confirmed = await confirm(

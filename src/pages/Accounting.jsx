@@ -3844,13 +3844,14 @@ const Accounting = () => {
       {/* Filter Bar */}
       <div className="glass-card" style={{ padding: '20px 25px', display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap', background: 'rgba(255,255,255,0.03)', marginBottom: '30px' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: '250px' }}>
-          <input type="text" placeholder={isID ? "Cari Invoice, Pelanggan, JO..." : "Search Invoices, Customers, JOs..."} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '10px 15px 10px 40px', borderRadius: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+          <input id="accounting-search" aria-label={isID ? "Cari Invoice, Pelanggan, JO..." : "Search Invoices, Customers, JOs..."} type="text" placeholder={isID ? "Cari Invoice, Pelanggan, JO..." : "Search Invoices, Customers, JOs..."} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '10px 15px 10px 40px', borderRadius: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
           <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
         </div>
         {(activeTab === 'billing' || activeTab === 'costing') && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{isID ? 'Urutkan JO:' : 'Sort JOs:'}</span>
+            <label htmlFor="jo-sort" style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{isID ? 'Urutkan JO:' : 'Sort JOs:'}</label>
             <select 
+              id="jo-sort"
               value={joSortBy} 
               onChange={(e) => setJoSortBy(e.target.value)}
               style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem', outline: 'none', cursor: 'pointer' }}
@@ -3866,8 +3867,9 @@ const Accounting = () => {
         )}
         {(activeTab === 'billing' || activeTab === 'piutang') && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{isID ? 'Urutkan Invoice:' : 'Sort Invoices:'}</span>
+            <label htmlFor="invoice-sort" style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{isID ? 'Urutkan Invoice:' : 'Sort Invoices:'}</label>
             <select 
+              id="invoice-sort"
               value={invoiceSortBy} 
               onChange={(e) => setInvoiceSortBy(e.target.value)}
               style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem', outline: 'none', cursor: 'pointer' }}
@@ -3885,9 +3887,9 @@ const Accounting = () => {
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>{isID ? 'Filter Tanggal:' : 'Date Filter:'}</span>
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
+          <input id="accounting-start-date" aria-label={isID ? "Tanggal Mulai" : "Start Date"} type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
           <span style={{ color: 'var(--text-muted)' }}>{isID ? 's/d' : 'to'}</span>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
+          <input id="accounting-end-date" aria-label={isID ? "Tanggal Akhir" : "End Date"} type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }} />
           {(startDate || endDate || searchTerm || categoryFilter !== 'all' || subcategoryFilter !== 'all') && (
             <button onClick={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); setCategoryFilter('all'); setSubcategoryFilter('all'); }} style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>Reset</button>
           )}

@@ -27,8 +27,8 @@
   --success-bg: rgba(16, 185, 129, 0.1);
   --success-border: rgba(16, 185, 129, 0.3);
 
-  --danger: var(--red-vibrant);
-  --danger-bg: rgba(239, 68, 68, 0.1);
+  --danger: #f87171; /* Brighter red for WCAG contrast in dark theme */
+  --danger-bg: rgba(248, 113, 113, 0.1);
   --danger-border: rgba(239, 68, 68, 0.2);
 
   --warning: var(--gold-vibrant);
@@ -45,7 +45,7 @@
   --bg: #030712; /* Deepest Midnight */
   --card-bg: rgba(17, 24, 39, 0.6);
   --text: #ecfdf5; /* Emerald Tinted White for high contrast */
-  --text-muted: #94a3b8;
+  --text-muted: #cbd5e1;
   --border: rgba(255, 255, 255, 0.05);
   --glass: rgba(3, 7, 18, 0.8);
   --glass-border: var(--secondary-border);
@@ -79,22 +79,22 @@
   --bg-gradient-2: rgba(180, 83, 9, 0.03);
   --card-item-bg: rgba(6, 95, 70, 0.03);
 
-  /* Semantic Theme Variables Overrides (Light Theme - Standard Colors) */
-  --success: #15803d; /* Green 700 */
-  --success-bg: rgba(21, 128, 61, 0.08);
-  --success-border: rgba(21, 128, 61, 0.15);
+  /* Semantic Theme Variables Overrides (Light Theme - High Contrast) */
+  --success: #166534; /* Green 800 */
+  --success-bg: rgba(22, 101, 52, 0.06);
+  --success-border: rgba(22, 101, 52, 0.12);
 
-  --danger: #b91c1c; /* Red 700 */
-  --danger-bg: rgba(185, 28, 28, 0.06);
-  --danger-border: rgba(185, 28, 28, 0.12);
+  --danger: #991b1b; /* Red 800 */
+  --danger-bg: rgba(153, 27, 27, 0.05);
+  --danger-border: rgba(153, 27, 27, 0.1);
 
-  --warning: #b45309; /* Amber 800 */
-  --warning-bg: rgba(180, 83, 9, 0.08);
-  --warning-border: rgba(180, 83, 9, 0.15);
+  --warning: #92400e; /* Amber 900 */
+  --warning-bg: rgba(146, 64, 14, 0.06);
+  --warning-border: rgba(146, 64, 14, 0.12);
 
-  --info: #1d4ed8; /* Blue 700 */
-  --info-bg: rgba(29, 78, 216, 0.08);
-  --info-border: rgba(29, 78, 216, 0.15);
+  --info: #1e40af; /* Blue 800 */
+  --info-bg: rgba(30, 64, 175, 0.05);
+  --info-border: rgba(30, 64, 175, 0.1);
 
   --secondary-bg: rgba(6, 95, 70, 0.08);
   --secondary-border: rgba(6, 95, 70, 0.15);
@@ -394,12 +394,51 @@ table thead th {
 }
 
 @media (max-width: 768px) {
-  h1 { fontSize: 1.8rem !important; }
-  h2 { fontSize: 1.5rem !important; }
+  h1 { font-size: 1.8rem !important; }
+  h2 { font-size: 1.5rem !important; }
   
   .input-group input, .input-group select {
     padding: 12px 15px;
     font-size: 16px; /* Prevents auto-zoom on iOS */
+  }
+}
+
+/* Skip link for keyboard accessibility */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 0;
+  background: var(--secondary);
+  color: #030712;
+  padding: 10px 20px;
+  z-index: 10000;
+  transition: top 0.2s;
+  font-weight: bold;
+  border-radius: 0 0 10px 0;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+/* Table scroll visual hints */
+.table-container {
+  position: relative;
+}
+.table-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 15px;
+  background: linear-gradient(to right, transparent, rgba(6, 95, 70, 0.15));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+@media (max-width: 1024px) {
+  .table-container::after {
+    opacity: 1;
   }
 }
 
@@ -713,5 +752,47 @@ textarea:focus-visible {
   white-space: normal;
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+
+/* Visible Focus States for Keyboard Navigation */
+*:focus-visible {
+  outline: 3px solid var(--secondary) !important;
+  outline-offset: 3px !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 768px) {
+  /* Enforce WCAG target tap size (44px min height/width) on mobile */
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  select,
+  .btn,
+  .btn-icon,
+  .search-bar,
+  .glass-card button {
+    min-height: 44px !important;
+  }
+  .btn-icon {
+    width: 44px !important;
+    height: 44px !important;
+  }
+  .btn-text {
+    padding: 10px 12px !important;
+    display: inline-block !important;
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+  /* Spacing: ensure buttons inside flex/grid containers are far enough apart on mobile */
+  .btn + .btn,
+  .btn + button,
+  button + .btn,
+  button + button,
+  .btn-icon + .btn-icon,
+  .btn-icon + button,
+  button + .btn-icon {
+    margin-left: 12px !important;
+    margin-top: 8px !important;
+  }
 }
 

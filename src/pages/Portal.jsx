@@ -47,16 +47,16 @@ const Portal = () => {
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <div className="glass-card" style={{ padding: '6px 15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Clock size={14} color="var(--secondary)" />
+            <Clock size={14} color="var(--secondary)" aria-hidden="true" />
             <span style={{ fontSize: '0.8rem', fontWeight: '500' }}>
               {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
-          <button onClick={toggleTheme} className="btn-icon" style={{ width: '36px', height: '36px' }}>
-            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          <button onClick={toggleTheme} className="btn-icon" aria-label="Toggle Theme" style={{ width: '36px', height: '36px' }}>
+            {theme === 'dark' ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
           </button>
-          <button onClick={toggleLanguage} className="btn-icon" style={{ width: 'auto', height: '36px', padding: '0 12px', fontSize: '0.75rem', fontWeight: '700' }}>
-            <Globe size={14} style={{ marginRight: '6px' }} /> {language === 'en' ? 'EN' : 'ID'}
+          <button onClick={toggleLanguage} className="btn-icon" aria-label="Toggle Language" style={{ width: 'auto', height: '36px', padding: '0 12px', fontSize: '0.75rem', fontWeight: '700' }}>
+            <Globe size={14} style={{ marginRight: '6px' }} aria-hidden="true" /> {language === 'en' ? 'EN' : 'ID'}
           </button>
         </div>
       </div>
@@ -93,7 +93,7 @@ const Portal = () => {
               className="btn btn-accent portal-btn" 
             >
               <span>{language === 'en' ? 'ENTER SYSTEM' : 'MASUK SISTEM'}</span>
-              <ArrowRight size={20} />
+              <ArrowRight size={20} aria-hidden="true" />
             </button>
           </div>
         </motion.div>
@@ -105,11 +105,11 @@ const Portal = () => {
             <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Status: Online</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Monitor size={14} color="var(--secondary)" />
+            <Monitor size={14} color="var(--secondary)" aria-hidden="true" />
             <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>V2.1.7 Revision</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <ShieldCheck size={14} color="var(--secondary)" />
+            <ShieldCheck size={14} color="var(--secondary)" aria-hidden="true" />
             <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Secured Gateway</span>
           </div>
         </div>

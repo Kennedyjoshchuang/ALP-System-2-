@@ -321,6 +321,7 @@ const SystemControl = () => {
                 {verifyStep === 2 && (
                   <div className="input-group">
                     <input
+                      aria-label={isID ? "Ketik DELETE untuk konfirmasi" : "Type DELETE to confirm"}
                       type="text"
                       value={verifyText}
                       onChange={e => setVerifyText(e.target.value)}
@@ -341,8 +342,9 @@ const SystemControl = () => {
 
                 {verifyStep === 3 && (
                   <div className="input-group">
-                    <label style={{ color: 'var(--secondary)', marginBottom: '15px' }}>{isID ? 'Masukkan Kunci Keamanan 4-Digit' : 'Enter 4-Digit Security Key'}</label>
+                    <label htmlFor="system-reset-otp" style={{ color: 'var(--secondary)', marginBottom: '15px' }}>{isID ? 'Masukkan Kunci Keamanan 4-Digit' : 'Enter 4-Digit Security Key'}</label>
                     <input
+                      id="system-reset-otp"
                       type="text"
                       maxLength={4}
                       value={otpInput}

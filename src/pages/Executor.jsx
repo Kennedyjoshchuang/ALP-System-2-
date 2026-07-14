@@ -884,19 +884,19 @@ const Executor = () => {
         )}
       </AnimatePresence>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
         <div>
           <h3 className="shimmer-text" style={{ fontSize: '1.8rem', margin: 0 }}>{isID ? 'Operasi Lapangan' : 'Field Operations'}</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{isID ? 'Eksekusi pekerjaan real-time dan pelacakan status.' : 'Real-time job execution and status tracking.'}</p>
         </div>
         
-        <div style={{ display: 'flex', gap: '20px' }}>
+        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', rowGap: '4px' }}>
           <button 
             onClick={() => setActiveTab('active')}
             style={{
               background: 'none', border: 'none', padding: '10px 0',
               color: activeTab === 'active' ? 'var(--secondary)' : 'var(--text-muted)',
-              fontSize: '1rem', fontWeight: '600', cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', gap: '8px'
+              fontSize: '1rem', fontWeight: '600', cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap'
             }}
           >
             <PlayCircle size={18} />
@@ -908,7 +908,7 @@ const Executor = () => {
             style={{
               background: 'none', border: 'none', padding: '10px 0',
               color: activeTab === 'records' ? 'var(--secondary)' : 'var(--text-muted)',
-              fontSize: '1rem', fontWeight: '600', cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', gap: '8px'
+              fontSize: '1rem', fontWeight: '600', cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap'
             }}
           >
             <History size={18} />
@@ -920,7 +920,7 @@ const Executor = () => {
             style={{
               background: 'none', border: 'none', padding: '10px 0',
               color: activeTab === 'pending_invoices' ? 'var(--secondary)' : 'var(--text-muted)',
-              fontSize: '1rem', fontWeight: '600', cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', gap: '8px'
+              fontSize: '1rem', fontWeight: '600', cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap'
             }}
           >
             <Receipt size={18} />
