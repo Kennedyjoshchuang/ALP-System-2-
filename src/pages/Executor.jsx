@@ -77,10 +77,7 @@ const Executor = () => {
   const [shipmentEdits, setShipmentEdits] = useState({});
   const [savingShipment, setSavingShipment] = useState({});
   const [photoViewer, setPhotoViewer] = useState(null);
-  const [issuingInvoiceJoId, setIssuingInvoiceJoId] = useState(null);
-  const [selectedBankId, setSelectedBankId] = useState('');
-  const [invoiceNotes, setInvoiceNotes] = useState('');
-  const [invoiceConfirmData, setInvoiceConfirmData] = useState(null);
+
 
   const handleHeaderClick = (columnType) => {
     if (columnType === 'id') {
@@ -173,200 +170,7 @@ const Executor = () => {
     }
   };
 
-  const handleIssueInvoice = async (joId, bankAccount, notes) => {
-    try {
-      if (!bankAccount) {
-        setIssuingInvoiceJoId(joId);
-        setInvoiceNotes('');
-        if (companyBankAccounts.length > 0) {
-          setSelectedBankId(companyBankAccounts[0].id);
-        }
-        return;
-      }
 
-      const linkedJO = jobOrders.find(j => String(j.id) === String(joId));
-      if (!linkedJO) {
-        toast.error('Job Order tidak ditemukan.');
-        return;
-      }
-
-      const linkedQuo = linkedJO.quotationId
-        ? quotations.find(q => String(q.id) === String(linkedJO.quotationId))
-        : null;
-
-      let targetJOs = [linkedJO];
-      if (linkedJO.quotationId) {
-        targetJOs = jobOrders.filter(j =>
-          String(j.quotationId) === String(linkedJO.quotationId) &&
-          (j.status === 'done' || String(j.id) === String(joId)) &&
-          j.customerName === linkedJO.customerName
-        );
-      }
-
-      const cleanNum = (val) => {
-        if (typeof val === 'number') return isNaN(val) ? 0 : val;
-        if (!val) return 0;
-        if (/^\d+(\.\d+)?$/.test(String(val))) return parseFloat(val);
-        let str = String(val).replace(/[^\d.,-]/g, '');
-        if (str.includes(',') && str.includes('.')) str = str.replace(/\./g, '').replace(/,/g, '.');
-        else if (str.includes(',')) str = str.replace(/,/g, '.');
-        const parsed = parseFloat(str);
-        return isNaN(parsed) ? 0 : parsed;
-      };
-
-      const items = [];
-      targetJOs.forEach(targetJo => {
-        if (Array.isArray(targetJo.items) && targetJo.items.length > 0) {
-          // Filter to items that are either done, dispatched or primary JO
-          const activeItems = targetJo.items.filter(item => item.status === 'done' || item.status === 'dispatched' || String(targetJo.id) === String(joId));
-          activeItems.forEach(item => {
-            const qty = cleanNum(item.issueQuantity || item.quantity || 1);
-            const rate = cleanNum(item.rate);
-            items.push({
-              description: item.description || 'Freight Forwarding Services',
-              qty,
-              rate,
-              containerNo: item.containerNo,
-              vehicleNo: item.vehicleNo,
-              driverName: item.driverName,
-            });
-          });
-        } else {
-          // Fallback to legacy single-item Job Order mapping
-          let quoItems = [];
-          const quo = targetJo.quotationId
-            ? quotations.find(q => String(q.id) === String(targetJo.quotationId))
-            : null;
-          if (quo && quo.items) {
-            try { quoItems = typeof quo.items === 'string' ? JSON.parse(quo.items) : quo.items; } catch(e) { quoItems = []; }
-          }
-          if (!Array.isArray(quoItems)) quoItems = [];
-          const targetDesc = (targetJo.instruction || targetJo.jobDescription || '').trim().toLowerCase();
-          const matchedItem = quoItems.find(i => (i.description || '').trim().toLowerCase() === targetDesc);
-          const rate = matchedItem ? cleanNum(matchedItem.rate) : cleanNum(targetJo.rate);
-          const qty = cleanNum(targetJo.issueQuantity || targetJo.quantity || 1);
-          items.push({
-            description: targetJo.instruction || targetJo.jobDescription || 'Freight Forwarding Services',
-            qty,
-            rate,
-            containerNo: targetJo.containerNo,
-            vehicleNo: targetJo.vehicleNo,
-            driverName: targetJo.driverName,
-          });
-        }
-      });
-
-      const newInvoiceId = `INV-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
-
-      setInvoiceConfirmData({
-        joId,
-        bankAccount,
-        consolidatedJOIds: targetJOs.map(j => j.id),
-        linkedJOs: targetJOs,
-        form: {
-          id: '',
-          customerName: linkedJO.customerName || '',
-          customerAddress: linkedQuo?.companyAddress || linkedJO?.address || customers.find(c => c.name === (linkedJO?.customerName || ''))?.address || '',
-          customerPic: linkedQuo?.pic || '',
-          customerPhone: linkedQuo?.phone || '',
-          customerEmail: linkedQuo?.email || '',
-          date: new Date().toISOString().substring(0, 10),
-          items,
-          extraCharges: [],
-          taxPercent: 0,
-          bankAccountId: bankAccount.id,
-          notes: notes || '',
-        },
-      });
-
-    } catch (err) {
-      console.error('Issue Invoice error:', err);
-      toast.error('Error saat menerbitkan invoice: ' + (err.message || 'Unknown error'));
-    }
-  };
-
-  const handleConfirmAndIssueInvoice = async () => {
-    if (!invoiceConfirmData) return;
-    const { joId, consolidatedJOIds, linkedJOs } = invoiceConfirmData;
-    const f = invoiceConfirmData.form;
-    try {
-      const bank = companyBankAccounts.find(b => b.id === f.bankAccountId) || invoiceConfirmData.bankAccount;
-
-      let subtotal = 0;
-      const items = (f.items || []).map(line => {
-        const qty = parseFloat(line.qty) || 1;
-        const rate = parseFloat(line.rate) || 0;
-        const amount = qty * rate;
-        subtotal += amount;
-        return { 
-          description: line.description, 
-          qty, 
-          rate, 
-          amount,
-          containerNo: line.containerNo,
-          vehicleNo: line.vehicleNo,
-          driverName: line.driverName,
-        };
-      });
-
-      const extra_charges = (f.extraCharges || []).map(line => {
-        const qty = parseFloat(line.qty) || 1;
-        const rate = parseFloat(line.rate) || 0;
-        const amount = qty * rate;
-        subtotal += amount;
-        return { description: line.description, qty, rate, amount };
-      });
-
-      const tax = subtotal * ((parseFloat(f.taxPercent) || 0) / 100);
-      const grandTotal = subtotal + tax;
-
-      const invoiceData = {
-        id: f.id.trim() || undefined,
-        joId,
-        consolidatedJOs: consolidatedJOIds,
-        customerName: f.customerName,
-        customerAddress: f.customerAddress,
-        customerPic: f.customerPic,
-        customerPhone: f.customerPhone,
-        customerEmail: f.customerEmail,
-        date: f.date,
-        amount: grandTotal,
-        subtotal,
-        tax,
-        items,
-        extra_charges,
-        notes: f.notes || null,
-      };
-
-      const newInv = await createCustomInvoice(invoiceData);
-      if (!newInv) throw new Error('Gagal menerbitkan invoice.');
-
-      const linkedJO = jobOrders.find(j => String(j.id) === String(joId));
-      const linkedQuo = linkedJO?.quotationId
-        ? quotations.find(q => String(q.id) === String(linkedJO.quotationId))
-        : null;
-      const customerObj = customers.find(c => c.name === (linkedJO?.customerName || ''));
-      const printData = {
-        invoice: {
-          ...newInv,
-          customerAddress: newInv.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customerObj?.address || ''
-        },
-        jo: linkedJO || null,
-        consolidatedJOs: linkedJOs || [],
-        quotation: linkedQuo || null,
-        bankAccount: bank,
-      };
-      localStorage.setItem('print_invoice_data_' + newInv.id, JSON.stringify(printData));
-
-      setInvoiceConfirmData(null);
-      setIssuingInvoiceJoId(null);
-      window.open('/print/invoice?id=' + newInv.id, '_blank');
-
-    } catch (err) {
-      console.error('Confirm Issue Invoice error:', err);
-      toast.error('Error: ' + (err.message || 'Gagal menerbitkan invoice.'));
-    }
-  };
 
   const handlePrint = () => {
     window.print();
@@ -992,7 +796,6 @@ const Executor = () => {
                   {isID ? 'Pengiriman' : 'Shipment'}{renderSortIndicator('created')}
                 </th>
                 <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Foto' : 'Photos'}</th>
-                <th style={{ padding: '15px' }}>{isID ? 'Aksi' : 'Action'}</th>
               </tr>
             </thead>
             <tbody>
@@ -1031,7 +834,7 @@ const Executor = () => {
                 if (pendingGroups.length === 0) {
                   return (
                     <tr>
-                      <td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      <td colSpan="5" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                         {isID ? 'Tidak ada invoice tertunda.' : 'No pending invoices found.'}
                       </td>
                     </tr>
@@ -1053,7 +856,7 @@ const Executor = () => {
                         }}
                         onClick={() => setExpandedCompletedGroups({ ...expandedCompletedGroups, [group.quotationId]: !isGroupExpanded })}
                       >
-                        <td colSpan="6" style={{ padding: '12px 15px', verticalAlign: 'middle' }}>
+                        <td colSpan="5" style={{ padding: '12px 15px', verticalAlign: 'middle' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                               <span style={{ fontSize: '1.2rem' }}>📁</span>
@@ -1065,18 +868,6 @@ const Executor = () => {
                               </span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                              {!allInvoiced && canWrite && (
-                                <ButtonWithLoading 
-                                  className="btn btn-gold" 
-                                  style={{ padding: '6px 14px', fontSize: '0.75rem', gap: '6px' }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleIssueInvoice(uninvoicedJOs[0].id);
-                                  }}
-                                >
-                                  {isID ? 'Terbitkan Invoice Gabungan' : 'Issue Combined Invoice'}
-                                </ButtonWithLoading>
-                              )}
                               <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                                 {group.jobOrders.length} {isID ? 'Pekerjaan' : 'Jobs'}
                               </span>
@@ -1291,19 +1082,7 @@ const Executor = () => {
                                 <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{isID ? 'Tidak Ada Foto' : 'No Photos'}</span>
                               )}
                             </td>
-                            <td style={{ padding: '15px' }}>
-                              <div style={{ display: 'flex', gap: '10px' }}>
-                                {!hasInvoice && canWrite ? (
-                                  <ButtonWithLoading className="btn btn-gold" style={{ padding: '8px 16px', fontSize: '0.85rem' }} onClick={() => handleIssueInvoice(jo.id)}>
-                                    {isID ? 'Terbitkan Invoice' : 'Issue Invoice'}
-                                  </ButtonWithLoading>
-                                ) : (
-                                  <span style={{ color: 'var(--success)', fontWeight: 'bold', fontSize: '0.85rem' }}>
-                                    {isID ? 'Sudah Ditagih' : 'Invoiced'}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
+
                           </tr>
                         );
                       })}
@@ -1929,259 +1708,9 @@ const Executor = () => {
         )}
       </div>
 
-      {/* Bank Selection Modal for Invoice Issuance */}
-      {issuingInvoiceJoId && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:10001, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }}>
-          <div className="glass-card" style={{ width:'100%', maxWidth:'500px', padding:'35px', textAlign:'center' }}>
-            <h3 style={{ color:'var(--secondary)', marginBottom:'20px' }}>{isID ? 'Pilih Rekening untuk Invoice' : 'Select Bank Account for Invoice'}</h3>
-            <p style={{ color:'var(--text-muted)', fontSize:'0.85rem', marginBottom:'25px' }}>
-              {isID ? 'Silakan pilih rekening bank yang akan dicantumkan pada Invoice untuk Job Order:' : 'Please select the bank account to be printed on the Invoice for Job Order:'} <strong>{issuingInvoiceJoId}</strong>
-            </p>
-            
-            <div style={{ marginBottom:'30px' }}>
-              <select 
-                value={selectedBankId} 
-                onChange={(e) => setSelectedBankId(e.target.value)}
-                style={{ width:'100%', padding:'12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'10px', color:'var(--text)', fontSize:'1rem' }}
-              >
-                {companyBankAccounts.map(bank => (
-                  <option key={bank.id} value={bank.id} style={{ background: 'var(--bg)', color: 'var(--text)' }}>
-                    {bank.bankName} - {bank.accountNumber} ({bank.accountName})
-                  </option>
-                ))}
-                {companyBankAccounts.length === 0 && <option value="" style={{ background: 'var(--bg)', color: 'var(--text-muted)' }}>{isID ? 'Belum ada rekening terdaftar' : 'No registered bank accounts'}</option>}
-              </select>
-              {companyBankAccounts.length === 0 && (
-                <p style={{ color:'var(--danger)', fontSize:'0.75rem', marginTop:'10px' }}>
-                  {isID ? 'Mohon tambahkan rekening perusahaan di menu Pengaturan Rekening Bank terlebih dahulu.' : 'Please add a company bank account in the Settings menu first.'}
-                </p>
-              )}
-            </div>
 
-            <div style={{ marginBottom:'30px', textAlign:'left' }}>
-              <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>
-                {isID ? 'Keterangan (Opsional)' : 'Description (Optional)'}
-              </label>
-              <textarea 
-                value={invoiceNotes}
-                onChange={(e) => setInvoiceNotes(e.target.value)}
-                placeholder={isID ? "Masukkan keterangan tambahan untuk invoice..." : "Enter additional description for the invoice..."}
-                style={{ width:'100%', minHeight:'80px', padding:'12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'10px', color:'var(--text)', fontSize:'0.9rem', resize:'vertical' }}
-              />
-            </div>
 
-            <div style={{ display:'flex', gap:'12px', justifyContent:'center' }}>
-              <button 
-                onClick={() => setIssuingInvoiceJoId(null)} 
-                className="btn" 
-                style={{ flex:1, padding:'12px', background:'rgba(255,255,255,0.05)', color:'var(--text)' }}
-              >
-                {isID ? 'Batal' : 'Cancel'}
-              </button>
-              <button 
-                onClick={() => {
-                  const bank = companyBankAccounts.find(b => b.id === selectedBankId);
-                  if (bank) {
-                    handleIssueInvoice(issuingInvoiceJoId, bank, invoiceNotes);
-                  } else {
-                    toast.error(isID ? "Silakan pilih rekening bank yang valid." : "Please select a valid bank account.");
-                  }
-                }} 
-                className="btn btn-gold" 
-                style={{ flex:2, padding:'12px', fontWeight:'700' }}
-                disabled={companyBankAccounts.length === 0}
-              >
-                {isID ? 'Konfirmasi & Terbitkan' : 'Confirm & Issue'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Invoice Confirmation & Edit Modal */}
-      {invoiceConfirmData && (() => {
-        const f = invoiceConfirmData.form;
-        const setF = (patch) => setInvoiceConfirmData(prev => ({ ...prev, form: { ...prev.form, ...patch } }));
-
-        const updateItem = (idx, field, val) => {
-          const next = [...f.items];
-          next[idx] = { ...next[idx], [field]: val };
-          setF({ items: next });
-        };
-        const addItem = () => setF({ items: [...f.items, { description: '', qty: 1, rate: 0 }] });
-        const removeItem = (idx) => setF({ items: f.items.filter((_, i) => i !== idx) });
-
-        const updateExtra = (idx, field, val) => {
-          const next = [...f.extraCharges];
-          next[idx] = { ...next[idx], [field]: val };
-          setF({ extraCharges: next });
-        };
-        const addExtra = () => setF({ extraCharges: [...f.extraCharges, { description: '', qty: 1, rate: 0 }] });
-        const removeExtra = (idx) => setF({ extraCharges: f.extraCharges.filter((_, i) => i !== idx) });
-
-        const subtotal = [...f.items, ...f.extraCharges].reduce((s, l) => s + (parseFloat(l.qty) || 1) * (parseFloat(l.rate) || 0), 0);
-        const taxAmt = subtotal * ((parseFloat(f.taxPercent) || 0) / 100);
-        const grandTotal = subtotal + taxAmt;
-
-        const fmtRp = (n) => `Rp ${n.toLocaleString('id-ID')}`;
-
-        const inputStyle = { width: '100%', padding: '8px 11px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.88rem' };
-        const labelStyle = { fontSize: '0.7rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '5px', display: 'block' };
-
-        return (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 10002, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '20px', overflowY: 'auto' }}>
-            <div className="glass-card" style={{ width: '100%', maxWidth: '780px', padding: '32px', marginTop: '10px', marginBottom: '30px' }}>
-
-              {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '18px' }}>
-                <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '900', color: 'var(--secondary)' }}>🧾 {isID ? 'Konfirmasi & Edit Invoice' : 'Confirm & Edit Invoice'}</h3>
-                <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                  {isID ? 'Periksa dan edit semua data sebelum invoice diterbitkan.' : 'Review and edit all data before the invoice is issued.'}
-                </p>
-              </div>
-
-              {/* Form Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '24px' }}>
-                <div>
-                  <label style={labelStyle}>{isID ? 'No. Invoice' : 'Invoice No.'}</label>
-                  <input type="text" value={f.id} onChange={(e) => setF({ id: e.target.value })} placeholder={isID ? '(Otomatis - Sequential)' : '(Auto-generated Sequential)'} style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>{isID ? 'Tanggal Invoice' : 'Invoice Date'}</label>
-                  <input type="date" value={f.date} onChange={(e) => setF({ date: e.target.value })} style={{ ...inputStyle, colorScheme: 'dark' }} />
-                </div>
-              </div>
-
-              {/* Customer Info */}
-              <div className="glass-card" style={{ padding: '20px', marginBottom: '24px', background: 'rgba(255,255,255,0.015)' }}>
-                <p style={{ ...labelStyle, fontSize: '0.72rem', color: 'var(--secondary)', marginBottom: '14px' }}>📋 {isID ? 'Info Pelanggan' : 'Customer Info'}</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                  <div>
-                    <label style={labelStyle}>{isID ? 'Nama Customer' : 'Customer Name'}</label>
-                    <input type="text" value={f.customerName} onChange={(e) => setF({ customerName: e.target.value })} style={inputStyle} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>{isID ? 'Alamat' : 'Address'}</label>
-                    <input 
-                      type="text" 
-                      value={f.customerAddress} 
-                      onChange={(e) => setF({ customerAddress: e.target.value })} 
-                      style={inputStyle} 
-                      placeholder={isID ? 'Alamat perusahaan customer...' : 'Customer company address...'}
-                    />
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px' }}>
-                  <div>
-                    <label style={labelStyle}>PIC</label>
-                    <input type="text" value={f.customerPic} onChange={(e) => setF({ customerPic: e.target.value })} style={inputStyle} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>{isID ? 'Telepon' : 'Phone'}</label>
-                    <input type="text" value={f.customerPhone} onChange={(e) => setF({ customerPhone: e.target.value })} style={inputStyle} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Email</label>
-                    <input type="text" value={f.customerEmail} onChange={(e) => setF({ customerEmail: e.target.value })} style={inputStyle} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div style={{ marginBottom: '24px' }}>
-                <label style={labelStyle}>{isID ? 'Keterangan (Opsional)' : 'Description (Optional)'}</label>
-                <textarea 
-                  value={f.notes} 
-                  onChange={(e) => setF({ notes: e.target.value })} 
-                  style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }} 
-                  placeholder={isID ? 'Masukkan keterangan tambahan untuk invoice...' : 'Enter additional description for the invoice...'}
-                />
-              </div>
-
-              {/* Service Items */}
-              <div style={{ marginBottom: '24px' }}>
-                <p style={{ ...labelStyle, fontSize: '0.72rem', color: 'var(--text)', marginBottom: '10px' }}>📦 {isID ? 'Item Layanan' : 'Service Items'}</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {f.items.map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                      <input type="text" placeholder={isID ? "Deskripsi layanan..." : "Service description..."} value={item.description} onChange={(e) => updateItem(idx, 'description', e.target.value)} style={{ ...inputStyle, flex: 3 }} />
-                      <input type="number" placeholder="Qty" value={item.qty} onChange={(e) => updateItem(idx, 'qty', e.target.value)} style={{ ...inputStyle, flex: 0.8 }} />
-                      <input type="number" placeholder="Rate" value={item.rate} onChange={(e) => updateItem(idx, 'rate', e.target.value)} style={{ ...inputStyle, flex: 1.5 }} />
-                      <button onClick={() => removeItem(idx)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '5px' }}><Trash2 size={16} /></button>
-                    </div>
-                  ))}
-                  <button className="btn" onClick={addItem} style={{ alignSelf: 'flex-start', padding: '6px 12px', fontSize: '0.78rem', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                    <Plus size={14} /> {isID ? 'Tambah Item' : 'Add Item'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Extra Charges */}
-              <div style={{ marginBottom: '32px' }}>
-                <p style={{ ...labelStyle, fontSize: '0.72rem', color: 'var(--text)', marginBottom: '10px' }}>➕ {isID ? 'Biaya Tambahan' : 'Extra Charges'}</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {f.extraCharges.map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                      <input type="text" placeholder={isID ? "Deskripsi biaya tambahan..." : "Extra charge description..."} value={item.description} onChange={(e) => updateExtra(idx, 'description', e.target.value)} style={{ ...inputStyle, flex: 3 }} />
-                      <input type="number" placeholder="Qty" value={item.qty} onChange={(e) => updateExtra(idx, 'qty', e.target.value)} style={{ ...inputStyle, flex: 0.8 }} />
-                      <input type="number" placeholder="Rate" value={item.rate} onChange={(e) => updateExtra(idx, 'rate', e.target.value)} style={{ ...inputStyle, flex: 1.5 }} />
-                      <button onClick={() => removeExtra(idx)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '5px' }}><Trash2 size={16} /></button>
-                    </div>
-                  ))}
-                  <button className="btn" onClick={addExtra} style={{ alignSelf: 'flex-start', padding: '6px 12px', fontSize: '0.78rem', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                    <Plus size={14} /> {isID ? 'Tambah Biaya Tambahan' : 'Add Extra Charge'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Bottom Details (Tax and Summary) */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '30px', borderTop: '1px solid var(--glass-border)', paddingTop: '24px' }}>
-                <div>
-                  <label style={labelStyle}>{isID ? 'Pajak (%)' : 'Tax (%)'}</label>
-                  <input type="number" value={f.taxPercent} onChange={(e) => setF({ taxPercent: e.target.value })} style={{ ...inputStyle, maxWidth: '120px' }} />
-                  <div style={{ marginTop: '20px' }}>
-                    <label style={labelStyle}>{isID ? 'Rekening Bank' : 'Bank Account'}</label>
-                    <select value={f.bankAccountId} onChange={(e) => setF({ bankAccountId: e.target.value })} style={inputStyle}>
-                      {companyBankAccounts.map(bank => (
-                        <option key={bank.id} value={bank.id} style={{ background: 'var(--bg)', color: 'var(--text)' }}>
-                          {bank.bankName} - {bank.accountNumber} ({bank.accountName})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--glass-border)', borderRadius: '12px', padding: '20px' }}>
-                  <p style={{ ...labelStyle, color: 'var(--secondary)', marginBottom: '12px' }}>{isID ? 'Ringkasan' : 'Summary'}</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.9rem' }}>
-                    {[
-                      [isID ? 'Subtotal' : 'Subtotal', fmtRp(subtotal)],
-                      [isID ? `Pajak (${f.taxPercent}%)` : `Tax (${f.taxPercent}%)`, fmtRp(taxAmt)],
-                      [isID ? 'Total Tagihan' : 'Grand Total', fmtRp(grandTotal), true]
-                    ].map(([label, val, highlight], idx) => (
-                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: highlight ? '900' : 'normal', borderTop: highlight ? '1px dashed var(--glass-border)' : 'none', paddingTop: highlight ? '10px' : '0', color: highlight ? 'var(--secondary)' : 'var(--text)' }}>
-                        <span>{label}</span>
-                        <span>{val}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div style={{ display: 'flex', gap: '15px', justifyContent: 'flex-end', marginTop: '35px', borderTop: '1px solid var(--glass-border)', paddingTop: '20px' }}>
-                <button className="btn" onClick={() => setInvoiceConfirmData(null)} style={{ padding: '10px 24px', background: 'rgba(255,255,255,0.05)' }}>
-                  ← {isID ? 'Kembali' : 'Back'}
-                </button>
-                <button className="btn btn-gold" onClick={handleConfirmAndIssueInvoice} style={{ padding: '10px 30px', fontWeight: '800' }}>
-                  ✓ {isID ? 'Konfirmasi & Terbitkan' : 'Confirm & Issue'}
-                </button>
-              </div>
-
-            </div>
-          </div>
-        );
-      })()}
 
       {/* Fullscreen Photo Viewer Modal */}
       {photoViewer && (

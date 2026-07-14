@@ -529,13 +529,18 @@ export const AppProvider = ({ children }) => {
       console.error("Job Order not found in local state for ID:", joId);
       return null;
     }
+
+    if (jo.shipmentStatus !== 'done') {
+      throw new Error("Job Order shipment must be marked as Done before generating an invoice.");
+    }
     
-    // Find all JOs sharing the same quotationId and customerName, and are in 'done' status.
+    // Find all JOs sharing the same quotationId and customerName, are in 'done' status, and have shipmentStatus === 'done'.
     let targetJOs = [jo];
     if (jo.quotationId) {
       targetJOs = jobOrders.filter(j => 
         String(j.quotationId) === String(jo.quotationId) && 
         (j.status === 'done' || String(j.id) === String(joId)) &&
+        j.shipmentStatus === 'done' &&
         j.customerName === jo.customerName
       );
     }
@@ -658,6 +663,14 @@ export const AppProvider = ({ children }) => {
     const consolidatedJOs = Array.isArray(invoiceData.consolidatedJOs) && invoiceData.consolidatedJOs.length > 0
       ? invoiceData.consolidatedJOs
       : invoiceData.joId ? [invoiceData.joId] : [];
+
+    // Verify that all consolidated JOs have shipmentStatus === 'done'
+    for (const id of consolidatedJOs) {
+      const targetJo = jobOrders.find(j => String(j.id) === String(id));
+      if (targetJo && targetJo.shipmentStatus !== 'done') {
+        throw new Error(`Job Order ${id} shipment status must be marked as Done before generating an invoice.`);
+      }
+    }
 
     const items = invoiceData.items || [];
     const newInvoice = {

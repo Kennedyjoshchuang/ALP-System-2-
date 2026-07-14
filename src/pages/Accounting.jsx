@@ -1854,6 +1854,19 @@ const Accounting = () => {
   
   const handleIssueInvoice = async (joId, bankAccount, notes) => {
     try {
+      const linkedJO = jobOrders.find(j => String(j.id) === String(joId));
+      if (!linkedJO) {
+        toast.error('Job Order tidak ditemukan.');
+        return;
+      }
+
+      if (linkedJO.shipmentStatus !== 'done') {
+        toast.error(isID 
+          ? 'Invoice hanya dapat diterbitkan untuk Job Order dengan status pengiriman Selesai / Done.' 
+          : 'Invoices can only be issued for Job Orders with a shipment status of Done.');
+        return;
+      }
+
       if (!bankAccount) {
         setIssuingInvoiceJoId(joId);
         setInvoiceNotes('');
@@ -1863,12 +1876,7 @@ const Accounting = () => {
         return;
       }
 
-      // Build preview data for the confirmation modal (mirrors createInvoice logic)
-      const linkedJO = jobOrders.find(j => String(j.id) === String(joId));
-      if (!linkedJO) {
-        toast.error('Job Order tidak ditemukan.');
-        return;
-      }
+      
 
       const linkedQuo = linkedJO.quotationId
         ? quotations.find(q => String(q.id) === String(linkedJO.quotationId))
@@ -4018,9 +4026,13 @@ const Accounting = () => {
                                     </button>
                                   );
                                 })()}
-                                {!invoice && canWrite && (
-                                  <ButtonWithLoading className="btn btn-gold" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px' }} onClick={() => handleIssueInvoice(jo.id)}>
-                                    <Receipt size={14} /> {isID ? 'Invoice' : 'Invoice'}
+                                {!invoice && canWrite && jo.shipmentStatus === "done" && (
+                                  <ButtonWithLoading
+                                    className="btn btn-gold"
+                                    style={{ padding: "7px 14px", fontSize: "0.8rem", gap: "6px" }}
+                                    onClick={() => handleIssueInvoice(jo.id)}
+                                  >
+                                    <Receipt size={14} /> {isID ? "Invoice" : "Invoice"}
                                   </ButtonWithLoading>
                                 )}
                               </div>
@@ -4226,11 +4238,15 @@ const Accounting = () => {
                                 </button>
                               );
                             })()}
-                            {!invoice && canWrite && (
-                              <ButtonWithLoading className="btn btn-gold" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px' }} onClick={() => handleIssueInvoice(jo.id)}>
-                                <Receipt size={14} /> {isID ? 'Invoice' : 'Invoice'}
-                              </ButtonWithLoading>
-                            )}
+                            {!invoice && canWrite && jo.shipmentStatus === "done" && (
+                                  <ButtonWithLoading
+                                    className="btn btn-gold"
+                                    style={{ padding: "7px 14px", fontSize: "0.8rem", gap: "6px" }}
+                                    onClick={() => handleIssueInvoice(jo.id)}
+                                  >
+                                    <Receipt size={14} /> {isID ? "Invoice" : "Invoice"}
+                                  </ButtonWithLoading>
+                                )}
                           </div>
                         </td>
                       </tr>
@@ -4357,11 +4373,15 @@ const Accounting = () => {
                                         </button>
                                       );
                                     })()}
-                                    {!invoice && canWrite && (
-                                      <ButtonWithLoading className="btn btn-gold" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px' }} onClick={() => handleIssueInvoice(jo.id)}>
-                                        <Receipt size={14} /> {isID ? 'Invoice' : 'Invoice'}
-                                      </ButtonWithLoading>
-                                    )}
+                                    {!invoice && canWrite && jo.shipmentStatus === "done" && (
+                                  <ButtonWithLoading
+                                    className="btn btn-gold"
+                                    style={{ padding: "7px 14px", fontSize: "0.8rem", gap: "6px" }}
+                                    onClick={() => handleIssueInvoice(jo.id)}
+                                  >
+                                    <Receipt size={14} /> {isID ? "Invoice" : "Invoice"}
+                                  </ButtonWithLoading>
+                                )}
                                   </div>
                                 </td>
                               </tr>
@@ -4568,9 +4588,13 @@ const Accounting = () => {
                                     </button>
                                   );
                                 })()}
-                                {!invoice && canWrite && (
-                                  <ButtonWithLoading className="btn btn-gold" style={{ padding: '7px 14px', fontSize: '0.8rem', gap: '6px' }} onClick={() => handleIssueInvoice(jo.id)}>
-                                    <Receipt size={14} /> {isID ? 'Invoice' : 'Invoice'}
+                                {!invoice && canWrite && jo.shipmentStatus === "done" && (
+                                  <ButtonWithLoading
+                                    className="btn btn-gold"
+                                    style={{ padding: "7px 14px", fontSize: "0.8rem", gap: "6px" }}
+                                    onClick={() => handleIssueInvoice(jo.id)}
+                                  >
+                                    <Receipt size={14} /> {isID ? "Invoice" : "Invoice"}
                                   </ButtonWithLoading>
                                 )}
                               </div>
@@ -4609,7 +4633,8 @@ const Accounting = () => {
                     <th style={{ padding: '15px' }}>{isID ? 'Pengiriman' : 'Shipment'}</th>
                     <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Foto' : 'Photos'}</th>
                     <th style={{ padding: '15px' }}>{isID ? 'Status Penagihan' : 'Billing Status'}</th>
-                  </tr>
+                     <th style={{ padding: '15px' }}>{isID ? 'Aksi' : 'Action'}</th>
+                   </tr>
                 </thead>
                 <tbody>
                   {(() => {
@@ -4647,8 +4672,8 @@ const Accounting = () => {
                     if (pendingGroups.length === 0) {
                       return (
                         <tr>
-                          <td colSpan="6" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                            {isID ? 'Tidak ada invoice tertunda.' : 'No pending invoices found.'}
+                          <td colSpan="7" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                             {isID ? 'Tidak ada invoice tertunda.' : 'No pending invoices found.'}
                           </td>
                         </tr>
                       );
@@ -4656,6 +4681,8 @@ const Accounting = () => {
 
                     return pendingGroups.map(group => {
                       const isGroupExpanded = expandedCompletedGroups[group.quotationId] !== false;
+                      const uninvoicedJOs = group.jobOrders.filter(jo => !invoices.some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.map(String).includes(String(jo.id)))));
+                      const allInvoiced = uninvoicedJOs.length === 0;
 
                       return (
                         <React.Fragment key={group.quotationId}>
@@ -4668,7 +4695,7 @@ const Accounting = () => {
                             }}
                             onClick={() => setExpandedCompletedGroups({ ...expandedCompletedGroups, [group.quotationId]: !isGroupExpanded })}
                           >
-                            <td colSpan="6" style={{ padding: '12px 15px', verticalAlign: 'middle' }}>
+                            <td colSpan="7" style={{ padding: '12px 15px', verticalAlign: 'middle' }}>
                               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                   <span style={{ fontSize: '1.2rem' }}>📁</span>
@@ -4680,6 +4707,18 @@ const Accounting = () => {
                                   </span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                  {!allInvoiced && canWrite && uninvoicedJOs.every(jo => jo.shipmentStatus === 'done') && (
+                                    <ButtonWithLoading 
+                                      className="btn btn-gold" 
+                                      style={{ padding: '6px 14px', fontSize: '0.75rem', gap: '6px' }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleIssueInvoice(uninvoicedJOs[0].id);
+                                      }}
+                                    >
+                                      {isID ? 'Terbitkan Invoice Gabungan' : 'Issue Combined Invoice'}
+                                    </ButtonWithLoading>
+                                  )}
                                   <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                                   {group.jobOrders.length} {isID ? 'Pekerjaan' : 'Jobs'}
                                   </span>
@@ -4866,12 +4905,27 @@ const Accounting = () => {
                                       </span>
                                     )}
                                   </td>
+                                  <td style={{ padding: '15px' }}>
+                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                      {!hasInvoice && canWrite && jo.shipmentStatus === 'done' ? (
+                                        <ButtonWithLoading 
+                                          className="btn btn-gold" 
+                                          style={{ padding: '8px 16px', fontSize: '0.85rem' }} 
+                                          onClick={() => handleIssueInvoice(jo.id)}
+                                        >
+                                          {isID ? 'Terbitkan Invoice' : 'Issue Invoice'}
+                                        </ButtonWithLoading>
+                                      ) : (
+                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>-</span>
+                                      )}
+                                    </div>
+                                  </td>
                                 </tr>
 
                                 {/* Collapsible Nested Invoice Row */}
                                 {hasInvoice && (
                                   <tr style={{ background: 'rgba(212, 175, 55, 0.02)', borderBottom: '1px solid var(--glass-border)' }}>
-                                    <td colSpan="6" style={{ padding: '10px 15px 15px 50px' }}>
+                                    <td colSpan="7" style={{ padding: '10px 15px 15px 50px' }}>
                                       <div style={{ fontSize: '0.72rem', color: 'var(--secondary)', fontWeight: '800', marginBottom: '8px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
                                         {isID ? 'Invoice Terkait:' : 'Associated Invoices:'}
                                       </div>
