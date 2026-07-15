@@ -548,7 +548,7 @@ export const AppProvider = ({ children }) => {
      // Calculate total amount across all target JOs and build items list
     let totalAmount = 0;
     const items = [];
-    targetJOs.forEach(targetJo => {
+     targetJOs.forEach(targetJo => {
       if (Array.isArray(targetJo.items) && targetJo.items.length > 0) {
         // Multi-item job order
         targetJo.items.forEach(item => {
@@ -560,6 +560,7 @@ export const AppProvider = ({ children }) => {
               description: item.description || 'Freight Forwarding Services',
               qty,
               rate,
+              joId: targetJo.id,
               containerNo: item.containerNo || [],
               vehicleNo: item.vehicleNo || [],
               driverName: item.driverName || []
@@ -595,6 +596,7 @@ export const AppProvider = ({ children }) => {
           description: targetJo.instruction || targetJo.jobDescription || 'Freight Forwarding Services',
           qty,
           rate,
+          joId: targetJo.id,
           containerNo: Array.isArray(targetJo.containerNo) ? targetJo.containerNo : (targetJo.containerNo ? [targetJo.containerNo] : []),
           vehicleNo: Array.isArray(targetJo.vehicleNo) ? targetJo.vehicleNo : (targetJo.vehicleNo ? [targetJo.vehicleNo] : []),
           driverName: Array.isArray(targetJo.driverName) ? targetJo.driverName : (targetJo.driverName ? [targetJo.driverName] : [])

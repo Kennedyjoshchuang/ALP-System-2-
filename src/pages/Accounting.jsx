@@ -2460,24 +2460,52 @@ const Accounting = () => {
       // Reconstruct legacy/single-item invoice items
       joIds.forEach(id => {
         const jo = jobOrders.find(j => String(j.id) === String(id));
-        const qty = jo ? parseFloat(jo.issueQuantity || jo.quantity || 1) : 1;
-        const subtotal = parseFloat(originalInv.subtotal || originalInv.amount || 0);
-        const rate = (String(id) === String(originalInv.joId)) ? (subtotal / qty) : 0;
-        
-        const containerNo = jo ? (Array.isArray(jo.containerNo) && jo.containerNo.length > 0 ? [...jo.containerNo] : [jo.containerNo || '']) : [''];
-        const vehicleNo = jo ? (Array.isArray(jo.vehicleNo) && jo.vehicleNo.length > 0 ? [...jo.vehicleNo] : [jo.vehicleNo || '']) : [''];
-        const driverName = jo ? (Array.isArray(jo.driverName) && jo.driverName.length > 0 ? [...jo.driverName] : [jo.driverName || '']) : [''];
+        if (jo && Array.isArray(jo.items) && jo.items.length > 0) {
+          jo.items.forEach(item => {
+            const qty = parseFloat(item.issueQuantity || item.quantity || 1);
+            const rate = parseFloat(item.rate || 0);
+            
+            const containerNo = Array.isArray(item.containerNo) && item.containerNo.length > 0 
+              ? [...item.containerNo] 
+              : (Array.isArray(jo.containerNo) && jo.containerNo.length > 0 ? [...jo.containerNo] : [jo.containerNo || '']);
+            const vehicleNo = Array.isArray(item.vehicleNo) && item.vehicleNo.length > 0 
+              ? [...item.vehicleNo] 
+              : (Array.isArray(jo.vehicleNo) && jo.vehicleNo.length > 0 ? [...jo.vehicleNo] : [jo.vehicleNo || '']);
+            const driverName = Array.isArray(item.driverName) && item.driverName.length > 0 
+              ? [...item.driverName] 
+              : (Array.isArray(jo.driverName) && jo.driverName.length > 0 ? [...jo.driverName] : [jo.driverName || '']);
 
-        preparedItems.push({
-          description: jo ? (jo.instruction || jo.jobDescription || '').split(' ||| ')[0].trim() : 'Freight Forwarding Services',
-          qty,
-          rate,
-          amount: rate * qty,
-          joId: id,
-          containerNo,
-          vehicleNo,
-          driverName
-        });
+            preparedItems.push({
+              description: item.description || 'Freight Forwarding Services',
+              qty,
+              rate,
+              amount: rate * qty,
+              joId: id,
+              containerNo,
+              vehicleNo,
+              driverName
+            });
+          });
+        } else {
+          const qty = jo ? parseFloat(jo.issueQuantity || jo.quantity || 1) : 1;
+          const subtotal = parseFloat(originalInv.subtotal || originalInv.amount || 0);
+          const rate = (String(id) === String(originalInv.joId)) ? (subtotal / qty) : 0;
+          
+          const containerNo = jo ? (Array.isArray(jo.containerNo) && jo.containerNo.length > 0 ? [...jo.containerNo] : [jo.containerNo || '']) : [''];
+          const vehicleNo = jo ? (Array.isArray(jo.vehicleNo) && jo.vehicleNo.length > 0 ? [...jo.vehicleNo] : [jo.vehicleNo || '']) : [''];
+          const driverName = jo ? (Array.isArray(jo.driverName) && jo.driverName.length > 0 ? [...jo.driverName] : [jo.driverName || '']) : [''];
+
+          preparedItems.push({
+            description: jo ? (jo.instruction || jo.jobDescription || '').split(' ||| ')[0].trim() : 'Freight Forwarding Services',
+            qty,
+            rate,
+            amount: rate * qty,
+            joId: id,
+            containerNo,
+            vehicleNo,
+            driverName
+          });
+        }
       });
 
       if (preparedItems.length === 0) {
