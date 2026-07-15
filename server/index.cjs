@@ -924,6 +924,16 @@ async function getNextInvoiceId(supabase, projectCode) {
   return `${seqStr}${suffix}`;
 }
 
+app.get('/api/invoices/next-number', async (req, res) => {
+  try {
+    const nextId = await getNextInvoiceId(supabase, 'ALP');
+    res.json({ nextInvoiceId: nextId });
+  } catch (error) {
+    console.error('Error in GET /api/invoices/next-number:', error);
+    res.status(500).json({ error: error.message || 'Failed to generate next invoice ID' });
+  }
+});
+
 app.get('/api/invoices', async (req, res) => {
   const { data, error } = await supabase.from('invoices').select('*');
   if (error) return handleError(res, error, 'GET invoices');

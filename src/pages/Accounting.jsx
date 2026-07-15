@@ -6,6 +6,7 @@ import { useApp } from '../context/AppContext';
 import { CreditCard, Download, Receipt, Wallet, CheckCircle, Plus, X, XCircle, DollarSign, Search, FileSpreadsheet, RotateCcw, Edit3, Save, Image, ChevronDown, ChevronUp, User, Briefcase, Banknote, Calendar, FileText, Trash2, Settings, ExternalLink, ShieldCheck, ShieldAlert, GitMerge } from 'lucide-react';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
+import { apiRequest } from '../api/api';
 
 const defaultSubcategories = {
   'Gaji': [
@@ -1986,7 +1987,15 @@ const Accounting = () => {
         }
       });
 
-      const newInvoiceId = `INV-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+      let suggestedInvoiceId = '';
+      try {
+        const nextRes = await apiRequest('invoices/next-number');
+        if (nextRes && nextRes.nextInvoiceId) {
+          suggestedInvoiceId = nextRes.nextInvoiceId;
+        }
+      } catch (err) {
+        console.error('Failed to fetch next invoice ID:', err);
+      }
 
       setInvoiceConfirmData({
         joId,
@@ -1994,7 +2003,7 @@ const Accounting = () => {
         consolidatedJOIds: targetJOs.map(j => j.id),
         linkedJOs: targetJOs,
         form: {
-          id: '',
+          id: suggestedInvoiceId,
           customerName: linkedJO.customerName || '',
           customerAddress: linkedQuo?.companyAddress || linkedJO?.address || customers.find(c => c.name === (linkedJO?.customerName || ''))?.address || '',
           customerPic: linkedQuo?.pic || '',
@@ -4079,6 +4088,17 @@ const Accounting = () => {
                 notes: ''
               });
               setShowCustomInvoiceModal(true);
+
+              // Fetch next invoice ID asynchronously
+              apiRequest('invoices/next-number')
+                .then(res => {
+                  if (res && res.nextInvoiceId) {
+                    setCustomInvoiceForm(prev => prev.id === '' ? { ...prev, id: res.nextInvoiceId } : prev);
+                  }
+                })
+                .catch(err => {
+                  console.error('Failed to fetch next invoice ID:', err);
+                });
             }}
             style={{
               display: 'flex', alignItems: 'center', gap: '8px',
