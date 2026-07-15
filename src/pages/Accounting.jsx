@@ -802,39 +802,60 @@ const Accounting = () => {
     );
   };
 
-  const getAggregatedContainers = (associatedJOs) => {
+  const getAggregatedContainers = (associatedJOs, invoice = null) => {
     const counts = {};
-    associatedJOs.forEach(jo => {
-      let list = [];
-      // 1. Try to get container numbers from jo.items (new scheme)
-      if (Array.isArray(jo.items) && jo.items.length > 0) {
-        jo.items.forEach(item => {
-          const cNo = item.containerNo;
-          if (Array.isArray(cNo)) {
-            list = [...list, ...cNo.filter(Boolean)];
-          } else if (cNo && String(cNo).trim()) {
-            list.push(String(cNo).trim());
-          }
-        });
-      }
-      
-      // 2. If no containers found in items, fall back to root containerNo (legacy scheme)
-      if (list.length === 0) {
-        const cNo = jo.containerNo;
+    
+    // 1. Try to get container numbers from invoice.items
+    if (invoice && Array.isArray(invoice.items) && invoice.items.length > 0) {
+      invoice.items.forEach(item => {
+        const cNo = item.containerNo;
         if (Array.isArray(cNo)) {
-          list = cNo.filter(Boolean);
+          cNo.filter(Boolean).forEach(num => {
+            const clean = String(num).trim();
+            if (clean) counts[clean] = (counts[clean] || 0) + 1;
+          });
         } else if (cNo && String(cNo).trim()) {
-          list = [String(cNo).trim()];
-        }
-      }
-
-      list.forEach(num => {
-        const clean = String(num).trim();
-        if (clean) {
+          const clean = String(cNo).trim();
           counts[clean] = (counts[clean] || 0) + 1;
         }
       });
-    });
+    }
+
+    // 2. Combine with associatedJOs container numbers
+    if (associatedJOs && Array.isArray(associatedJOs)) {
+      associatedJOs.forEach(jo => {
+        let list = [];
+        // A. Try to get container numbers from jo.items (new scheme)
+        if (Array.isArray(jo.items) && jo.items.length > 0) {
+          jo.items.forEach(item => {
+            const cNo = item.containerNo;
+            if (Array.isArray(cNo)) {
+              list = [...list, ...cNo.filter(Boolean)];
+            } else if (cNo && String(cNo).trim()) {
+              list.push(String(cNo).trim());
+            }
+          });
+        }
+        
+        // B. If no containers found in items, fall back to root containerNo (legacy scheme)
+        if (list.length === 0) {
+          const cNo = jo.containerNo;
+          if (Array.isArray(cNo)) {
+            list = cNo.filter(Boolean);
+          } else if (cNo && String(cNo).trim()) {
+            list = [String(cNo).trim()];
+          }
+        }
+
+        list.forEach(num => {
+          const clean = String(num).trim();
+          if (clean) {
+            counts[clean] = (counts[clean] || 0) + 1;
+          }
+        });
+      });
+    }
+
     return Object.entries(counts).map(([num, count]) => {
       return count > 1 ? `${num} (${count}x)` : num;
     });
@@ -1604,12 +1625,17 @@ const Accounting = () => {
               return jo.containerNo.some(c => c && c.toLowerCase().includes(term));
             }
             return jo.containerNo && jo.containerNo.toLowerCase().includes(term);
-          });
+          }) || (Array.isArray(inv.items) && inv.items.some(item => {
+            if (Array.isArray(item.containerNo)) {
+              return item.containerNo.some(c => c && c.toLowerCase().includes(term));
+            }
+            return item.containerNo && String(item.containerNo).toLowerCase().includes(term);
+          }));
           return id.toLowerCase().includes(term) || name.toLowerCase().includes(term) || containerMatch;
         })
         .map(inv => {
           const associatedJOs = getAssociatedJOs(inv);
-          const containerNumbers = getAggregatedContainers(associatedJOs).join(', ');
+          const containerNumbers = getAggregatedContainers(associatedJOs, inv).join(', ');
           return {
             Invoice_ID: inv.id,
             JO_ID: inv.joId,
@@ -2313,7 +2339,7 @@ const Accounting = () => {
     try {
       await settleInvoice(settleModal.id, settleForm.paymentProof, settleForm.taxes, settleForm.taxProof, settleForm.paymentDate);
       setSettleModal(null);
-      toast.error('Payment settled! Invoice moved to Lunas Records.');
+      toast.success('Payment settled! Invoice moved to Lunas Records.');
     } catch (err) {
       toast.error('Gagal settle pembayaran: ' + err.message);
     }
@@ -2541,7 +2567,12 @@ const Accounting = () => {
             return jo.containerNo.some(c => c && c.toLowerCase().includes(term));
           }
           return jo.containerNo && jo.containerNo.toLowerCase().includes(term);
-        });
+        }) || (Array.isArray(inv.items) && inv.items.some(item => {
+          if (Array.isArray(item.containerNo)) {
+            return item.containerNo.some(c => c && c.toLowerCase().includes(term));
+          }
+          return item.containerNo && String(item.containerNo).toLowerCase().includes(term);
+        }));
         return id.toLowerCase().includes(term) || name.toLowerCase().includes(term) || containerMatch;
       });
 
@@ -2675,7 +2706,7 @@ const Accounting = () => {
                       }
                     });
                     
-                    const allContainers = getAggregatedContainers(associatedJOs);
+                    const allContainers = getAggregatedContainers(associatedJOs, selectedInvoice);
                     allVehicles = [...new Set(allVehicles)];
                     allPhotos = [...new Set(allPhotos)];
                     allStatuses = [...new Set(allStatuses)];
@@ -5142,7 +5173,7 @@ const Accounting = () => {
                       <td style={{ padding: '15px' }}>
                         {(() => {
                           const associatedJOs = getAssociatedJOs(inv);
-                          const allContainers = getAggregatedContainers(associatedJOs);
+                          const allContainers = getAggregatedContainers(associatedJOs, inv);
                           if (allContainers.length === 0) return '—';
                           return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>

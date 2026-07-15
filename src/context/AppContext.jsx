@@ -240,8 +240,8 @@ export const AppProvider = ({ children }) => {
         };
       };
 
-      setInvoices(safeParse(invData, ['extra_charges', 'tax_deduction_proof', 'taxes_deducted', 'paymentProofPhoto', 'signedInvoicePhoto', 'signedReceiptPhoto']).map(unpackInvoiceNotes));
-      const parsedReceivables = safeParse(recData, ['extra_charges', 'tax_deduction_proof', 'taxes_deducted', 'paymentProofPhoto', 'signedInvoicePhoto', 'signedReceiptPhoto']).map(rec => {
+      setInvoices(safeParse(invData, ['extra_charges', 'tax_deduction_proof', 'taxes_deducted', 'paymentProofPhoto', 'signedInvoicePhoto', 'signedReceiptPhoto', 'consolidatedJOs', 'items']).map(unpackInvoiceNotes));
+      const parsedReceivables = safeParse(recData, ['extra_charges', 'tax_deduction_proof', 'taxes_deducted', 'paymentProofPhoto', 'signedInvoicePhoto', 'signedReceiptPhoto', 'consolidatedJOs', 'items']).map(rec => {
         const originalInv = invData.find(i => i.id === rec.id || i.id === rec.invoiceId);
         const unpackedInv = originalInv ? unpackInvoiceNotes(originalInv) : null;
         return {
