@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import DigitalSignatureController from '../components/DigitalSignatureController';
+import { useApp } from '../context/AppContext';
 
 const PrintInvoice = () => {
-  const [data, setData] = useState(null);
+  const { invoices = [], jobOrders = [], quotations = [], companyBankAccounts = [] } = useApp() || {};
+  const [localData, setLocalData] = useState(null);
   const [dueDays, setDueDays] = useState(() => parseInt(localStorage.getItem('invoice_due_days') || '14', 10));
   const [sigConfig, setSigConfig] = useState({
     type: 'none',
@@ -14,26 +16,44 @@ const PrintInvoice = () => {
     sigColor: '#1e3a8a'
   });
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get('id');
-    let saved = null;
-    if (id) {
-      saved = localStorage.getItem('print_invoice_data_' + id);
-    }
-    if (!saved) {
-      saved = localStorage.getItem('print_invoice_data');
-    }
-    if (saved) setData(JSON.parse(saved));
-  }, []);
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
 
-  if (!data) return (
+  useEffect(() => {
+    if (!id) return;
+    const saved = localStorage.getItem('print_invoice_data_' + id) || localStorage.getItem('print_invoice_data');
+    if (saved) {
+      try {
+        setLocalData(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to parse local print data:', e);
+      }
+    }
+  }, [id]);
+
+  // Resolve dynamically from AppContext to ensure live edited values
+  const contextInvoice = invoices.find(i => String(i.id) === String(id));
+  const contextJo = contextInvoice ? jobOrders.find(j => String(j.id) === String(contextInvoice.joId)) : null;
+  const contextConsolidated = (contextInvoice && contextInvoice.consolidatedJOs)
+    ? jobOrders.filter(j => contextInvoice.consolidatedJOs.map(String).includes(String(j.id)))
+    : (contextJo ? [contextJo] : []);
+  const contextQuotation = contextJo ? quotations.find(q => String(q.id) === String(contextJo.quotationId)) : null;
+  const contextBankAccount = contextInvoice ? companyBankAccounts.find(b => b.id === contextInvoice.bankAccountId) : null;
+
+  const invoice = contextInvoice || localData?.invoice;
+  const jo = contextJo || localData?.jo;
+  const consolidatedJOs = (contextInvoice && contextInvoice.consolidatedJOs && contextConsolidated.length > 0)
+    ? contextConsolidated
+    : (localData?.consolidatedJOs || []);
+  const quotation = contextQuotation || localData?.quotation;
+  const bankAccount = contextBankAccount || localData?.bankAccount;
+
+  if (!invoice) return (
     <div style={{ padding: '60px', textAlign: 'center', fontFamily: 'sans-serif', color: '#64748b' }}>
       Memuat data invoice…
     </div>
   );
 
-  const { invoice, jo, consolidatedJOs, quotation, bankAccount } = data;
   const targetJOs = Array.isArray(consolidatedJOs) && consolidatedJOs.length > 0 ? consolidatedJOs : (jo ? [jo] : []);
   let extraCharges = Array.isArray(invoice?.extra_charges) ? invoice.extra_charges : [];
 
@@ -229,8 +249,8 @@ const PrintInvoice = () => {
                 <tr key={`inv-item-${idx}`} style={{ borderBottom: '1px solid #e2e8f0' }}>
                   <td style={{ padding: '15px 14px' }}>
                     <div style={{ fontWeight: '800', fontSize: '1rem' }}>{item.description || 'Logistics Service'}</div>
-                    {((item.containerNo && (Array.isArray(item.containerNo) ? item.containerNo.some?.(Boolean) || item.containerNo.length > 0 : item.containerNo)) ||
-                      (item.vehicleNo && (Array.isArray(item.vehicleNo) ? item.vehicleNo.some?.(Boolean) || item.vehicleNo.length > 0 : item.vehicleNo))) && (
+                    {((item.containerNo && (Array.isArray(item.containerNo) ? item.containerNo.some?.(Boolean) : item.containerNo)) ||
+                      (item.vehicleNo && (Array.isArray(item.vehicleNo) ? item.vehicleNo.some?.(Boolean) : item.vehicleNo))) && (
                       <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px', fontWeight: '600' }}>
                         {item.containerNo && (Array.isArray(item.containerNo) ? item.containerNo.some(Boolean) : item.containerNo) && `Container: ${Array.isArray(item.containerNo) ? item.containerNo.filter(Boolean).join(', ') : item.containerNo}`}
                         {item.vehicleNo && (Array.isArray(item.vehicleNo) ? item.vehicleNo.some(Boolean) : item.vehicleNo) && ` | Vehicle: ${Array.isArray(item.vehicleNo) ? item.vehicleNo.filter(Boolean).join(', ') : item.vehicleNo}`}

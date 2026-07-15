@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import DigitalSignatureController from '../components/DigitalSignatureController';
+import { useApp } from '../context/AppContext';
 
 const PrintInvoiceReceipt = () => {
-  const [data, setData] = useState(null);
+  const { invoices = [], companyBankAccounts = [] } = useApp() || {};
+  const [localData, setLocalData] = useState(null);
   const [sigConfig, setSigConfig] = useState({
     type: 'none',
     showStamp: true,
@@ -13,24 +15,29 @@ const PrintInvoiceReceipt = () => {
     sigColor: '#1e3a8a'
   });
 
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
+
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get('id');
-    let savedData = null;
-    if (id) {
-      savedData = localStorage.getItem('print_invoice_data_' + id);
-    }
-    if (!savedData) {
-      savedData = localStorage.getItem('print_invoice_data');
-    }
+    if (!id) return;
+    const savedData = localStorage.getItem('print_invoice_data_' + id) || localStorage.getItem('print_invoice_data');
     if (savedData) {
-      setData(JSON.parse(savedData));
+      try {
+        setLocalData(JSON.parse(savedData));
+      } catch (e) {
+        console.error('Failed to parse local print data:', e);
+      }
     }
-  }, []);
+  }, [id]);
 
-  if (!data) return <div style={{ padding: '50px', textAlign: 'center' }}>Loading Receipt Draft...</div>;
+  // Resolve dynamically from AppContext to ensure live edited values
+  const contextInvoice = invoices.find(i => String(i.id) === String(id));
+  const contextBankAccount = contextInvoice ? companyBankAccounts.find(b => b.id === contextInvoice.bankAccountId) : null;
 
-  const { invoice, bankAccount } = data;
+  const invoice = contextInvoice || localData?.invoice;
+  const bankAccount = contextBankAccount || localData?.bankAccount;
+
+  if (!invoice) return <div style={{ padding: '50px', textAlign: 'center' }}>Loading Receipt Draft...</div>;
   const totalAmount = parseFloat(invoice?.amount || 0);
 
   return (

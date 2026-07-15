@@ -1,28 +1,44 @@
 import React, { useEffect, useState } from 'react';
+import { useApp } from '../context/AppContext';
 
 const PrintInvoiceAttachment = () => {
-  const [data, setData] = useState(null);
+  const { invoices = [], jobOrders = [] } = useApp() || {};
+  const [localData, setLocalData] = useState(null);
+
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get('id');
-    let saved = null;
-    if (id) {
-      saved = localStorage.getItem('print_invoice_data_' + id);
+    if (!id) return;
+    const saved = localStorage.getItem('print_invoice_data_' + id) || localStorage.getItem('print_invoice_data');
+    if (saved) {
+      try {
+        setLocalData(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to parse local print data:', e);
+      }
     }
-    if (!saved) {
-      saved = localStorage.getItem('print_invoice_data');
-    }
-    if (saved) setData(JSON.parse(saved));
-  }, []);
+  }, [id]);
 
-  if (!data) return (
+  // Resolve dynamically from AppContext to ensure live edited values
+  const contextInvoice = invoices.find(i => String(i.id) === String(id));
+  const contextJo = contextInvoice ? jobOrders.find(j => String(j.id) === String(contextInvoice.joId)) : null;
+  const contextConsolidated = (contextInvoice && contextInvoice.consolidatedJOs)
+    ? jobOrders.filter(j => contextInvoice.consolidatedJOs.map(String).includes(String(j.id)))
+    : (contextJo ? [contextJo] : []);
+
+  const invoice = contextInvoice || localData?.invoice;
+  const jo = contextJo || localData?.jo;
+  const consolidatedJOs = (contextInvoice && contextInvoice.consolidatedJOs && contextConsolidated.length > 0)
+    ? contextConsolidated
+    : (localData?.consolidatedJOs || []);
+
+  if (!invoice) return (
     <div style={{ padding: '60px', textAlign: 'center', fontFamily: 'sans-serif', color: '#64748b' }}>
       Memuat data lampiran…
     </div>
   );
 
-  const { invoice, jo, consolidatedJOs } = data;
   const targetJOs = Array.isArray(consolidatedJOs) && consolidatedJOs.length > 0 ? consolidatedJOs : (jo ? [jo] : []);
   const operationalPhotos = targetJOs.reduce((acc, currJo) => acc.concat(Array.isArray(currJo.photos) ? currJo.photos : []), []);
   

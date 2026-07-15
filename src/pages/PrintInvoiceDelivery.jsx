@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import DigitalSignatureController from '../components/DigitalSignatureController';
+import { useApp } from '../context/AppContext';
 
 const PrintInvoiceDelivery = () => {
-  const [data, setData] = useState(null);
+  const { invoices = [], jobOrders = [], companyBankAccounts = [] } = useApp() || {};
+  const [localData, setLocalData] = useState(null);
   const [sigConfig, setSigConfig] = useState({
     type: 'none',
     showStamp: true,
@@ -13,26 +15,41 @@ const PrintInvoiceDelivery = () => {
     sigColor: '#1e3a8a'
   });
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get('id');
-    let saved = null;
-    if (id) {
-      saved = localStorage.getItem('print_invoice_data_' + id);
-    }
-    if (!saved) {
-      saved = localStorage.getItem('print_invoice_data');
-    }
-    if (saved) setData(JSON.parse(saved));
-  }, []);
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
 
-  if (!data) return (
+  useEffect(() => {
+    if (!id) return;
+    const saved = localStorage.getItem('print_invoice_data_' + id) || localStorage.getItem('print_invoice_data');
+    if (saved) {
+      try {
+        setLocalData(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to parse local print data:', e);
+      }
+    }
+  }, [id]);
+
+  // Resolve dynamically from AppContext to ensure live edited values
+  const contextInvoice = invoices.find(i => String(i.id) === String(id));
+  const contextJo = contextInvoice ? jobOrders.find(j => String(j.id) === String(contextInvoice.joId)) : null;
+  const contextConsolidated = (contextInvoice && contextInvoice.consolidatedJOs)
+    ? jobOrders.filter(j => contextInvoice.consolidatedJOs.map(String).includes(String(j.id)))
+    : (contextJo ? [contextJo] : []);
+  const contextBankAccount = contextInvoice ? companyBankAccounts.find(b => b.id === contextInvoice.bankAccountId) : null;
+
+  const invoice = contextInvoice || localData?.invoice;
+  const jo = contextJo || localData?.jo;
+  const consolidatedJOs = (contextInvoice && contextInvoice.consolidatedJOs && contextConsolidated.length > 0)
+    ? contextConsolidated
+    : (localData?.consolidatedJOs || []);
+  const bankAccount = contextBankAccount || localData?.bankAccount;
+
+  if (!invoice) return (
     <div style={{ padding: '60px', textAlign: 'center', fontFamily: 'sans-serif', color: '#64748b' }}>
       Memuat data tanda terima…
     </div>
   );
-
-  const { invoice, jo, consolidatedJOs, bankAccount } = data;
 
   const fmtDate = (d) => {
     if (!d) return '—';
