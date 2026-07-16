@@ -74,9 +74,24 @@ async function main() {
     const sftp = await getSFTP(conn);
     console.log('📁 Starting upload...');
     
+    // 1. Upload frontend dist
     await uploadDir(sftp, localDistDir, remoteBase + '/dist');
     
-    console.log('\n🎉 Deployment complete!');
+    // 2. Upload backend server file
+    console.log('Uploading backend server file...');
+    await uploadFile(sftp, path.join(__dirname, 'server', 'index.cjs'), remoteBase + '/server/index.cjs');
+
+    console.log('\n🎉 Upload complete! Restarting PM2 process...');
+    
+    // 3. Restart backend server process
+    await new Promise((resolve, reject) => {
+      conn.exec('pm2 restart ALPSystem', (err, stream) => {
+        if (err) return reject(err);
+        stream.on('close', resolve).stderr.on('data', data => console.error(data.toString()));
+      });
+    });
+    
+    console.log('✅ PM2 process "ALPSystem" restarted successfully!');
     console.log('🌐 Live at: http://76.13.196.51');
   } finally {
     conn.end();
