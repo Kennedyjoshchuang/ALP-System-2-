@@ -905,9 +905,10 @@ export const AppProvider = ({ children }) => {
       method: 'PUT',
       body: JSON.stringify(updates)
     });
-    setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, ...updates } : inv));
+    const newId = updates.id || id;
+    setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, ...updates, id: newId } : inv));
     // Also update receivable if it exists
-    setReceivables(prev => prev.map(r => r.id === id ? { ...r, ...updates, balance: updates.amount ?? r.balance } : r));
+    setReceivables(prev => prev.map(r => (r.id === id || r.invoiceId === id) ? { ...r, ...updates, id: newId, invoiceId: newId, balance: updates.amount ?? r.balance } : r));
   };
   const deleteQuotation = async (id) => {
 

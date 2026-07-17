@@ -1072,6 +1072,94 @@ app.post('/api/invoices', async (req, res) => {
 app.put('/api/invoices/*id', async (req, res) => {
   const id = Array.isArray(req.params.id) ? req.params.id.join('/') : req.params.id;
   const updates = req.body;
+
+  if (updates.id && updates.id !== id) {
+    try {
+      // 1. Check if the new ID already exists
+      const { data: existing, error: checkErr } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('id', updates.id)
+        .maybeSingle();
+      
+      if (checkErr) throw checkErr;
+      if (existing) {
+        return res.status(400).json({ error: `Invoice number ${updates.id} already exists.` });
+      }
+
+      // 2. Fetch the old invoice row
+      const { data: oldInv, error: fetchErr } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (fetchErr) throw fetchErr;
+
+      // 3. Create the new invoice data and insert it
+      const newInv = {
+        ...oldInv,
+        ...updates
+      };
+      const { error: insertErr } = await supabase.from('invoices').insert(newInv);
+      if (insertErr) throw insertErr;
+
+      // 4. Update corresponding receivable if it exists
+      const recUpdates = {};
+      if (updates.customerName !== undefined) recUpdates.customerName = updates.customerName;
+      if (updates.amount !== undefined) {
+        recUpdates.amount = updates.amount;
+        recUpdates.balance = updates.amount;
+      }
+      if (updates.subtotal !== undefined) recUpdates.subtotal = updates.subtotal;
+      if (updates.tax !== undefined) recUpdates.tax = updates.tax;
+      if (updates.extra_charges !== undefined) recUpdates.extra_charges = updates.extra_charges;
+      if (updates.status !== undefined) recUpdates.status = updates.status;
+      if (updates.paymentProofPhoto !== undefined) recUpdates.paymentProofPhoto = updates.paymentProofPhoto;
+      if (updates.paidDate !== undefined) recUpdates.paidDate = updates.paidDate;
+
+      // Also update receivable's own ID and foreign key invoiceId
+      const { data: oldRec, error: fetchRecErr } = await supabase
+        .from('receivables')
+        .select('id')
+        .eq('invoiceId', id)
+        .maybeSingle();
+
+      if (fetchRecErr) {
+        await supabase.from('invoices').delete().eq('id', updates.id);
+        throw fetchRecErr;
+      }
+
+      if (oldRec) {
+        const { error: updateRecErr } = await supabase
+          .from('receivables')
+          .update({
+            ...recUpdates,
+            id: updates.id,
+            invoiceId: updates.id
+          })
+          .eq('invoiceId', id);
+
+        if (updateRecErr) {
+          await supabase.from('invoices').delete().eq('id', updates.id);
+          throw updateRecErr;
+        }
+      }
+
+      // 5. Delete the old invoice row
+      const { error: deleteErr } = await supabase.from('invoices').delete().eq('id', id);
+      if (deleteErr) {
+        await supabase.from('invoices').delete().eq('id', updates.id);
+        throw deleteErr;
+      }
+
+      return res.sendStatus(200);
+    } catch (err) {
+      console.error(`Error migrating invoice ID from ${id} to ${updates.id}:`, err);
+      return res.status(500).json({ error: err.message || 'Failed to migrate invoice ID' });
+    }
+  }
+
   const { error } = await supabase.from('invoices').update(updates).eq('id', id);
   if (error) return handleError(res, error, 'PUT invoices');
 

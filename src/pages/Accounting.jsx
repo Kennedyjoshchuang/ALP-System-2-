@@ -2534,6 +2534,7 @@ const Accounting = () => {
 
     const preparedInv = {
       ...originalInv,
+      originalId: originalInv.id,
       items: preparedItems
     };
 
@@ -2578,7 +2579,8 @@ const Accounting = () => {
         };
       });
 
-      await updateInvoice(editingInvoice.id, {
+      await updateInvoice(editingInvoice.originalId, {
+        id: editingInvoice.id,
         amount: finalAmount,
         subtotal: subtotal,
         tax: 0,
@@ -7086,6 +7088,16 @@ const Accounting = () => {
               <p style={{ color:'var(--text-muted)', fontSize:'0.85rem', marginBottom:'25px' }}>Revision for <strong style={{color:'var(--text)'}}>{editingInvoice.id}</strong></p>
               
               <div style={{ display:'grid', gap:'20px' }}>
+                <div>
+                  <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Nomor Invoice' : 'Invoice Number'}</label>
+                  <input 
+                    type="text" 
+                    value={editingInvoice.id} 
+                    onChange={e => setEditingInvoice({...editingInvoice, id: e.target.value})}
+                    style={{ width:'100%', padding:'12px 15px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'10px', color:'var(--text)', fontSize:'1.1rem', fontWeight:'700' }}
+                  />
+                </div>
+
                 <div>
                   <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>Base Amount (Revenue)</label>
                   <div style={{ position:'relative' }}>
