@@ -2011,7 +2011,18 @@ const Accounting = () => {
           customerEmail: linkedQuo?.email || '',
           date: new Date().toISOString().substring(0, 10),
           items,
-          extraCharges: [],
+          extraCharges: targetJOs.reduce((acc, jo) => {
+            if (jo.extra_charges && Array.isArray(jo.extra_charges)) {
+              jo.extra_charges.forEach(ec => {
+                acc.push({
+                  description: ec.description || '',
+                  qty: parseFloat(ec.qty) || 1,
+                  rate: parseFloat(ec.rate || ec.amount || 0)
+                });
+              });
+            }
+            return acc;
+          }, []),
           taxPercent: 0,
           bankAccountId: bankAccount.id,
           notes: notes || '',

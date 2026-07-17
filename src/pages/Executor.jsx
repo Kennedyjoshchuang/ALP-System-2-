@@ -341,6 +341,48 @@ const Executor = () => {
     }
   };
 
+  const handleExtraChargeChange = (joId, index, field, value) => {
+    setLocalData(prev => {
+      const current = prev[joId]?.extra_charges || [];
+      const updated = [...current];
+      updated[index] = { ...updated[index], [field]: value };
+      return {
+        ...prev,
+        [joId]: {
+          ...(prev[joId] || {}),
+          extra_charges: updated
+        }
+      };
+    });
+  };
+
+  const addExtraCharge = (joId) => {
+    setLocalData(prev => {
+      const current = prev[joId]?.extra_charges || [];
+      return {
+        ...prev,
+        [joId]: {
+          ...(prev[joId] || {}),
+          extra_charges: [...current, { description: '', qty: 1, rate: 0 }]
+        }
+      };
+    });
+  };
+
+  const removeExtraCharge = (joId, index) => {
+    setLocalData(prev => {
+      const current = prev[joId]?.extra_charges || [];
+      const updated = current.filter((_, i) => i !== index);
+      return {
+        ...prev,
+        [joId]: {
+          ...(prev[joId] || {}),
+          extra_charges: updated
+        }
+      };
+    });
+  };
+
   const handleLocalUpdate = (joId, field, value) => {
     setLocalData(prev => ({
       ...prev,
@@ -468,7 +510,8 @@ const Executor = () => {
           vesselName: jo.vesselName || '',
           etd: jo.etd || '',
           dispatchedAtLocal: toDatetimeLocal(jo.dispatchedAt),
-          completedAtLocal: toDatetimeLocal(jo.completedAt)
+          completedAtLocal: toDatetimeLocal(jo.completedAt),
+          extra_charges: Array.isArray(jo.extra_charges) ? jo.extra_charges.map(ec => ({ ...ec })) : []
         }
       }));
     }
@@ -527,7 +570,8 @@ const Executor = () => {
       vesselName: jo.vesselName,
       etd: jo.etd,
       dispatchedAtLocal: toDatetimeLocal(jo.dispatchedAt),
-      completedAtLocal: toDatetimeLocal(jo.completedAt)
+      completedAtLocal: toDatetimeLocal(jo.completedAt),
+      extra_charges: Array.isArray(jo.extra_charges) ? jo.extra_charges.map(ec => ({ ...ec })) : []
     };
     
     const data = { ...rawData };
@@ -606,7 +650,8 @@ const Executor = () => {
       vesselName: jo.vesselName,
       etd: jo.etd,
       dispatchedAtLocal: toDatetimeLocal(jo.dispatchedAt),
-      completedAtLocal: toDatetimeLocal(jo.completedAt)
+      completedAtLocal: toDatetimeLocal(jo.completedAt),
+      extra_charges: Array.isArray(jo.extra_charges) ? jo.extra_charges.map(ec => ({ ...ec })) : []
     };
     
     const data = { ...rawData };
@@ -1689,6 +1734,69 @@ const Executor = () => {
                                             <strong style={{ color: 'var(--text)' }}>{isID ? 'Instruksi Lengkap:' : 'Full Instruction:'}</strong> {jo.jobDescription || jo.instruction || '-'}
                                           </>
                                         )}
+                                      </div>
+                                      
+                                      <div style={{ marginTop: '20px', borderTop: '1px solid var(--glass-border)', paddingTop: '20px', marginBottom: '15px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                          <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700' }}>
+                                            {isID ? 'Biaya Tambahan (Extra Charges)' : 'Extra Charges'}
+                                          </label>
+                                          {canWrite && (
+                                            <button 
+                                              type="button"
+                                              onClick={() => addExtraCharge(jo.id)}
+                                              style={{ background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px solid var(--secondary)', borderRadius: '6px', padding: '4px 10px', fontSize: '0.7rem', cursor: 'pointer' }}
+                                            >
+                                              + {isID ? 'Tambah Biaya' : 'Add Cost'}
+                                            </button>
+                                          )}
+                                        </div>
+                                        
+                                        <div style={{ display: 'grid', gap: '10px', maxHeight: '200px', overflowY: 'auto', paddingRight: '5px' }}>
+                                          {(localData[jo.id]?.extra_charges || []).map((charge, idx) => (
+                                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 120px 32px', gap: '8px', alignItems: 'center' }}>
+                                              <input 
+                                                disabled={!canWrite}
+                                                type="text" 
+                                                placeholder={isID ? "Deskripsi Biaya" : "Description"} 
+                                                value={charge.description} 
+                                                onChange={e => handleExtraChargeChange(jo.id, idx, 'description', e.target.value)}
+                                                style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.85rem' }}
+                                              />
+                                              <input 
+                                                disabled={!canWrite}
+                                                type="number" 
+                                                placeholder="Qty" 
+                                                value={charge.qty} 
+                                                onChange={e => handleExtraChargeChange(jo.id, idx, 'qty', e.target.value)}
+                                                style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.85rem', textAlign: 'center' }}
+                                              />
+                                              <input 
+                                                disabled={!canWrite}
+                                                type="number" 
+                                                step="any" 
+                                                placeholder="Rp / Rate" 
+                                                value={charge.rate} 
+                                                onChange={e => handleExtraChargeChange(jo.id, idx, 'rate', e.target.value)}
+                                                style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.85rem', fontWeight: '600' }}
+                                              />
+                                              {canWrite && (
+                                                <button 
+                                                  type="button"
+                                                  onClick={() => removeExtraCharge(jo.id, idx)}
+                                                  style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', borderRadius: '6px', height: '32px', cursor: 'pointer' }}
+                                                >
+                                                  <X size={14} />
+                                                </button>
+                                              )}
+                                            </div>
+                                          ))}
+                                          {(localData[jo.id]?.extra_charges || []).length === 0 && (
+                                            <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', margin: 0 }}>
+                                              {isID ? 'Tidak ada biaya tambahan' : 'No extra charges'}
+                                            </p>
+                                          )}
+                                        </div>
                                       </div>
                                       
                                       {canWrite && (

@@ -25,9 +25,11 @@ const AdminHub = () => {
     email: '',
     companyAddress: '',
     jobDescription: '',
-    items: [{ description: '', rate: '', quantity: 1 }]
+    items: [{ description: '', rate: '', quantity: 1 }],
+    extraCharges: []
   });
   const [selectedQuoteId, setSelectedQuoteId] = useState('');
+  const [quoteJOExtraCharges, setQuoteJOExtraCharges] = useState([]);
   const [selectedActivityIndex, setSelectedActivityIndex] = useState(0);
   const [selectedActivities, setSelectedActivities] = useState({});
   const [issueQuantity, setIssueQuantity] = useState(1);
@@ -456,7 +458,8 @@ const AdminHub = () => {
         phone: quote.phone || 'N/A',
         email: quote.email || 'N/A',
         quoteValidity: quote.validTo || 'N/A',
-        items: joItems
+        items: joItems,
+        extra_charges: quoteJOExtraCharges
       });
     } else {
       await createJO({
@@ -466,7 +469,8 @@ const AdminHub = () => {
         phone: quote.phone || 'N/A',
         email: quote.email || 'N/A',
         rate: parseFloat(quote.rate || 0),
-        quantity: parseInt(issueQuantity, 10)
+        quantity: parseInt(issueQuantity, 10),
+        extra_charges: quoteJOExtraCharges
       });
     }
 
@@ -475,6 +479,7 @@ const AdminHub = () => {
     setSelectedActivities({});
     setSelectedActivityIndex(0);
     setIssueQuantity(1);
+    setQuoteJOExtraCharges([]);
   };
 
   const handleModalSubmit = (e) => {
@@ -519,7 +524,8 @@ const AdminHub = () => {
         rate: primaryRate,
         quantity: totalQty,
         quoteValidity: 'N/A',
-        items: joItems
+        items: joItems,
+        extra_charges: directJOForm.extraCharges || []
       });
       toast.success(isID ? 'Job Order berhasil dibuat!' : 'Job Order successfully created!');
       setShowDirectJOModal(false);
@@ -530,7 +536,8 @@ const AdminHub = () => {
         email: '',
         companyAddress: '',
         jobDescription: '',
-        items: [{ description: '', rate: '', quantity: 1 }]
+        items: [{ description: '', rate: '', quantity: 1 }],
+        extraCharges: []
       });
     } catch (err) {
       console.error(err);
@@ -995,7 +1002,7 @@ const AdminHub = () => {
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               className="glass-card" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', padding: '40px', position: 'relative'  , overflowX: 'auto' }}
             >
-              <button onClick={() => setShowModal(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              <button onClick={() => { setShowModal(false); setQuoteJOExtraCharges([]); }} style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
 
@@ -1209,8 +1216,87 @@ const AdminHub = () => {
                   );
                 })()}
 
+                <div style={{ marginBottom: '25px', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <label style={{ fontWeight: 'bold', margin: 0 }}>{isID ? 'Biaya Tambahan (Extra Charges)' : 'Extra Charges'}</label>
+                    <button 
+                      type="button"
+                      onClick={() => setQuoteJOExtraCharges(prev => [...prev, { description: '', rate: '', quantity: 1 }])}
+                      className="btn"
+                      style={{ padding: '6px 12px', fontSize: '0.8rem', background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px solid var(--secondary)' }}
+                    >
+                      + {isID ? 'Tambah Biaya' : 'Add Cost'}
+                    </button>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {quoteJOExtraCharges.map((ec, idx) => (
+                      <div key={idx} style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                        <div style={{ flex: 2, minWidth: '150px' }}>
+                          <input
+                            type="text"
+                            required
+                            placeholder={isID ? "Deskripsi Biaya" : "Description"}
+                            value={ec.description}
+                            onChange={e => {
+                              const next = [...quoteJOExtraCharges];
+                              next[idx].description = e.target.value;
+                              setQuoteJOExtraCharges(next);
+                            }}
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div style={{ flex: 1, minWidth: '100px' }}>
+                          <input
+                            type="number"
+                            required
+                            min="0"
+                            placeholder={isID ? "Harga Satuan" : "Unit Rate"}
+                            value={ec.rate}
+                            onChange={e => {
+                              const next = [...quoteJOExtraCharges];
+                              next[idx].rate = e.target.value;
+                              setQuoteJOExtraCharges(next);
+                            }}
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div style={{ width: '80px' }}>
+                          <input
+                            type="number"
+                            required
+                            min="1"
+                            placeholder={isID ? "Jumlah" : "Qty"}
+                            value={ec.quantity}
+                            onChange={e => {
+                              const next = [...quoteJOExtraCharges];
+                              next[idx].quantity = parseInt(e.target.value) || 1;
+                              setQuoteJOExtraCharges(next);
+                            }}
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuoteJOExtraCharges(quoteJOExtraCharges.filter((_, i) => i !== idx));
+                          }}
+                          style={{ padding: '8px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                    {quoteJOExtraCharges.length === 0 && (
+                      <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', padding: '10px', background: 'rgba(255,255,255,0.01)', borderRadius: '8px', margin: 0 }}>
+                        {isID ? 'Tidak ada biaya tambahan' : 'No extra charges'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px' }}>
-                  <button type="button" onClick={() => setShowModal(false)} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)' }}>
+                  <button type="button" onClick={() => { setShowModal(false); setQuoteJOExtraCharges([]); }} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)' }}>
                     {isID ? 'Batal' : 'Cancel'}
                   </button>
                   <ButtonWithLoading type="submit" className="btn btn-gold" style={{ flex: 1 }} disabled={!selectedQuoteId} onClick={handleModalSubmit}>
@@ -1233,7 +1319,7 @@ const AdminHub = () => {
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               className="glass-card" style={{ width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto', padding: '40px', position: 'relative', overflowX: 'auto' }}
             >
-              <button onClick={() => setShowDirectJOModal(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              <button onClick={() => { setShowDirectJOModal(false); setDirectJOForm({ customerId: '', customerName: '', phone: '', email: '', companyAddress: '', jobDescription: '', items: [{ description: '', rate: '', quantity: 1 }], extraCharges: [] }); }} style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
 
@@ -1425,8 +1511,88 @@ const AdminHub = () => {
                   </button>
                 </div>
 
+                <div style={{ marginBottom: '25px', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <label style={{ fontWeight: 'bold', margin: 0 }}>{isID ? 'Biaya Tambahan (Extra Charges)' : 'Extra Charges'}</label>
+                    <button 
+                      type="button"
+                      onClick={() => setDirectJOForm(prev => ({ ...prev, extraCharges: [...(prev.extraCharges || []), { description: '', rate: '', quantity: 1 }] }))}
+                      className="btn"
+                      style={{ padding: '6px 12px', fontSize: '0.8rem', background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px solid var(--secondary)' }}
+                    >
+                      + {isID ? 'Tambah Biaya' : 'Add Cost'}
+                    </button>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {(directJOForm.extraCharges || []).map((ec, idx) => (
+                      <div key={idx} style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                        <div style={{ flex: 2, minWidth: '150px' }}>
+                          <input
+                            type="text"
+                            required
+                            placeholder={isID ? "Deskripsi Biaya" : "Description"}
+                            value={ec.description}
+                            onChange={e => {
+                              const next = [...directJOForm.extraCharges];
+                              next[idx].description = e.target.value;
+                              setDirectJOForm(prev => ({ ...prev, extraCharges: next }));
+                            }}
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div style={{ flex: 1, minWidth: '100px' }}>
+                          <input
+                            type="number"
+                            required
+                            min="0"
+                            placeholder={isID ? "Harga Satuan" : "Unit Rate"}
+                            value={ec.rate}
+                            onChange={e => {
+                              const next = [...directJOForm.extraCharges];
+                              next[idx].rate = e.target.value;
+                              setDirectJOForm(prev => ({ ...prev, extraCharges: next }));
+                            }}
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div style={{ width: '80px' }}>
+                          <input
+                            type="number"
+                            required
+                            min="1"
+                            placeholder={isID ? "Jumlah" : "Qty"}
+                            value={ec.quantity}
+                            onChange={e => {
+                              const next = [...directJOForm.extraCharges];
+                              next[idx].quantity = parseInt(e.target.value) || 1;
+                              setDirectJOForm(prev => ({ ...prev, extraCharges: next }));
+                            }}
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = directJOForm.extraCharges.filter((_, i) => i !== idx);
+                            setDirectJOForm(prev => ({ ...prev, extraCharges: next }));
+                          }}
+                          style={{ padding: '8px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                    {(directJOForm.extraCharges || []).length === 0 && (
+                      <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', padding: '10px', background: 'rgba(255,255,255,0.01)', borderRadius: '8px', margin: 0 }}>
+                        {isID ? 'Tidak ada biaya tambahan' : 'No extra charges'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px' }}>
-                  <button type="button" onClick={() => setShowDirectJOModal(false)} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)' }}>
+                  <button type="button" onClick={() => { setShowDirectJOModal(false); setDirectJOForm({ customerId: '', customerName: '', phone: '', email: '', companyAddress: '', jobDescription: '', items: [{ description: '', rate: '', quantity: 1 }], extraCharges: [] }); }} className="btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)' }}>
                     {isID ? 'Batal' : 'Cancel'}
                   </button>
                   <ButtonWithLoading type="submit" className="btn btn-gold" style={{ flex: 1 }}>

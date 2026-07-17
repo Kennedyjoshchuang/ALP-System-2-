@@ -90,7 +90,8 @@ CREATE TABLE job_orders (
     date TEXT,
     phone TEXT,
     email TEXT,
-    rate NUMERIC
+    rate NUMERIC,
+    extra_charges JSONB DEFAULT '[]'::jsonb
 );
 
 CREATE TABLE invoices (

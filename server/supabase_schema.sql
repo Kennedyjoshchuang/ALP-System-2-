@@ -88,7 +88,8 @@ CREATE TABLE IF NOT EXISTS job_orders (
     "shipmentStatus" TEXT,
     etd TEXT,
     eta TEXT,
-    "vesselName" TEXT
+    "vesselName" TEXT,
+    extra_charges JSONB DEFAULT '[]'::jsonb
 );
 
 -- 6. Invoices

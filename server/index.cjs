@@ -533,7 +533,8 @@ app.post('/api/job-orders', async (req, res) => {
       phone, email, rate: parsedRate, quoteValidity, date,
       photos: [], costs: [],
       containerNo: [], vehicleNo: [], driverName: [],
-      items: joItems
+      items: joItems,
+      extra_charges: req.body.extra_charges || []
     });
     if (error) return handleError(res, error, 'POST job_orders');
     clearJobOrdersCache();
@@ -578,7 +579,8 @@ app.post('/api/job-orders/bulk', async (req, res) => {
         phone, email, rate: parsedRate, quoteValidity, date,
         photos: [], costs: [],
         containerNo: [], vehicleNo: [], driverName: [],
-        items: joItems
+        items: joItems,
+        extra_charges: jo.extra_charges || []
       });
       if (error) throw error;
       insertedJOs.push({
@@ -588,6 +590,7 @@ app.post('/api/job-orders/bulk', async (req, res) => {
         photos: [], costs: [],
         containerNo: [], vehicleNo: [], driverName: [],
         items: joItems,
+        extra_charges: jo.extra_charges || [],
         jobDescription: instructionStr
       });
     }

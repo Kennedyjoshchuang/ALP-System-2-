@@ -76,6 +76,7 @@ db.exec(`
     quoteValidity TEXT,
     date TEXT,
     items TEXT DEFAULT '[]',
+    extra_charges TEXT DEFAULT '[]',
     FOREIGN KEY(quotationId) REFERENCES quotations(id)
   );
 

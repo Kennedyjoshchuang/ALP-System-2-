@@ -174,7 +174,7 @@ export const AppProvider = ({ children }) => {
 
       setProspects(Array.isArray(prosData) ? prosData : []);
       setQuotations(safeParse(quoData, ['items']));
-      const parsedJOs = safeParse(joData, ['photos', 'costs', 'containerNo', 'vehicleNo', 'driverName', 'items']).map(jo => {
+      const parsedJOs = safeParse(joData, ['photos', 'costs', 'containerNo', 'vehicleNo', 'driverName', 'items', 'extra_charges']).map(jo => {
         let instructionText = jo.instruction || '';
         let dispatchedAt = jo.dispatchedAt || null;
         let completedAt = jo.completedAt || null;
