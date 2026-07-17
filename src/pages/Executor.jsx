@@ -116,6 +116,32 @@ const Executor = () => {
     return new Date(dateStr).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
+  const convertDMYToYYYYMMDD = (dmy) => {
+    if (!dmy) return '';
+    const parts = dmy.split('/');
+    if (parts.length === 3) {
+      const [day, month, year] = parts;
+      return `${year}-${month}-${day}`;
+    }
+    return dmy;
+  };
+
+  const convertYYYYMMDDToDMY = (ymd) => {
+    if (!ymd) return '';
+    const parts = ymd.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      return `${day}/${month}/${year}`;
+    }
+    return ymd;
+  };
+
+  const formatETD = (etdStr) => {
+    if (!etdStr) return '';
+    if (etdStr.includes('/')) return etdStr;
+    return convertYYYYMMDDToDMY(etdStr);
+  };
+
   const getAssociatedJOs = (invoice) => {
     if (!invoice) return [];
     const primaryJo = jobOrders.find(j => String(j.id) === String(invoice.joId));
@@ -440,6 +466,7 @@ const Executor = () => {
           })) : [],
           activityStatus: jo.activityStatus || '',
           vesselName: jo.vesselName || '',
+          etd: jo.etd || '',
           dispatchedAtLocal: toDatetimeLocal(jo.dispatchedAt),
           completedAtLocal: toDatetimeLocal(jo.completedAt)
         }
@@ -498,6 +525,7 @@ const Executor = () => {
       })) : [],
       activityStatus: jo.activityStatus,
       vesselName: jo.vesselName,
+      etd: jo.etd,
       dispatchedAtLocal: toDatetimeLocal(jo.dispatchedAt),
       completedAtLocal: toDatetimeLocal(jo.completedAt)
     };
@@ -576,6 +604,7 @@ const Executor = () => {
       })) : [],
       activityStatus: jo.activityStatus,
       vesselName: jo.vesselName,
+      etd: jo.etd,
       dispatchedAtLocal: toDatetimeLocal(jo.dispatchedAt),
       completedAtLocal: toDatetimeLocal(jo.completedAt)
     };
@@ -1028,8 +1057,8 @@ const Executor = () => {
                                     <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', width: '35px' }}>ETD:</span>
                                     <input 
                                       type="date" 
-                                      value={shipmentEdits[jo.id]?.etd ?? jo.etd ?? ''} 
-                                      onChange={(e) => handleShipmentChange(jo.id, 'etd', e.target.value)}
+                                      value={convertDMYToYYYYMMDD(shipmentEdits[jo.id]?.etd ?? jo.etd ?? '')} 
+                                      onChange={(e) => handleShipmentChange(jo.id, 'etd', convertYYYYMMDDToDMY(e.target.value))}
                                       style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text)', border: '1px solid var(--glass-border)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.75rem', flex: 1, colorScheme: 'dark' }}
                                     />
                                   </div>
@@ -1062,7 +1091,7 @@ const Executor = () => {
                                       </span>
                                     </div>
                                   )}
-                                  {jo.etd && <div><span style={{ color: 'var(--text-muted)' }}>ETD:</span> {formatDate(jo.etd)}</div>}
+                                  {jo.etd && <div><span style={{ color: 'var(--text-muted)' }}>ETD:</span> {formatETD(jo.etd)}</div>}
                                   {jo.eta && <div><span style={{ color: 'var(--text-muted)' }}>ETA:</span> {formatDate(jo.eta)}</div>}
                                   {!jo.shipmentStatus && !jo.etd && !jo.eta && (
                                     <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>-</span>
@@ -1275,6 +1304,11 @@ const Executor = () => {
                             {jo.vesselName && (
                               <div style={{ fontSize: '0.85rem' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>{isID ? 'Kapal:' : 'Vessel:'}</span> {jo.vesselName}
+                              </div>
+                            )}
+                            {jo.etd && (
+                              <div style={{ fontSize: '0.85rem' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>ETD:</span> {formatETD(jo.etd)}
                               </div>
                             )}
                           </td>
@@ -1571,6 +1605,25 @@ const Executor = () => {
                                           value={localData[jo.id]?.vesselName || ''} 
                                           onChange={e => handleLocalUpdate(jo.id, 'vesselName', e.target.value)} 
                                           placeholder={isID ? "Masukkan nama kapal..." : "Enter vessel name..."} 
+                                        />
+                                      </div>
+                                      
+                                      <div className="input-group">
+                                        <label>{isID ? 'ETD Kapal (Estimated Departure)' : 'Vessel ETD (Estimated Departure)'}</label>
+                                        <input 
+                                          disabled={!canWrite}
+                                          type="date" 
+                                          value={convertDMYToYYYYMMDD(localData[jo.id]?.etd || '')} 
+                                          onChange={e => handleLocalUpdate(jo.id, 'etd', convertYYYYMMDDToDMY(e.target.value))} 
+                                          style={{
+                                            background: 'var(--input-bg)',
+                                            border: '1px solid var(--border)',
+                                            borderRadius: '10px',
+                                            color: 'var(--text)',
+                                            padding: '12px',
+                                            width: '100%',
+                                            colorScheme: 'dark'
+                                          }}
                                         />
                                       </div>
                                       

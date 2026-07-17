@@ -11,6 +11,17 @@ const SuratJalanDetail = () => {
   
   const jo = jobOrders.find(item => item.id === id);
 
+  const formatETD = (etdStr) => {
+    if (!etdStr) return '';
+    if (etdStr.includes('/')) return etdStr;
+    const parts = etdStr.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      return `${day}/${month}/${year}`;
+    }
+    return etdStr;
+  };
+
   useEffect(() => {
     // If it's a direct print request (optional: check query params)
     const urlParams = new URLSearchParams(window.location.search);
@@ -125,6 +136,16 @@ const SuratJalanDetail = () => {
               <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                 <h4 style={{ color: '#065f46', marginBottom: '15px', textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: '700' }}>Informasi Kendaraan</h4>
                 <div style={{ display: 'grid', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b', fontSize: '0.85rem' }}>Vessel / Kapal:</span>
+                    <span style={{ fontWeight: '700', color: '#1e293b' }}>{jo.vesselName || '-'}</span>
+                  </div>
+                  {jo.etd && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b', fontSize: '0.85rem' }}>ETD:</span>
+                      <span style={{ fontWeight: '700', color: '#1e293b' }}>{formatETD(jo.etd)}</span>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#64748b', fontSize: '0.85rem' }}>No. Container:</span>
                     <span style={{ fontWeight: '700', color: '#1e293b' }}>{jo.containerNo || '-'}</span>
