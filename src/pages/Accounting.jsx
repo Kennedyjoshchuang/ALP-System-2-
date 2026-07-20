@@ -1674,6 +1674,85 @@ const Accounting = () => {
       }, {}));
       dataToExport = summary;
       fileName = "Outstanding_Receivables_By_Customer";
+    } else if (activeTab === 'other_expenses') {
+      dataToExport = (filteredOtherTransactions || []).map(t => {
+        const taxDeduction = Array.isArray(t.taxes) && t.taxes.length > 0
+          ? t.taxes.reduce((acc, x) => acc + parseFloat(x.amount || 0), 0)
+          : 0;
+
+        let sourceOrTarget = '-';
+        if (t.companyBankAccountId === 'CUSTOM' && t.customSourceTarget) {
+          sourceOrTarget = t.customSourceTarget;
+        } else if (t.companyBankAccountId) {
+          const companyBank = (companyBankAccounts || []).find(b => b.id === t.companyBankAccountId);
+          if (companyBank) {
+            sourceOrTarget = `${companyBank.bankName} (${companyBank.accountNumber})`;
+          }
+        }
+
+        return {
+          ID: t.id,
+          Type: t.type === 'income' ? (isID ? 'Pendapatan' : 'Income') : (isID ? 'Pengeluaran' : 'Expense'),
+          Description: t.description || '-',
+          Employee: t.employeeName || '-',
+          Category: t.category || '-',
+          Subcategory: t.subcategory || '-',
+          Account_Recipient: t.bankName && t.bankName !== '-' ? `${t.bankName} (${t.bankAccount || ''})` : '-',
+          Source_Target_Account: sourceOrTarget,
+          Date: t.expenseDate || t.date || '-',
+          Amount: parseFloat(t.amount || 0),
+          Tax_Deduction: taxDeduction,
+          Total: parseFloat(t.totalAfterTax || t.amount || 0)
+        };
+      });
+      fileName = "Other_Income_Expenses_Report";
+    } else if (activeTab === 'salary') {
+      dataToExport = (salaries || [])
+        .filter(s => filterByDate(s.expenseDate || s.date))
+        .filter(s => (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
+        .map(s => {
+          const taxSum = Array.isArray(s.taxes) ? s.taxes.reduce((acc, x) => acc + parseFloat(x.amount || 0), 0) : 0;
+          const base = parseFloat(s.baseSalary || 0);
+          return {
+            ID: s.id,
+            Name: s.name,
+            Position: s.position || '-',
+            Period: s.period || '-',
+            Bank: `${s.bankName || ''} ${s.bankAccount || ''}`.trim() || '-',
+            Base_Salary: base,
+            Tax_Deduction: taxSum,
+            Total_Paid: base - taxSum,
+            Date: s.expenseDate || s.date || '-'
+          };
+        });
+      fileName = "Payroll_Salary_Report";
+    } else if (activeTab === 'reimbursements') {
+      dataToExport = (reimbursementsList || [])
+        .filter(r => filterByDate(r.expenseDate || r.date))
+        .filter(r => (r.employeeName || '').toLowerCase().includes(searchTerm.toLowerCase()) || (r.description || '').toLowerCase().includes(searchTerm.toLowerCase()))
+        .map(r => ({
+          ID: r.id,
+          Staff_Name: r.employeeName || '-',
+          Description: r.description || '-',
+          Category: r.category || '-',
+          Bank_Account: r.bankName && r.bankName !== '-' ? `${r.bankName} (${r.bankAccount || ''})` : '-',
+          Amount: parseFloat(r.amount || 0),
+          Date: r.expenseDate || r.date || '-'
+        }));
+      fileName = "Staff_Reimbursements_Report";
+    } else if (activeTab === 'hutang') {
+      dataToExport = (purchaseOrders || [])
+        .filter(po => filterByDate(po.date))
+        .filter(po => (po.id || '').toLowerCase().includes(searchTerm.toLowerCase()) || (po.vendorName || '').toLowerCase().includes(searchTerm.toLowerCase()))
+        .map(po => ({
+          PO_ID: po.id,
+          JO_ID: po.joId || '-',
+          Vendor: po.vendorName || '-',
+          Date: po.date || '-',
+          Grand_Total: parseFloat(po.grandTotal || po.amount || 0),
+          Status: po.status || '-'
+        }));
+      fileName = "Accounts_Payables_Ledger";
     }
 
     if (dataToExport.length === 0) {
