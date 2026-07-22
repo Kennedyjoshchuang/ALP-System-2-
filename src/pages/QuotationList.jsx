@@ -6,12 +6,15 @@ import {
   FileText, 
   Search, 
   Download, 
+  FolderDown,
   Trash2, 
   CheckCircle,
   Clock,
   ChevronLeft
 } from 'lucide-react';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
+import { exportQuotationsFolder } from '../utils/quotationPdfUtils.jsx';
+import ExportProgressModal from '../components/ExportProgressModal';
 
 const QuotationList = () => {
   const confirm = useConfirm();
@@ -30,6 +33,25 @@ const QuotationList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('created_desc');
   const [selectedDraft, setSelectedDraft] = useState(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [exportStatus, setExportStatus] = useState({ isOpen: false, current: 0, total: 0, statusText: '' });
+
+  const handleExportAllPdfs = async () => {
+    setIsExportingPdf(true);
+    setExportStatus({ isOpen: true, current: 0, total: filteredQuotations.length, statusText: isID ? 'Memulai ekspor...' : 'Starting export...' });
+    try {
+      await exportQuotationsFolder(filteredQuotations, {
+        companyName: "PT. ALPHA LOGISTICS PRAKARSA",
+        companyAddress: "Jl. Duyung Kavling III Batu Ampar, Batam – Kepulauan Riau – Indonesia",
+        systemName: "ALP"
+      }, (current, total, statusText) => {
+        setExportStatus({ isOpen: true, current, total, statusText });
+      });
+    } finally {
+      setIsExportingPdf(false);
+      setExportStatus({ isOpen: false, current: 0, total: 0, statusText: '' });
+    }
+  };
 
   const getQuotationTime = (q) => {
     if (!q.date) return 0;
@@ -89,6 +111,13 @@ const QuotationList = () => {
 
   return (
     <div className="quotation-list-container" style={{ display: 'grid', gap: '25px' }}>
+      <ExportProgressModal
+        isOpen={exportStatus.isOpen}
+        current={exportStatus.current}
+        total={exportStatus.total}
+        statusText={exportStatus.statusText}
+        isID={isID}
+      />
       
       {/* Draft Modal for Viewing */}
       <AnimatePresence>
@@ -282,6 +311,16 @@ const QuotationList = () => {
                 <option value="amount_asc">{isID ? 'Total Nilai (Terendah)' : 'Amount (Lowest)'}</option>
               </select>
             </div>
+            <ButtonWithLoading
+              className="btn btn-gold"
+              disabled={isExportingPdf || filteredQuotations.length === 0}
+              onClick={handleExportAllPdfs}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '0.85rem' }}
+              title={isID ? "Unduh semua penawaran sebagai folder ZIP" : "Download all quotations as a ZIP folder"}
+            >
+              <FolderDown size={16} />
+              {isExportingPdf ? (isID ? 'Memproses...' : 'Processing...') : (isID ? 'Unduh Semua PDF (ZIP)' : 'Download All PDFs (ZIP)')}
+            </ButtonWithLoading>
             <div style={{ position: 'relative', width: '250px' }}>
               <input 
                 type="text" 

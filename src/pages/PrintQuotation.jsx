@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import DigitalSignatureController from '../components/DigitalSignatureController';
 
-const PrintQuotation = () => {
-  const [data, setData] = useState(null);
+const PrintQuotation = ({ initialData, hideToolbar = false }) => {
+  const [data, setData] = useState(initialData || null);
   const { t } = useApp() || { t: (k) => k };
   const [sigConfig, setSigConfig] = useState({
     type: 'none',
@@ -16,6 +16,10 @@ const PrintQuotation = () => {
   });
 
   useEffect(() => {
+    if (initialData) {
+      setData(initialData);
+      return;
+    }
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
     let savedData = null;
@@ -28,7 +32,7 @@ const PrintQuotation = () => {
     if (savedData) {
       setData(JSON.parse(savedData));
     }
-  }, []);
+  }, [initialData]);
 
   if (!data) return <div style={{ padding: '50px', textAlign: 'center' }}>Loading Quotation Data...</div>;
 
@@ -81,6 +85,15 @@ const PrintQuotation = () => {
           -webkit-print-color-adjust: exact; 
           print-color-adjust: exact;
           color: #1e293b;
+          background-color: #ffffff;
+        }
+        h1, h2, h3, h4, h5, header {
+          background: transparent !important;
+          background-color: transparent !important;
+        }
+        tr, p, ul, ol, h4, h3, h2, h1, table, .avoid-break {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
         }
         @page {
           size: A4;
@@ -107,20 +120,22 @@ const PrintQuotation = () => {
       `}</style>
 
       {/* Print toolbar - hidden when printing */}
-      <div className="no-print" style={{
-        position: 'sticky', top: 0, zIndex: 100,
-        display: 'flex', justifyContent: 'flex-end', gap: '15px', alignItems: 'center',
-        padding: '15px 30px', background: 'rgba(15,23,42,0.95)',
-        backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(255,255,255,0.1)'
-      }}>
-        <DigitalSignatureController onConfigChange={setSigConfig} />
-        <button onClick={() => window.close()} style={{ height: '40px', padding: '0 20px', fontSize: '0.9rem', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
-          Close
-        </button>
-        <button onClick={() => window.print()} style={{ height: '40px', padding: '0 20px', fontSize: '0.9rem', background: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}>
-          🖨️ Print / Save PDF
-        </button>
-      </div>
+      {!hideToolbar && (
+        <div className="no-print" style={{
+          position: 'sticky', top: 0, zIndex: 100,
+          display: 'flex', justifyContent: 'flex-end', gap: '15px', alignItems: 'center',
+          padding: '15px 30px', background: 'rgba(15,23,42,0.95)',
+          backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(255,255,255,0.1)'
+        }}>
+          <DigitalSignatureController onConfigChange={setSigConfig} />
+          <button onClick={() => window.close()} style={{ height: '40px', padding: '0 20px', fontSize: '0.9rem', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>
+            Close
+          </button>
+          <button onClick={() => window.print()} style={{ height: '40px', padding: '0 20px', fontSize: '0.9rem', background: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}>
+            🖨️ Print / Save PDF
+          </button>
+        </div>
+      )}
       
       <div
         id="quotation-print-area"
