@@ -6,6 +6,7 @@ import { exportToExcel } from '../utils/exportUtils';
 import { exportQuotationsFolder } from '../utils/quotationPdfUtils.jsx';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
 import ExportProgressModal from '../components/ExportProgressModal';
+import ExportFilterModal from '../components/ExportFilterModal';
 import toast from 'react-hot-toast';
 
 ;
@@ -67,7 +68,27 @@ const Marketing = () => {
   const [editQuoteMarketingPhone, setEditQuoteMarketingPhone] = useState('');
   const [editQuoteMarketingEmail, setEditQuoteMarketingEmail] = useState('');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [exportStatus, setExportStatus] = useState({ isOpen: false, current: 0, total: 0, statusText: '' });
+
+  const handleConfirmExport = async (targetList, filterType) => {
+    if (!targetList || targetList.length === 0) return;
+    setIsExportingPdf(true);
+    setExportStatus({ isOpen: true, current: 0, total: targetList.length, statusText: isID ? 'Memulai ekspor...' : 'Starting export...' });
+
+    try {
+      await exportQuotationsFolder(targetList, {
+        companyName: "PT. ALPHA LOGISTICS PRAKARSA",
+        companyAddress: "Jl. Duyung Kavling III Batu Ampar, Batam – Kepulauan Riau – Indonesia",
+        systemName: filterType === 'pending' ? "ALP_Pending" : (filterType === 'approved' ? "ALP_Approved" : "ALP")
+      }, (current, total, statusText) => {
+        setExportStatus({ isOpen: true, current, total, statusText });
+      });
+    } finally {
+      setIsExportingPdf(false);
+      setExportStatus({ isOpen: false, current: 0, total: 0, statusText: '' });
+    }
+  };
 
   const handleExportAllPdfs = async () => {
     const filteredQuotes = quotations
@@ -618,6 +639,24 @@ const Marketing = () => {
         current={exportStatus.current}
         total={exportStatus.total}
         statusText={exportStatus.statusText}
+        isID={isID}
+      />
+
+      <ExportFilterModal
+        isOpen={isFilterModalOpen}
+        onClose={() => setIsFilterModalOpen(false)}
+        onConfirm={handleConfirmExport}
+        quotations={quotations
+          .filter(q => filterByDate(q.date))
+          .filter(q => {
+            const name = q.customerName || '';
+            const id = q.id || '';
+            const pic = q.pic || '';
+            const term = fullQuoteSearchTerm.toLowerCase();
+            return name.toLowerCase().includes(term) ||
+                   id.toLowerCase().includes(term) ||
+                   pic.toLowerCase().includes(term);
+          })}
         isID={isID}
       />
 
@@ -1811,7 +1850,7 @@ const Marketing = () => {
                 <ButtonWithLoading
                   className="btn btn-gold"
                   disabled={isExportingPdf || quotations.length === 0}
-                  onClick={handleExportAllPdfs}
+                  onClick={() => setIsFilterModalOpen(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '0.85rem' }}
                   title={isID ? "Unduh semua penawaran sebagai folder ZIP" : "Download all quotations as a ZIP folder"}
                 >
