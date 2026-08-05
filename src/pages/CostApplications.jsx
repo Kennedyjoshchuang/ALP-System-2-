@@ -245,12 +245,17 @@ const CostApplications = () => {
     const totalAmount = items.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
     const id = formId || 'EXP-' + Date.now() + Math.random().toString(36).substr(2, 4);
 
+    const existingApp = formId ? applications.find(a => a.id === formId) : null;
+
     const serializedDescription = JSON.stringify({
       type: 'cost_application',
       costType,
       joId: costType === 'operational' ? selectedJoId : null,
       items,
-      status: 'pending',
+      status: existingApp ? (existingApp.status || 'pending') : 'pending',
+      releasedDate: existingApp ? (existingApp.releasedDate || null) : null,
+      companyBankAccountId: existingApp ? (existingApp.companyBankAccountId || null) : null,
+      customSourceTarget: existingApp ? (existingApp.customSourceTarget || '') : '',
       requestedBy: applicatorName,
       employeeId: user?.employeeId || null,
       notes,
@@ -525,7 +530,15 @@ const CostApplications = () => {
                         )}
                       </td>
                       <td style={{ padding: '15px', fontWeight: 'bold', color: 'var(--secondary)' }}>
-                        {app.joId ? app.joId : '-'}
+                        {app.joId ? (
+                          <span 
+                            onClick={() => navigate('/accounting', { state: { activeTab: 'costing', searchTerm: app.joId } })}
+                            style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--secondary)' }}
+                            title={isID ? 'Lihat Job Order di Catatan Finansial JO' : 'View Job Order in Financial JO Records'}
+                          >
+                            {app.joId} 🔗
+                          </span>
+                        ) : '-'}
                       </td>
                       <td style={{ padding: '15px' }}>
                         <div style={{ fontSize: '0.85rem', fontWeight: '700' }}>{app.bankName}</div>

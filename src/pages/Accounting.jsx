@@ -1088,14 +1088,24 @@ const Accounting = () => {
     if (!canWrite) return;
     const finalCategory = otherExpenseForm.category === 'CUSTOM' ? otherExpenseForm.customCategory : otherExpenseForm.category;
     const finalSubcategory = otherExpenseForm.subcategory === 'CUSTOM' ? otherExpenseForm.customSubcategory : otherExpenseForm.subcategory;
+    
+    const existingRaw = otherExpenseForm.id ? (otherExpenses || []).find(e => e.id === otherExpenseForm.id) : null;
+    let existingParsed = {};
+    if (existingRaw && existingRaw.description && typeof existingRaw.description === 'string' && existingRaw.description.startsWith('{')) {
+      try { existingParsed = JSON.parse(existingRaw.description); } catch(e){}
+    }
+
+    const isCostApp = existingParsed.type === 'cost_application' || otherExpenseForm.type === 'cost_application';
+
     const serializedDescription = JSON.stringify({
-      type: otherExpenseForm.type || 'expense',
+      ...existingParsed,
+      type: isCostApp ? 'cost_application' : (otherExpenseForm.type || 'expense'),
       category: finalCategory || 'Lain-lain',
       subcategory: finalSubcategory || '',
       description: otherExpenseForm.descriptionText || '',
-      employeeId: otherExpenseForm.employeeId || null,
-      companyBankAccountId: otherExpenseForm.companyBankAccountId || null,
-      customSourceTarget: otherExpenseForm.companyBankAccountId === 'CUSTOM' ? otherExpenseForm.customSourceTarget : ''
+      employeeId: otherExpenseForm.employeeId || existingParsed.employeeId || null,
+      companyBankAccountId: otherExpenseForm.companyBankAccountId || existingParsed.companyBankAccountId || null,
+      customSourceTarget: otherExpenseForm.companyBankAccountId === 'CUSTOM' ? otherExpenseForm.customSourceTarget : (existingParsed.customSourceTarget || '')
     });
 
     const totalTaxes = (otherExpenseForm.taxes || []).reduce((acc, t) => acc + parseFloat(t.amount || 0), 0);
@@ -1250,6 +1260,22 @@ const Accounting = () => {
     return map;
   }, [purchaseOrders]);
 
+  const costAppMap = React.useMemo(() => {
+    const map = {};
+    (otherExpenses || []).forEach(e => {
+      let parsed = {};
+      if (e.description && typeof e.description === 'string' && e.description.startsWith('{')) {
+        try { parsed = JSON.parse(e.description); } catch(err){}
+      }
+      if (parsed.type === 'cost_application' && parsed.joId) {
+        const joIdStr = String(parsed.joId);
+        if (!map[joIdStr]) map[joIdStr] = [];
+        map[joIdStr].push({ ...e, ...parsed, amount: parseFloat(e.amount || 0), rawRecord: e });
+      }
+    });
+    return map;
+  }, [otherExpenses]);
+
   const invoiceMap = React.useMemo(() => {
     const map = {};
     (invoices || []).forEach(inv => {
@@ -1313,12 +1339,15 @@ const Accounting = () => {
     return activeJOs.reduce((acc, j) => {
       const manualCost = Array.isArray(j.costs) ? j.costs.reduce((a, c) => a + parseFloat(c.total || 0), 0) : 0;
       const poCost = (poMap[j.id] || []).reduce((a, p) => a + parseFloat(p.grandTotal || 0), 0);
-      const cost = manualCost + poCost;
+      const costAppCost = (costAppMap[String(j.id)] || [])
+        .filter(ca => ca.status !== 'rejected')
+        .reduce((a, ca) => a + (parseFloat(ca.amount) || 0), 0);
+      const cost = manualCost + poCost + costAppCost;
       const inv = invoiceMap[String(j.id)];
       const rev = inv ? parseFloat(inv.amount || inv.subtotal || 0) : 0;
       return { cost: acc.cost + cost, revenue: acc.revenue + rev };
     }, { cost: 0, revenue: 0 });
-  }, [activeJOs, poMap, invoiceMap]);
+  }, [activeJOs, poMap, costAppMap, invoiceMap]);
 
   const joInvoiceMap = React.useMemo(() => {
     const map = {};
@@ -1390,7 +1419,10 @@ const Accounting = () => {
       group.jobOrders.forEach(jo => {
         const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + parseFloat(c.total || 0), 0) : 0;
         const poCost = (poMap[jo.id] || []).reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
-        groupCost += (manualCost + poCost);
+        const costAppCost = (costAppMap[String(jo.id)] || [])
+          .filter(ca => ca.status !== 'rejected')
+          .reduce((a, ca) => a + (parseFloat(ca.amount) || 0), 0);
+        groupCost += (manualCost + poCost + costAppCost);
 
         const invoice = joInvoiceMap[String(jo.id)];
         if (invoice && !uniqueInvoices.has(invoice.id)) {
@@ -1406,7 +1438,7 @@ const Accounting = () => {
       };
     });
     return financials;
-  }, [groupedPLData, poMap, joInvoiceMap]);
+  }, [groupedPLData, poMap, costAppMap, joInvoiceMap]);
 
   const vendorList = vendors || [];
 
@@ -1598,7 +1630,10 @@ const Accounting = () => {
       dataToExport = activeJOs.map(jo => {
         const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s,c)=>s+(c.total||0),0) : 0;
         const poCost = (purchaseOrders || []).filter(po => po.joId === jo.id).reduce((s,p)=>s+(p.grandTotal||0),0);
-        const totalCost = manualCost + poCost;
+        const costAppCost = (costAppMap[String(jo.id)] || [])
+          .filter(ca => ca.status !== 'rejected')
+          .reduce((s, ca) => s + (parseFloat(ca.amount) || 0), 0);
+        const totalCost = manualCost + poCost + costAppCost;
         const invoice = (invoices || []).find(inv => inv.joId === jo.id);
         const revenue = invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : 0;
         
@@ -3891,30 +3926,75 @@ const Accounting = () => {
             <p style={{ color:'var(--text-muted)',fontSize:'0.85rem',marginBottom:'25px' }}>{isID ? 'Pelanggan:' : 'Customer:'} <strong style={{color:'var(--text)'}}>{costModal.customerName}</strong></p>
 
             {/* Existing costs */}
-            {Array.isArray(costModal.costs) && costModal.costs.length > 0 && (
-              <div style={{ marginBottom:'25px' }}>
-                <div style={{ fontSize:'0.75rem',color:'var(--secondary)',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'10px' }}>{isID ? 'Biaya Tercatat' : 'Recorded Costs'}</div>
-                <div className="table-container"><table style={{ width:'100%',borderCollapse:'collapse',fontSize:'0.875rem' }}>
-                  <thead><tr style={{ borderBottom:'1px solid var(--glass-border)',color:'var(--text-muted)' }}><th style={{padding:'8px',textAlign:'left'}}>{isID ? 'Vendor' : 'Vendor'}</th><th style={{padding:'8px',textAlign:'left'}}>{isID ? 'Layanan' : 'Service'}</th><th style={{padding:'8px',textAlign:'center'}}>Qty</th><th style={{padding:'8px',textAlign:'right'}}>Total</th><th style={{padding:'8px'}}></th></tr></thead>
-                  <tbody>
-                    {costModal.costs.map((c, ci) => (
-                      <tr key={ci} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                        <td className="word-wrap-cell" style={{padding:'8px',color:'var(--text-muted)'}}>{c.vendorName}</td>
-                        <td className="word-wrap-cell" style={{padding:'8px'}}>{c.serviceDescription}</td>
-                        <td style={{padding:'8px',textAlign:'center'}}>{c.qty}</td>
-                        <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color:'var(--secondary)'}}>Rp {(c.total||0).toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
-                        <td style={{padding:'8px'}}><button className="btn btn-sm btn-danger" onClick={() => handleDeleteCost(costModal, ci)}>{isID ? 'Hapus' : 'Delete'}</button></td>
+            {(() => {
+              const manualCostsList = Array.isArray(costModal.costs) ? costModal.costs : [];
+              const poCostsList = poMap[costModal.id] || [];
+              const costAppsList = costAppMap[String(costModal.id)] || [];
+              const hasRecordedCosts = manualCostsList.length > 0 || poCostsList.length > 0 || costAppsList.length > 0;
+
+              if (!hasRecordedCosts) return null;
+
+              const manualTotal = manualCostsList.reduce((s, c) => s + parseFloat(c.total || 0), 0);
+              const poTotal = poCostsList.reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
+              const costAppTotal = costAppsList.filter(ca => ca.status !== 'rejected').reduce((s, ca) => s + parseFloat(ca.amount || 0), 0);
+              const grandTotal = manualTotal + poTotal + costAppTotal;
+
+              return (
+                <div style={{ marginBottom:'25px' }}>
+                  <div style={{ fontSize:'0.75rem',color:'var(--secondary)',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'10px' }}>{isID ? 'Biaya & Pengeluaran Tercatat' : 'Recorded Costs & Expenses'}</div>
+                  <div className="table-container"><table style={{ width:'100%',borderCollapse:'collapse',fontSize:'0.875rem' }}>
+                    <thead><tr style={{ borderBottom:'1px solid var(--glass-border)',color:'var(--text-muted)' }}><th style={{padding:'8px',textAlign:'left'}}>{isID ? 'Vendor / Sumber' : 'Vendor / Source'}</th><th style={{padding:'8px',textAlign:'left'}}>{isID ? 'Layanan / Deskripsi' : 'Service / Description'}</th><th style={{padding:'8px',textAlign:'center'}}>Jenis</th><th style={{padding:'8px',textAlign:'right'}}>Total</th><th style={{padding:'8px'}}></th></tr></thead>
+                    <tbody>
+                      {manualCostsList.map((c, ci) => (
+                        <tr key={`mc-${ci}`} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                          <td className="word-wrap-cell" style={{padding:'8px',color:'var(--text-muted)'}}>{c.vendorName || c.customVendorName || (isID ? 'Vendor Kustom' : 'Custom Vendor')}</td>
+                          <td className="word-wrap-cell" style={{padding:'8px'}}>{c.serviceDescription || c.customServiceDescription || '—'}</td>
+                          <td style={{padding:'8px',textAlign:'center'}}><span style={{ fontSize: '0.62rem', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px solid rgba(212, 175, 55, 0.25)', padding: '2px 6px', borderRadius: '4px' }}>Manual</span></td>
+                          <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color:'var(--secondary)'}}>Rp {(c.total||0).toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
+                          <td style={{padding:'8px'}}><button className="btn btn-sm btn-danger" onClick={() => handleDeleteCost(costModal, ci)}>{isID ? 'Hapus' : 'Delete'}</button></td>
+                        </tr>
+                      ))}
+                      {poCostsList.map((p, pi) => (
+                        <tr key={`po-${pi}`} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                          <td className="word-wrap-cell" style={{padding:'8px',color:'var(--text-muted)'}}>{p.vendorName || 'PO Vendor'}</td>
+                          <td className="word-wrap-cell" style={{padding:'8px'}}>{p.items?.map(i => i.serviceDescription).join(', ') || (isID ? 'Layanan PO' : 'PO Services')}</td>
+                          <td style={{padding:'8px',textAlign:'center'}}><span style={{ fontSize: '0.62rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '2px 6px', borderRadius: '4px' }}>PO: {p.poNumber || p.id}</span></td>
+                          <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color:'#3b82f6'}}>Rp {(p.grandTotal||0).toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
+                          <td style={{padding:'8px'}}></td>
+                        </tr>
+                      ))}
+                      {costAppsList.map((ca, cai) => {
+                        const caStatus = ca.status || 'pending';
+                        const statusBg = caStatus === 'paid' || caStatus === 'released' ? 'rgba(34, 197, 94, 0.1)' : caStatus === 'approved' ? 'rgba(59, 130, 246, 0.1)' : caStatus === 'rejected' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)';
+                        const statusColor = caStatus === 'paid' || caStatus === 'released' ? '#22c55e' : caStatus === 'approved' ? '#3b82f6' : caStatus === 'rejected' ? '#ef4444' : '#f59e0b';
+                        const statusLabel = caStatus === 'paid' || caStatus === 'released' ? (isID ? 'Cair' : 'Released') : caStatus === 'approved' ? (isID ? 'Disetujui' : 'Approved') : caStatus === 'rejected' ? (isID ? 'Ditolak' : 'Rejected') : (isID ? 'Menunggu' : 'Pending');
+                        const itemDesc = Array.isArray(ca.items) ? ca.items.map(it => it.details).filter(Boolean).join(', ') : (ca.notes || '—');
+
+                        return (
+                          <tr key={`ca-${cai}`} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                            <td className="word-wrap-cell" style={{padding:'8px',color:'var(--text-muted)'}}>{ca.employeeName || ca.requestedBy || (isID ? 'Pengajuan Biaya' : 'Cost App')}</td>
+                            <td className="word-wrap-cell" style={{padding:'8px'}}>{itemDesc}</td>
+                            <td style={{padding:'8px',textAlign:'center'}}>
+                              <div style={{ display: 'flex', gap: '3px', justifyContent: 'center' }}>
+                                <span style={{ fontSize: '0.62rem', background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7', border: '1px solid rgba(168, 85, 247, 0.25)', padding: '2px 6px', borderRadius: '4px' }}>Cost App: {ca.id}</span>
+                                <span style={{ fontSize: '0.62rem', background: statusBg, color: statusColor, border: `1px solid ${statusColor}40`, padding: '2px 6px', borderRadius: '4px' }}>{statusLabel}</span>
+                              </div>
+                            </td>
+                            <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color: caStatus === 'rejected' ? 'var(--text-muted)' : '#a855f7', textDecoration: caStatus === 'rejected' ? 'line-through' : 'none'}}>Rp {(ca.amount||0).toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
+                            <td style={{padding:'8px'}}></td>
+                          </tr>
+                        );
+                      })}
+                      <tr style={{ borderTop:'2px solid var(--glass-border)' }}>
+                        <td colSpan="3" style={{padding:'10px 8px',fontWeight:'700',textAlign:'right'}}>{isID ? 'Grand Total Biaya' : 'Grand Total Cost'}</td>
+                        <td style={{padding:'10px 8px',textAlign:'right',fontWeight:'800',color:'var(--danger)',fontSize:'1.1rem'}}>Rp {grandTotal.toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
+                        <td></td>
                       </tr>
-                    ))}
-                    <tr style={{ borderTop:'2px solid var(--glass-border)' }}>
-                      <td colSpan="3" style={{padding:'10px 8px',fontWeight:'700',textAlign:'right'}}>{isID ? 'Grand Total Biaya' : 'Grand Total Cost'}</td>
-                      <td style={{padding:'10px 8px',textAlign:'right',fontWeight:'800',color:'var(--danger)',fontSize:'1.1rem'}}>Rp {costModal.costs.reduce((s,c)=>s+(c.total||0),0).toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
-                      <td></td>
-                    </tr>
-                  </tbody>
-                </table></div>
-              </div>
-            )}
+                    </tbody>
+                  </table></div>
+                </div>
+              );
+            })()}
 
             {/* Add new cost lines */}
             <div style={{ fontSize:'0.75rem',color:'var(--secondary)',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'12px' }}>{isID ? 'Tambah Biaya Baru' : 'Add New Cost'}</div>
@@ -4321,7 +4401,8 @@ const Accounting = () => {
                     if (hasItems) {
                       const manualCostTotal = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + parseFloat(c.total || 0), 0) : 0;
                       const poCostTotal = (poMap[jo.id] || []).reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
-                      const totalCost = manualCostTotal + poCostTotal;
+                      const costAppTotal = (costAppMap[String(jo.id)] || []).filter(ca => ca.status !== 'rejected').reduce((s, ca) => s + (parseFloat(ca.amount) || 0), 0);
+                      const totalCost = manualCostTotal + poCostTotal + costAppTotal;
 
                       const invoice = joInvoiceMap[String(jo.id)];
                       const revenue = invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : jo.items.reduce((s, item) => s + parseFloat(item.rate || 0) * parseFloat(item.issueQuantity || item.quantity || 1), 0);
@@ -4480,8 +4561,9 @@ const Accounting = () => {
                                     {(() => {
                                       const manualCostsList = Array.isArray(jo.costs) ? jo.costs : [];
                                       const poCostsList = poMap[jo.id] || [];
+                                      const costAppsList = costAppMap[String(jo.id)] || [];
                                       
-                                      if (manualCostsList.length === 0 && poCostsList.length === 0) {
+                                      if (manualCostsList.length === 0 && poCostsList.length === 0 && costAppsList.length === 0) {
                                         return (
                                           <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem', fontStyle: 'italic' }}>
                                             {isID ? 'Belum ada catatan biaya.' : 'No costing records registered.'}
@@ -4513,6 +4595,33 @@ const Accounting = () => {
                                                 </td>
                                               </tr>
                                             ))}
+                                            {costAppsList.map((ca, caIdx) => {
+                                              const caStatus = ca.status || 'pending';
+                                              const statusBg = caStatus === 'paid' || caStatus === 'released' ? 'rgba(34, 197, 94, 0.1)' : caStatus === 'approved' ? 'rgba(59, 130, 246, 0.1)' : caStatus === 'rejected' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)';
+                                              const statusColor = caStatus === 'paid' || caStatus === 'released' ? '#22c55e' : caStatus === 'approved' ? '#3b82f6' : caStatus === 'rejected' ? '#ef4444' : '#f59e0b';
+                                              const statusLabel = caStatus === 'paid' || caStatus === 'released' ? (isID ? 'Cair' : 'Released') : caStatus === 'approved' ? (isID ? 'Disetujui' : 'Approved') : caStatus === 'rejected' ? (isID ? 'Ditolak' : 'Rejected') : (isID ? 'Menunggu' : 'Pending');
+                                              const itemDesc = Array.isArray(ca.items) ? ca.items.map(it => it.details).filter(Boolean).join(', ') : (ca.notes || '—');
+
+                                              return (
+                                                <tr key={`ca-${caIdx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.78rem' }}>
+                                                  <td style={{ padding: '8px 0', fontWeight: '500' }}>
+                                                    <div>{ca.employeeName || ca.requestedBy || (isID ? 'Pengajuan Biaya' : 'Cost App')}</div>
+                                                    <div style={{ display: 'flex', gap: '4px', marginTop: '3px' }}>
+                                                      <span style={{ fontSize: '0.58rem', background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7', border: '1px solid rgba(168, 85, 247, 0.25)', padding: '1px 4px', borderRadius: '3px', display: 'inline-block' }}>
+                                                        Cost App: {ca.id}
+                                                      </span>
+                                                      <span style={{ fontSize: '0.58rem', background: statusBg, color: statusColor, border: `1px solid ${statusColor}40`, padding: '1px 4px', borderRadius: '3px', display: 'inline-block' }}>
+                                                        {statusLabel}
+                                                      </span>
+                                                    </div>
+                                                  </td>
+                                                  <td style={{ padding: '8px 0', color: 'var(--text-muted)' }}>{itemDesc}</td>
+                                                  <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: '700', color: caStatus === 'rejected' ? 'var(--text-muted)' : '#ef4444', textDecoration: caStatus === 'rejected' ? 'line-through' : 'none' }}>
+                                                    Rp {parseFloat(ca.amount || 0).toLocaleString()}
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })}
                                             {poCostsList.map((p, pIdx) => (
                                               <tr key={`po-${pIdx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.78rem' }}>
                                                 <td style={{ padding: '8px 0', fontWeight: '500' }}>
@@ -4544,7 +4653,8 @@ const Accounting = () => {
 
                     const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + parseFloat(c.total || 0), 0) : 0;
                     const poCost = (poMap[jo.id] || []).reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
-                    const totalCost = manualCost + poCost;
+                    const costAppCost = (costAppMap[String(jo.id)] || []).filter(ca => ca.status !== 'rejected').reduce((s, ca) => s + (parseFloat(ca.amount) || 0), 0);
+                    const totalCost = manualCost + poCost + costAppCost;
                     
                     const invoice = joInvoiceMap[String(jo.id)];
                     const revenue = invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : 0;
@@ -4662,7 +4772,8 @@ const Accounting = () => {
                         if (hasItems) {
                           const manualCostTotal = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + parseFloat(c.total || 0), 0) : 0;
                           const poCostTotal = (poMap[jo.id] || []).reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
-                          const totalCost = manualCostTotal + poCostTotal;
+                          const costAppTotal = (costAppMap[String(jo.id)] || []).filter(ca => ca.status !== 'rejected').reduce((s, ca) => s + (parseFloat(ca.amount) || 0), 0);
+                          const totalCost = manualCostTotal + poCostTotal + costAppTotal;
 
                           const invoice = joInvoiceMap[String(jo.id)];
                           const revenue = invoice ? parseFloat(invoice.amount || invoice.subtotal || 0) : jo.items.reduce((s, item) => s + parseFloat(item.rate || 0) * parseFloat(item.issueQuantity || item.quantity || 1), 0);
@@ -4827,8 +4938,9 @@ const Accounting = () => {
                                     {(() => {
                                       const manualCostsList = Array.isArray(jo.costs) ? jo.costs : [];
                                       const poCostsList = poMap[jo.id] || [];
+                                      const costAppsList = costAppMap[String(jo.id)] || [];
                                       
-                                      if (manualCostsList.length === 0 && poCostsList.length === 0) {
+                                      if (manualCostsList.length === 0 && poCostsList.length === 0 && costAppsList.length === 0) {
                                         return (
                                           <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem', fontStyle: 'italic' }}>
                                             {isID ? 'Belum ada catatan biaya.' : 'No costing records registered.'}
@@ -4860,6 +4972,33 @@ const Accounting = () => {
                                                 </td>
                                               </tr>
                                             ))}
+                                            {costAppsList.map((ca, caIdx) => {
+                                              const caStatus = ca.status || 'pending';
+                                              const statusBg = caStatus === 'paid' || caStatus === 'released' ? 'rgba(34, 197, 94, 0.1)' : caStatus === 'approved' ? 'rgba(59, 130, 246, 0.1)' : caStatus === 'rejected' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)';
+                                              const statusColor = caStatus === 'paid' || caStatus === 'released' ? '#22c55e' : caStatus === 'approved' ? '#3b82f6' : caStatus === 'rejected' ? '#ef4444' : '#f59e0b';
+                                              const statusLabel = caStatus === 'paid' || caStatus === 'released' ? (isID ? 'Cair' : 'Released') : caStatus === 'approved' ? (isID ? 'Disetujui' : 'Approved') : caStatus === 'rejected' ? (isID ? 'Ditolak' : 'Rejected') : (isID ? 'Menunggu' : 'Pending');
+                                              const itemDesc = Array.isArray(ca.items) ? ca.items.map(it => it.details).filter(Boolean).join(', ') : (ca.notes || '—');
+
+                                              return (
+                                                <tr key={`ca-${caIdx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.78rem' }}>
+                                                  <td style={{ padding: '8px 0', fontWeight: '500' }}>
+                                                    <div>{ca.employeeName || ca.requestedBy || (isID ? 'Pengajuan Biaya' : 'Cost App')}</div>
+                                                    <div style={{ display: 'flex', gap: '4px', marginTop: '3px' }}>
+                                                      <span style={{ fontSize: '0.58rem', background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7', border: '1px solid rgba(168, 85, 247, 0.25)', padding: '1px 4px', borderRadius: '3px', display: 'inline-block' }}>
+                                                        Cost App: {ca.id}
+                                                      </span>
+                                                      <span style={{ fontSize: '0.58rem', background: statusBg, color: statusColor, border: `1px solid ${statusColor}40`, padding: '1px 4px', borderRadius: '3px', display: 'inline-block' }}>
+                                                        {statusLabel}
+                                                      </span>
+                                                    </div>
+                                                  </td>
+                                                  <td style={{ padding: '8px 0', color: 'var(--text-muted)' }}>{itemDesc}</td>
+                                                  <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: '700', color: caStatus === 'rejected' ? 'var(--text-muted)' : '#ef4444', textDecoration: caStatus === 'rejected' ? 'line-through' : 'none' }}>
+                                                    Rp {parseFloat(ca.amount || 0).toLocaleString()}
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })}
                                             {poCostsList.map((p, pIdx) => (
                                               <tr key={`po-${pIdx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.78rem' }}>
                                                 <td style={{ padding: '8px 0', fontWeight: '500' }}>
@@ -4891,7 +5030,8 @@ const Accounting = () => {
 
                         const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + parseFloat(c.total || 0), 0) : 0;
                         const poCost = (poMap[jo.id] || []).reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
-                        const totalCost = manualCost + poCost;
+                        const costAppCost = (costAppMap[String(jo.id)] || []).filter(ca => ca.status !== 'rejected').reduce((s, ca) => s + (parseFloat(ca.amount) || 0), 0);
+                        const totalCost = manualCost + poCost + costAppCost;
                         
                         const invoice = joInvoiceMap[String(jo.id)];
                         const isPrimaryJo = invoice && String(invoice.joId) === String(jo.id);
@@ -5540,7 +5680,8 @@ const Accounting = () => {
                           if (!jo) return '—';
                           const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s,c)=>s+(c.total||0),0) : 0;
                           const poCost = (purchaseOrders || []).filter(po => po.joId === jo.id).reduce((s,p)=>s+(p.grandTotal||0),0);
-                          const totalCost = manualCost + poCost;
+                          const costAppCost = (costAppMap[String(jo.id)] || []).filter(ca => ca.status !== 'rejected').reduce((s, ca) => s + (parseFloat(ca.amount) || 0), 0);
+                          const totalCost = manualCost + poCost + costAppCost;
                           return totalCost > 0 ? `Rp ${totalCost.toLocaleString('id-ID')}` : '—';
                         })()}
                       </td>
@@ -5550,7 +5691,8 @@ const Accounting = () => {
                           if (!jo) return '—';
                           const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s,c)=>s+(c.total||0),0) : 0;
                           const poCost = (purchaseOrders || []).filter(po => po.joId === jo.id).reduce((s,p)=>s+(p.grandTotal||0),0);
-                          const totalCost = manualCost + poCost;
+                          const costAppCost = (costAppMap[String(jo.id)] || []).filter(ca => ca.status !== 'rejected').reduce((s, ca) => s + (parseFloat(ca.amount) || 0), 0);
+                          const totalCost = manualCost + poCost + costAppCost;
                           const revenue = inv.amount || inv.subtotal;
                           const profit = revenue - totalCost;
                           return (
@@ -7577,6 +7719,66 @@ const Accounting = () => {
                                 />
                               </div>
                             </div>
+
+                            {/* JO Costs & Expenses Breakdown */}
+                            <div style={{ marginTop: '12px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+                              <div style={{ fontWeight: '700', fontSize: '0.75rem', color: '#ef4444', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>
+                                {isID ? 'Rincian Biaya & Pengeluaran JO' : 'JO Costs & Expenses Breakdown'}
+                              </div>
+                              {(() => {
+                                const manualCostsList = Array.isArray(jo.costs) ? jo.costs : [];
+                                const poCostsList = poMap[jo.id] || [];
+                                const costAppsList = costAppMap[String(jo.id)] || [];
+
+                                if (manualCostsList.length === 0 && poCostsList.length === 0 && costAppsList.length === 0) {
+                                  return (
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                      {isID ? 'Belum ada catatan biaya.' : 'No costing records registered.'}
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <div style={{ display: 'grid', gap: '4px', fontSize: '0.75rem' }}>
+                                    {manualCostsList.map((c, cIdx) => (
+                                      <div key={`mc-${cIdx}`} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                        <div>
+                                          <span>{c.vendorName || c.customVendorName || (isID ? 'Vendor Kustom' : 'Custom Vendor')}</span>
+                                          <span style={{ fontSize: '0.58rem', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px solid rgba(212, 175, 55, 0.25)', padding: '1px 4px', borderRadius: '3px', marginLeft: '6px' }}>Manual</span>
+                                        </div>
+                                        <span style={{ fontWeight: '700', color: '#ef4444' }}>Rp {parseFloat(c.total || 0).toLocaleString()}</span>
+                                      </div>
+                                    ))}
+                                    {poCostsList.map((p, pIdx) => (
+                                      <div key={`po-${pIdx}`} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                        <div>
+                                          <span>{p.vendorName || (isID ? 'Vendor PO' : 'PO Vendor')}</span>
+                                          <span style={{ fontSize: '0.58rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '1px 4px', borderRadius: '3px', marginLeft: '6px' }}>PO: {p.poNumber || p.id}</span>
+                                        </div>
+                                        <span style={{ fontWeight: '700', color: '#ef4444' }}>Rp {parseFloat(p.grandTotal || 0).toLocaleString()}</span>
+                                      </div>
+                                    ))}
+                                    {costAppsList.map((ca, caIdx) => {
+                                      const caStatus = ca.status || 'pending';
+                                      const statusBg = caStatus === 'paid' || caStatus === 'released' ? 'rgba(34, 197, 94, 0.1)' : caStatus === 'approved' ? 'rgba(59, 130, 246, 0.1)' : caStatus === 'rejected' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)';
+                                      const statusColor = caStatus === 'paid' || caStatus === 'released' ? '#22c55e' : caStatus === 'approved' ? '#3b82f6' : caStatus === 'rejected' ? '#ef4444' : '#f59e0b';
+                                      const statusLabel = caStatus === 'paid' || caStatus === 'released' ? (isID ? 'Cair' : 'Released') : caStatus === 'approved' ? (isID ? 'Disetujui' : 'Approved') : caStatus === 'rejected' ? (isID ? 'Ditolak' : 'Rejected') : (isID ? 'Menunggu' : 'Pending');
+
+                                      return (
+                                        <div key={`ca-${caIdx}`} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                          <div>
+                                            <span>{ca.employeeName || ca.requestedBy || (isID ? 'Pengajuan Biaya' : 'Cost App')}</span>
+                                            <span style={{ fontSize: '0.58rem', background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7', border: '1px solid rgba(168, 85, 247, 0.25)', padding: '1px 4px', borderRadius: '3px', marginLeft: '6px' }}>Cost App: {ca.id}</span>
+                                            <span style={{ fontSize: '0.58rem', background: statusBg, color: statusColor, border: `1px solid ${statusColor}40`, padding: '1px 4px', borderRadius: '3px', marginLeft: '4px' }}>{statusLabel}</span>
+                                          </div>
+                                          <span style={{ fontWeight: '700', color: caStatus === 'rejected' ? 'var(--text-muted)' : '#ef4444', textDecoration: caStatus === 'rejected' ? 'line-through' : 'none' }}>Rp {parseFloat(ca.amount || 0).toLocaleString()}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
+                            </div>
                           </div>
                         );
                       })}
@@ -9484,6 +9686,51 @@ const Accounting = () => {
                 <div style={{ marginTop: '12px', padding: '8px 12px', background: 'var(--secondary-bg)', borderRadius: '6px', fontSize: '0.78rem', color: 'var(--secondary)', fontWeight: '700' }}>
                   JO Ref: {invoiceConfirmData.consolidatedJOIds.join(', ')}
                 </div>
+
+                {/* JO Costs & Expenses Breakdown */}
+                <div style={{ marginTop: '14px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
+                  <p style={{ ...labelStyle, fontSize: '0.72rem', color: '#ef4444', marginBottom: '8px' }}>
+                    💰 {isID ? 'Rincian Biaya & Pengeluaran JO (Catatan Biaya Internal)' : 'JO Costs & Expenses Breakdown (Internal Cost Records)'}
+                  </p>
+                  <div style={{ display: 'grid', gap: '6px', fontSize: '0.78rem' }}>
+                    {(invoiceConfirmData.consolidatedJOIds || []).map(cJoId => {
+                      const joObj = jobOrders.find(j => String(j.id) === String(cJoId)) || {};
+                      const manualCostsList = Array.isArray(joObj.costs) ? joObj.costs : [];
+                      const poCostsList = poMap[cJoId] || [];
+                      const costAppsList = costAppMap[String(cJoId)] || [];
+                      const hasCosts = manualCostsList.length > 0 || poCostsList.length > 0 || costAppsList.length > 0;
+
+                      if (!hasCosts) return null;
+
+                      return (
+                        <div key={cJoId} style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '8px' }}>
+                          <div style={{ fontWeight: '700', color: 'var(--secondary)', marginBottom: '4px', fontSize: '0.75rem' }}>JO {cJoId}:</div>
+                          {manualCostsList.map((c, idx) => (
+                            <div key={`mc-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: 'var(--text-muted)' }}>
+                              <span>{c.vendorName || c.customVendorName || 'Manual Cost'} - {c.serviceDescription || c.customServiceDescription || '—'}</span>
+                              <span style={{ color: '#ef4444', fontWeight: '700' }}>Rp {parseFloat(c.total || 0).toLocaleString()}</span>
+                            </div>
+                          ))}
+                          {poCostsList.map((p, idx) => (
+                            <div key={`po-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: 'var(--text-muted)' }}>
+                              <span>PO: {p.poNumber || p.id} ({p.vendorName || 'Vendor'})</span>
+                              <span style={{ color: '#ef4444', fontWeight: '700' }}>Rp {parseFloat(p.grandTotal || 0).toLocaleString()}</span>
+                            </div>
+                          ))}
+                          {costAppsList.map((ca, idx) => (
+                            <div key={`ca-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: 'var(--text-muted)' }}>
+                              <div>
+                                <span>Cost App {ca.id}: {ca.employeeName || ca.requestedBy || ''}</span>
+                                <span style={{ fontSize: '0.62rem', background: ca.status === 'rejected' ? 'rgba(239,68,68,0.1)' : 'rgba(168,85,247,0.1)', color: ca.status === 'rejected' ? '#ef4444' : '#a855f7', border: '1px solid rgba(168,85,247,0.25)', padding: '1px 4px', borderRadius: '3px', marginLeft: '6px' }}>{ca.status}</span>
+                              </div>
+                              <span style={{ color: ca.status === 'rejected' ? 'var(--text-muted)' : '#ef4444', fontWeight: '700', textDecoration: ca.status === 'rejected' ? 'line-through' : 'none' }}>Rp {parseFloat(ca.amount || 0).toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               {/* Custom Notes Section */}
@@ -9541,9 +9788,34 @@ const Accounting = () => {
                     </button>
                   </div>
                 ))}
-                <button onClick={addExtra} style={{ marginTop: '4px', background: 'none', border: '1px dashed var(--border)', borderRadius: '8px', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Plus size={14} /> {isID ? 'Tambah Biaya Tambahan' : 'Add Extra Charge'}
-                </button>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
+                  <button onClick={addExtra} style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: '8px', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Plus size={14} /> {isID ? 'Tambah Biaya Tambahan' : 'Add Extra Charge'}
+                  </button>
+                  {(() => {
+                    const targetCostApps = (invoiceConfirmData.consolidatedJOIds || []).flatMap(joId => (costAppMap[String(joId)] || []).filter(ca => ca.status !== 'rejected'));
+                    if (targetCostApps.length === 0) return null;
+
+                    return (
+                      <button
+                        onClick={() => {
+                          const importedExtras = targetCostApps.map(ca => {
+                            const itemDesc = Array.isArray(ca.items) ? ca.items.map(it => it.details).filter(Boolean).join(', ') : (ca.notes || ca.category || 'Cost App');
+                            return {
+                              description: `[Cost App ${ca.id}] ${ca.employeeName || ca.requestedBy || ''} - ${itemDesc}`,
+                              qty: 1,
+                              rate: parseFloat(ca.amount || 0)
+                            };
+                          });
+                          setF({ extraCharges: [...f.extraCharges, ...importedExtras] });
+                        }}
+                        style={{ background: 'rgba(168, 85, 247, 0.1)', border: '1px solid rgba(168, 85, 247, 0.3)', borderRadius: '8px', color: '#a855f7', cursor: 'pointer', padding: '6px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <Plus size={14} /> {isID ? `Import ${targetCostApps.length} Pengajuan Biaya (Cost App)` : `Import ${targetCostApps.length} Cost Apps`}
+                      </button>
+                    );
+                  })()}
+                </div>
               </div>
 
               {/* Totals + Tax + Bank */}
