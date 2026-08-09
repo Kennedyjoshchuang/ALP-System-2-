@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import DigitalSignatureController from '../components/DigitalSignatureController';
+import ExtraDocsUploader from '../components/ExtraDocsUploader';
 import { useApp } from '../context/AppContext';
 
 const PrintInvoice = () => {
-  const { invoices = [], jobOrders = [], quotations = [], companyBankAccounts = [] } = useApp() || {};
+  const { invoices = [], jobOrders = [], quotations = [], companyBankAccounts = [], updateInvoice } = useApp() || {};
   const [localData, setLocalData] = useState(null);
   const [dueDays, setDueDays] = useState(() => parseInt(localStorage.getItem('invoice_due_days') || '14', 10));
+  const [extraDocs, setExtraDocs] = useState([]);
   const [sigConfig, setSigConfig] = useState({
     type: 'none',
     showStamp: true,
@@ -47,6 +49,100 @@ const PrintInvoice = () => {
     : (localData?.consolidatedJOs || []);
   const quotation = contextQuotation || localData?.quotation;
   const bankAccount = contextBankAccount || localData?.bankAccount;
+
+  useEffect(() => {
+    if (invoice) {
+      const initialDocs = invoice.extraDocuments || invoice.extra_documents || invoice.attachedDocs || localData?.invoice?.extraDocuments || [];
+      setExtraDocs(initialDocs);
+    }
+  }, [invoice?.id]);
+
+  const handleExtraDocsChange = (newDocs) => {
+    setExtraDocs(newDocs);
+    if (invoice) {
+      const updatedInv = { ...invoice, extraDocuments: newDocs, extra_documents: newDocs };
+      if (id) {
+        const savedKey = 'print_invoice_data_' + id;
+        const currentLocal = localStorage.getItem(savedKey) || localStorage.getItem('print_invoice_data');
+        if (currentLocal) {
+          try {
+            const parsed = JSON.parse(currentLocal);
+            parsed.invoice = updatedInv;
+            localStorage.setItem(savedKey, JSON.stringify(parsed));
+            localStorage.setItem('print_invoice_data', JSON.stringify(parsed));
+          } catch (e) {}
+        }
+      }
+      if (typeof updateInvoice === 'function' && invoice.id) {
+        updateInvoice(invoice.id, { extraDocuments: newDocs, extra_documents: newDocs });
+      }
+    }
+  };
+
+  const handleMoveExtraPage = (globalIdx, direction) => {
+    const flat = [];
+    (extraDocs || []).forEach((doc, docIdx) => {
+      if (Array.isArray(doc.pages)) {
+        doc.pages.forEach((p) => {
+          flat.push({ docId: doc.id || docIdx, docName: doc.name, docType: doc.type, dataUrl: p });
+        });
+      }
+    });
+
+    const targetIdx = globalIdx + direction;
+    if (targetIdx < 0 || targetIdx >= flat.length) return;
+
+    const temp = flat[globalIdx];
+    flat[globalIdx] = flat[targetIdx];
+    flat[targetIdx] = temp;
+
+    const docMap = new Map();
+    flat.forEach(p => {
+      if (!docMap.has(p.docId)) {
+        docMap.set(p.docId, { id: p.docId, name: p.docName, type: p.docType, pages: [] });
+      }
+      docMap.get(p.docId).pages.push(p.dataUrl);
+    });
+
+    handleExtraDocsChange(Array.from(docMap.values()));
+  };
+
+  const handleDeleteExtraPage = (globalIdx) => {
+    const flat = [];
+    (extraDocs || []).forEach((doc, docIdx) => {
+      if (Array.isArray(doc.pages)) {
+        doc.pages.forEach((p) => {
+          flat.push({ docId: doc.id || docIdx, docName: doc.name, docType: doc.type, dataUrl: p });
+        });
+      }
+    });
+
+    flat.splice(globalIdx, 1);
+
+    const docMap = new Map();
+    flat.forEach(p => {
+      if (!docMap.has(p.docId)) {
+        docMap.set(p.docId, { id: p.docId, name: p.docName, type: p.docType, pages: [] });
+      }
+      docMap.get(p.docId).pages.push(p.dataUrl);
+    });
+
+    handleExtraDocsChange(Array.from(docMap.values()));
+  };
+
+  const allExtraPages = (extraDocs || []).reduce((acc, doc) => {
+    if (Array.isArray(doc.pages)) {
+      doc.pages.forEach((pageDataUrl, pageIdx) => {
+        acc.push({
+          docName: doc.name,
+          pageNumber: pageIdx + 1,
+          totalPages: doc.pages.length,
+          dataUrl: pageDataUrl
+        });
+      });
+    }
+    return acc;
+  }, []);
 
   if (!invoice) return (
     <div style={{ padding: '60px', textAlign: 'center', fontFamily: 'sans-serif', color: '#64748b' }}>
@@ -123,6 +219,15 @@ const PrintInvoice = () => {
             margin: 0 !important;
             box-shadow: none !important;
           }
+          .extra-page-container {
+            width: 210mm !important;
+            height: 297mm !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            page-break-before: always !important;
+            page-break-inside: avoid !important;
+          }
         }
       `}</style>
 
@@ -157,6 +262,7 @@ const PrintInvoice = () => {
         
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <DigitalSignatureController onConfigChange={setSigConfig} />
+          <ExtraDocsUploader extraDocuments={extraDocs} onChange={handleExtraDocsChange} compact={true} />
           {(photos.length > 0 || invoice?.signedInvoicePhoto || invoice?.signedReceiptPhoto) && (
             <button
               onClick={() => window.open('/print/invoice-attachment', '_blank')}
@@ -497,6 +603,110 @@ const PrintInvoice = () => {
           </div>
         </div>
       </div>
+
+      {/* Extra Document Pages */}
+      {allExtraPages.map((page, idx) => (
+        <div 
+          key={`extra-page-${idx}`} 
+          className="extra-page-container" 
+          style={{ 
+            width: '210mm', 
+            height: '297mm', 
+            background: 'white', 
+            margin: '24px auto', 
+            padding: '0', 
+            boxShadow: '0 4px 30px rgba(0,0,0,0.12)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            pageBreakBefore: 'always',
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Non-printed Page Action Bar */}
+          <div
+            className="no-print"
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              zIndex: 20,
+              background: 'rgba(15, 23, 42, 0.85)',
+              backdropFilter: 'blur(8px)',
+              borderRadius: '8px',
+              padding: '6px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.25)'
+            }}
+          >
+            <span style={{ color: 'white', fontSize: '0.75rem', fontWeight: '800', marginRight: '6px' }}>
+              Halaman Tambahan {idx + 1} ({page.docName})
+            </span>
+            <button
+              type="button"
+              disabled={idx === 0}
+              onClick={() => handleMoveExtraPage(idx, -1)}
+              style={{
+                background: idx === 0 ? '#475569' : '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '4px 10px',
+                fontSize: '0.75rem',
+                fontWeight: '700',
+                cursor: idx === 0 ? 'not-allowed' : 'pointer'
+              }}
+              title="Geser Halaman Ke Atas"
+            >
+              ⬆️ Ke Atas
+            </button>
+            <button
+              type="button"
+              disabled={idx === allExtraPages.length - 1}
+              onClick={() => handleMoveExtraPage(idx, 1)}
+              style={{
+                background: idx === allExtraPages.length - 1 ? '#475569' : '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '4px 10px',
+                fontSize: '0.75rem',
+                fontWeight: '700',
+                cursor: idx === allExtraPages.length - 1 ? 'not-allowed' : 'pointer'
+              }}
+              title="Geser Halaman Ke Bawah"
+            >
+              ⬇️ Ke Bawah
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDeleteExtraPage(idx)}
+              style={{
+                background: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '4px 10px',
+                fontSize: '0.75rem',
+                fontWeight: '700',
+                cursor: 'pointer'
+              }}
+              title="Hapus Halaman Ini"
+            >
+              🗑️ Hapus
+            </button>
+          </div>
+
+          <img
+            src={page.dataUrl}
+            alt={`Lampiran ${page.docName} Hal ${page.pageNumber}`}
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          />
+        </div>
+      ))}
     </div>
   );
 };

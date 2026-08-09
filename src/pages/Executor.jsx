@@ -217,11 +217,22 @@ const Executor = () => {
   };
 
   const getJoTimestamp = (jo) => {
-    if (jo.id && jo.id.startsWith('JO-')) {
-      const tsStr = jo.id.substring(3);
-      const ts = parseInt(tsStr, 10);
-      if (!isNaN(ts) && ts > 1000000000000) {
-        return ts;
+    if (jo.id) {
+      if (jo.id.startsWith('JO-')) {
+        const tsStr = jo.id.substring(3);
+        const ts = parseInt(tsStr, 10);
+        if (!isNaN(ts) && ts > 1000000000000) {
+          return ts;
+        }
+      } else {
+        const parts = jo.id.split('.');
+        if (parts.length === 3) {
+          const seq = parseInt(parts[2], 10);
+          if (!isNaN(seq)) {
+            const d = jo.date ? new Date(jo.date).getTime() : 0;
+            return d + seq;
+          }
+        }
       }
     }
     if (jo.date) {

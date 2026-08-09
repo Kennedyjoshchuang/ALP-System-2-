@@ -216,6 +216,7 @@ export const AppProvider = ({ children }) => {
         let notesText = inv.notes || '';
         let consolidatedJOs = Array.isArray(inv.consolidatedJOs) ? inv.consolidatedJOs : [];
         let items = Array.isArray(inv.items) ? inv.items : [];
+        let extraDocuments = Array.isArray(inv.extraDocuments) ? inv.extraDocuments : (Array.isArray(inv.extra_documents) ? inv.extra_documents : (Array.isArray(inv.attachedDocs) ? inv.attachedDocs : []));
 
         if (notesText && notesText.includes('|||')) {
           const parts = notesText.split('|||');
@@ -228,6 +229,9 @@ export const AppProvider = ({ children }) => {
             if (Array.isArray(meta.items) && items.length === 0) {
               items = meta.items;
             }
+            if (Array.isArray(meta.extraDocuments) && extraDocuments.length === 0) {
+              extraDocuments = meta.extraDocuments;
+            }
           } catch (e) {
             // ignore
           }
@@ -236,19 +240,21 @@ export const AppProvider = ({ children }) => {
           ...inv,
           notes: notesText || null,
           consolidatedJOs: consolidatedJOs.length > 0 ? consolidatedJOs : (inv.joId ? [inv.joId] : []),
-          items: items
+          items: items,
+          extraDocuments: extraDocuments
         };
       };
 
-      setInvoices(safeParse(invData, ['extra_charges', 'tax_deduction_proof', 'taxes_deducted', 'paymentProofPhoto', 'signedInvoicePhoto', 'signedReceiptPhoto', 'consolidatedJOs', 'items']).map(unpackInvoiceNotes));
-      const parsedReceivables = safeParse(recData, ['extra_charges', 'tax_deduction_proof', 'taxes_deducted', 'paymentProofPhoto', 'signedInvoicePhoto', 'signedReceiptPhoto', 'consolidatedJOs', 'items']).map(rec => {
+      setInvoices(safeParse(invData, ['extra_charges', 'tax_deduction_proof', 'taxes_deducted', 'paymentProofPhoto', 'signedInvoicePhoto', 'signedReceiptPhoto', 'consolidatedJOs', 'items', 'extraDocuments', 'extra_documents', 'attachedDocs']).map(unpackInvoiceNotes));
+      const parsedReceivables = safeParse(recData, ['extra_charges', 'tax_deduction_proof', 'taxes_deducted', 'paymentProofPhoto', 'signedInvoicePhoto', 'signedReceiptPhoto', 'consolidatedJOs', 'items', 'extraDocuments', 'extra_documents', 'attachedDocs']).map(rec => {
         const originalInv = invData.find(i => i.id === rec.id || i.id === rec.invoiceId);
         const unpackedInv = originalInv ? unpackInvoiceNotes(originalInv) : null;
         return {
           ...rec,
           joId: rec.joId || (unpackedInv ? unpackedInv.joId : null),
           consolidatedJOs: (unpackedInv && unpackedInv.consolidatedJOs) ? unpackedInv.consolidatedJOs : (rec.joId ? [rec.joId] : []),
-          items: unpackedInv ? (unpackedInv.items || []) : []
+          items: unpackedInv ? (unpackedInv.items || []) : [],
+          extraDocuments: unpackedInv ? (unpackedInv.extraDocuments || []) : []
         };
       });
       setReceivables(parsedReceivables);

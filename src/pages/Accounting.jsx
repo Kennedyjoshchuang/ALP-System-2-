@@ -6,6 +6,7 @@ import { useApp } from '../context/AppContext';
 import { CreditCard, Download, Receipt, Wallet, CheckCircle, Plus, X, XCircle, DollarSign, Search, FileSpreadsheet, RotateCcw, Edit3, Save, Image, ChevronDown, ChevronUp, User, Briefcase, Banknote, Calendar, FileText, Trash2, Settings, ExternalLink, ShieldCheck, ShieldAlert, GitMerge } from 'lucide-react';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
+import ExtraDocsUploader from '../components/ExtraDocsUploader';
 import { apiRequest } from '../api/api';
 
 const defaultSubcategories = {
@@ -1298,11 +1299,22 @@ const Accounting = () => {
 
   const sortedActiveJOs = React.useMemo(() => {
     const getJoTimestamp = (jo) => {
-      if (jo.id && jo.id.startsWith('JO-')) {
-        const tsStr = jo.id.substring(3);
-        const ts = parseInt(tsStr, 10);
-        if (!isNaN(ts) && ts > 1000000000000) {
-          return ts;
+      if (jo.id) {
+        if (jo.id.startsWith('JO-')) {
+          const tsStr = jo.id.substring(3);
+          const ts = parseInt(tsStr, 10);
+          if (!isNaN(ts) && ts > 1000000000000) {
+            return ts;
+          }
+        } else {
+          const parts = jo.id.split('.');
+          if (parts.length === 3) {
+            const seq = parseInt(parts[2], 10);
+            if (!isNaN(seq)) {
+              const d = jo.date ? new Date(jo.date).getTime() : 0;
+              return d + seq;
+            }
+          }
         }
       }
       if (jo.date) {
@@ -1887,11 +1899,22 @@ const Accounting = () => {
 
 
   const getJoTimestamp = (jo) => {
-    if (jo.id && jo.id.startsWith('JO-')) {
-      const tsStr = jo.id.substring(3);
-      const ts = parseInt(tsStr, 10);
-      if (!isNaN(ts) && ts > 1000000000000) {
-        return ts;
+    if (jo.id) {
+      if (jo.id.startsWith('JO-')) {
+        const tsStr = jo.id.substring(3);
+        const ts = parseInt(tsStr, 10);
+        if (!isNaN(ts) && ts > 1000000000000) {
+          return ts;
+        }
+      } else {
+        const parts = jo.id.split('.');
+        if (parts.length === 3) {
+          const seq = parseInt(parts[2], 10);
+          if (!isNaN(seq)) {
+            const d = jo.date ? new Date(jo.date).getTime() : 0;
+            return d + seq;
+          }
+        }
       }
     }
     if (jo.date) {
@@ -7672,6 +7695,13 @@ const Accounting = () => {
                   </div>
                 </div>
 
+                <div>
+                  <ExtraDocsUploader
+                    extraDocuments={editingInvoice.extraDocuments || editingInvoice.extra_documents || []}
+                    onChange={docs => setEditingInvoice({ ...editingInvoice, extraDocuments: docs, extra_documents: docs })}
+                  />
+                </div>
+
                 {linkedJOs.length > 0 && (
                   <div style={{ marginTop: '10px' }}>
                     <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'10px', textTransform:'uppercase', fontWeight:'700' }}>
@@ -8035,6 +8065,14 @@ const Accounting = () => {
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Extra Document Pages Upload */}
+              <div style={{ marginBottom: '20px' }}>
+                <ExtraDocsUploader
+                  extraDocuments={customInvoiceForm.extraDocuments || []}
+                  onChange={docs => setCustomInvoiceForm({ ...customInvoiceForm, extraDocuments: docs })}
+                />
               </div>
 
               {/* Summary Calculations */}
