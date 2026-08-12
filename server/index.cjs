@@ -956,14 +956,114 @@ app.post('/api/job-orders/convert-legacy', async (req, res) => {
 
 app.put('/api/job-orders/:id', async (req, res) => {
   try {
-    const updates = req.body;
-    
+    const oldId = req.params.id;
+    const { cascadeTo, newJoId, joNumber, ...updates } = req.body;
+    delete updates.joNumber;
+    const targetNewId = newJoId || updates.id;
+    const isIdChanged = targetNewId && String(targetNewId).trim() !== String(oldId).trim();
+
+    if (isIdChanged) {
+      const trimmedNewId = String(targetNewId).trim();
+      if (!trimmedNewId) {
+        return res.status(400).json({ error: 'Nomor Job Order tidak boleh kosong.' });
+      }
+
+      // Check if newId already exists in job_orders
+      const { data: existingJo, error: checkErr } = await supabase
+        .from('job_orders')
+        .select('id')
+        .eq('id', trimmedNewId)
+        .maybeSingle();
+
+      if (checkErr) return handleError(res, checkErr, 'check existing jo id');
+
+      if (existingJo) {
+        return res.status(400).json({ error: `Nomor Job Order "${trimmedNewId}" sudah terdaftar di sistem. Silakan gunakan nomor lain.` });
+      }
+
+      // 1. Cascade update to invoices
+      const { data: invoices, error: invFetchErr } = await supabase
+        .from('invoices')
+        .select('*');
+
+      if (!invFetchErr && invoices && invoices.length > 0) {
+        for (const inv of invoices) {
+          let isUpdated = false;
+          let updatedJoId = inv.joId;
+          let updatedConsolidated = Array.isArray(inv.consolidatedJOs) ? inv.consolidatedJOs : [];
+          let updatedNotes = inv.notes || '';
+
+          if (String(inv.joId) === String(oldId)) {
+            updatedJoId = trimmedNewId;
+            isUpdated = true;
+          }
+
+          if (updatedConsolidated.some(id => String(id) === String(oldId))) {
+            updatedConsolidated = updatedConsolidated.map(id => String(id) === String(oldId) ? trimmedNewId : id);
+            isUpdated = true;
+          }
+
+          if (updatedNotes.includes('|||')) {
+            const parts = updatedNotes.split('|||');
+            const notesText = parts[0].trim();
+            try {
+              const meta = JSON.parse(parts[1].trim());
+              let metaUpdated = false;
+
+              if (Array.isArray(meta.consolidatedJOs) && meta.consolidatedJOs.some(id => String(id) === String(oldId))) {
+                meta.consolidatedJOs = meta.consolidatedJOs.map(id => String(id) === String(oldId) ? trimmedNewId : id);
+                metaUpdated = true;
+              }
+
+              if (metaUpdated) {
+                updatedNotes = `${notesText} ||| ${JSON.stringify(meta)}`;
+                isUpdated = true;
+              }
+            } catch (e) {}
+          }
+
+          if (isUpdated) {
+            const { error: updateInvErr } = await supabase
+              .from('invoices')
+              .update({
+                joId: updatedJoId,
+                consolidatedJOs: updatedConsolidated,
+                notes: updatedNotes
+              })
+              .eq('id', inv.id);
+
+            if (updateInvErr) console.error('Error updating invoice cascade:', updateInvErr.message);
+          }
+        }
+      }
+
+      // 2. Cascade update to purchase_orders
+      const { data: pos, error: poFetchErr } = await supabase
+        .from('purchase_orders')
+        .select('*');
+
+      if (!poFetchErr && pos && pos.length > 0) {
+        for (const po of pos) {
+          if (String(po.joId) === String(oldId)) {
+            const { error: updatePoErr } = await supabase
+              .from('purchase_orders')
+              .update({ joId: trimmedNewId })
+              .eq('id', po.id);
+
+            if (updatePoErr) console.error('Error updating PO cascade:', updatePoErr.message);
+          }
+        }
+      }
+
+      updates.id = trimmedNewId;
+    }
+
     // Resolve incoming URL placeholders back to original base64 strings
     if (updates.photos && Array.isArray(updates.photos)) {
       const { data: existing, error: fetchErr } = await supabase
         .from('job_orders')
         .select('photos')
-        .eq('id', req.params.id)
+        .eq('id', oldId)
         .single();
       
       if (!fetchErr && existing && existing.photos) {
@@ -983,11 +1083,37 @@ app.put('/api/job-orders/:id', async (req, res) => {
         updates.photos = resolvedPhotos;
       }
     }
-    
-    const { error } = await supabase.from('job_orders').update(updates).eq('id', req.params.id);
+
+    const { error } = await supabase.from('job_orders').update(updates).eq('id', oldId);
     if (error) return handleError(res, error, 'PUT job_orders');
+
+    const effectiveId = isIdChanged ? updates.id : oldId;
+
+    if (updates.customerName) {
+      const cascadeList = cascadeTo ?? ['invoices', 'receivables', 'purchaseOrders', 'quotation'];
+      if (cascadeList.includes('invoices')) {
+        await supabase.from('invoices').update({ customerName: updates.customerName }).eq('joId', effectiveId);
+      }
+      if (cascadeList.includes('receivables')) {
+        const { data: invs } = await supabase.from('invoices').select('id').eq('joId', effectiveId);
+        if (invs && invs.length > 0) {
+          const invIds = invs.map(i => i.id);
+          await supabase.from('receivables').update({ customerName: updates.customerName }).in('invoiceId', invIds);
+        }
+      }
+      if (cascadeList.includes('purchaseOrders')) {
+        await supabase.from('purchase_orders').update({ customerName: updates.customerName }).eq('joId', effectiveId);
+      }
+      if (cascadeList.includes('quotation')) {
+        const { data: jo } = await supabase.from('job_orders').select('quotationId').eq('id', effectiveId).single();
+        if (jo && jo.quotationId) {
+          await supabase.from('quotations').update({ customerName: updates.customerName }).eq('id', jo.quotationId);
+        }
+      }
+    }
+
     clearJobOrdersCache();
-    res.sendStatus(200);
+    res.json({ success: true, id: effectiveId });
   } catch (err) {
     console.error('Update JO Error:', err);
     res.status(500).json({ error: err.message });

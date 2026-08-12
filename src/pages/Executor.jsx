@@ -508,6 +508,7 @@ const Executor = () => {
       setLocalData(prev => ({
         ...prev,
         [jo.id]: {
+          joNumber: jo.id,
           containerNo: Array.isArray(jo.containerNo) && jo.containerNo.length > 0 ? [...jo.containerNo] : [jo.containerNo || ''],
           vehicleNo: Array.isArray(jo.vehicleNo) && jo.vehicleNo.length > 0 ? [...jo.vehicleNo] : [jo.vehicleNo || ''],
           driverName: Array.isArray(jo.driverName) && jo.driverName.length > 0 ? [...jo.driverName] : [jo.driverName || ''],
@@ -590,6 +591,7 @@ const Executor = () => {
     data.completedAt = toISOString(data.completedAtLocal);
     delete data.dispatchedAtLocal;
     delete data.completedAtLocal;
+    delete data.joNumber;
 
     if (!data.activityStatus) {
       toast.error(isID ? 'Status Aktivitas wajib diisi!' : 'Activity Status is required!');
@@ -648,6 +650,7 @@ const Executor = () => {
 
   const handleSaveChanges = async (jo) => {
     const rawData = localData[jo.id] || {
+      joNumber: jo.id,
       containerNo: jo.containerNo,
       vehicleNo: jo.vehicleNo,
       driverName: jo.driverName,
@@ -665,11 +668,31 @@ const Executor = () => {
       extra_charges: Array.isArray(jo.extra_charges) ? jo.extra_charges.map(ec => ({ ...ec })) : []
     };
     
+    const newJoNumber = (rawData.joNumber || jo.id).trim();
+
+    if (!newJoNumber) {
+      toast.error(isID ? 'Nomor Job Order tidak boleh kosong!' : 'Job Order Number cannot be empty!');
+      return;
+    }
+
+    if (newJoNumber !== jo.id) {
+      const exists = jobOrders.some(j => j.id === newJoNumber);
+      if (exists) {
+        toast.error(isID ? `Nomor JO "${newJoNumber}" sudah terdaftar di sistem!` : `JO Number "${newJoNumber}" already exists!`);
+        return;
+      }
+    }
+
     const data = { ...rawData };
     data.dispatchedAt = toISOString(data.dispatchedAtLocal);
     data.completedAt = toISOString(data.completedAtLocal);
     delete data.dispatchedAtLocal;
     delete data.completedAtLocal;
+    delete data.joNumber;
+
+    if (newJoNumber !== jo.id) {
+      data.newJoId = newJoNumber;
+    }
 
     const hasItems = Array.isArray(jo.items) && jo.items.length > 0;
     if (hasItems) {
@@ -680,11 +703,20 @@ const Executor = () => {
     }
 
     try {
-      await updateJOStatus(jo.id, data);
+      const targetId = await updateJOStatus(jo.id, data);
+      if (newJoNumber !== jo.id) {
+        setUploadingForId(targetId);
+        setLocalData(prev => {
+          const next = { ...prev };
+          delete next[jo.id];
+          next[targetId] = { ...rawData, joNumber: targetId };
+          return next;
+        });
+      }
       toast.success(isID ? 'Perubahan berhasil disimpan!' : 'Changes saved successfully!');
     } catch (err) {
       console.error(err);
-      toast.error(isID ? 'Gagal menyimpan perubahan.' : 'Failed to save changes.');
+      toast.error(err.error || err.message || (isID ? 'Gagal menyimpan perubahan.' : 'Failed to save changes.'));
     }
   };
 
@@ -1500,6 +1532,27 @@ const Executor = () => {
                                 >
                                   <div className="grid-responsive-2" style={{ padding: '25px' }}>
                                     <div style={{ display: 'grid', gap: '25px' }}>
+                                      <div className="input-group">
+                                        <label style={{ color: 'var(--secondary)', fontWeight: '700' }}>
+                                          {isID ? 'Nomor Job Order (JO Number)' : 'Job Order Number (JO Number)'} <span style={{ color: 'var(--danger)' }}>*</span>
+                                        </label>
+                                        <input 
+                                          disabled={!canWrite}
+                                          type="text" 
+                                          value={localData[jo.id]?.joNumber ?? jo.id} 
+                                          onChange={e => handleLocalUpdate(jo.id, 'joNumber', e.target.value)} 
+                                          placeholder="2026.08.0001"
+                                          style={{ 
+                                            fontFamily: 'monospace', 
+                                            fontWeight: '700', 
+                                            color: 'var(--secondary)',
+                                            background: 'rgba(212, 175, 55, 0.05)',
+                                            border: '1px solid rgba(212, 175, 55, 0.3)',
+                                            borderRadius: '10px',
+                                            padding: '12px'
+                                          }} 
+                                        />
+                                      </div>
                                       {Array.isArray(jo.items) && jo.items.length > 0 ? (
                                         <div style={{ display: 'grid', gap: '25px' }}>
                                           {jo.items.filter(item => item.status === 'dispatched' || item.status === 'done').map((item, itemIdx) => {

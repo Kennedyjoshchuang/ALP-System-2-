@@ -454,6 +454,10 @@ export const AppProvider = ({ children }) => {
     const eta = 'eta' in updates ? updates.eta : currentJo.eta;
     const vesselName = 'vesselName' in updates ? updates.vesselName : currentJo.vesselName;
     
+    const rawNewId = updates.newJoId || updates.id;
+    const newJoId = rawNewId ? String(rawNewId).trim() : null;
+    const isIdChanged = newJoId && newJoId !== joId;
+
     const finalUpdates = { ...updates };
     
     // Clean up SQL columns to avoid PostgREST schema cache error
@@ -463,6 +467,7 @@ export const AppProvider = ({ children }) => {
     delete finalUpdates.etd;
     delete finalUpdates.eta;
     delete finalUpdates.vesselName;
+    delete finalUpdates.joNumber;
     
     if (dispatchedAt || completedAt || shipmentStatus || etd || eta || vesselName) {
       // Get the raw instruction (without old metadata)
@@ -476,11 +481,17 @@ export const AppProvider = ({ children }) => {
       finalUpdates.instruction = `${rawInstruction} ||| ${JSON.stringify(meta)}`;
     }
     
-    // Optimistic update
+    const apiRes = await apiRequest(`job-orders/${joId}`, {
+      method: 'PUT',
+      body: JSON.stringify(finalUpdates)
+    });
+
+    const targetId = isIdChanged ? (apiRes?.id || newJoId) : joId;
+
+    // Optimistic / State update for Job Orders
     setJobOrders(prev => prev.map(jo => {
       if (jo.id === joId) {
-        const merged = { ...jo, ...updates };
-        // Clean up serialized string inside state so the frontend gets pristine instruction
+        const merged = { ...jo, ...updates, id: targetId };
         if (merged.instruction && merged.instruction.includes('|||')) {
           merged.instruction = merged.instruction.split('|||')[0].trim();
         }
@@ -491,15 +502,47 @@ export const AppProvider = ({ children }) => {
         merged.etd = etd;
         merged.eta = eta;
         merged.vesselName = vesselName;
+        delete merged.newJoId;
         return merged;
       }
       return jo;
     }));
 
-    await apiRequest(`job-orders/${joId}`, {
-      method: 'PUT',
-      body: JSON.stringify(finalUpdates)
-    });
+    if (isIdChanged) {
+      setInvoices(prev => prev.map(inv => {
+        let changed = false;
+        let updatedJoId = inv.joId;
+        let updatedConsolidated = Array.isArray(inv.consolidatedJOs) ? [...inv.consolidatedJOs] : [];
+
+        if (String(inv.joId) === String(joId)) {
+          updatedJoId = targetId;
+          changed = true;
+        }
+
+        if (updatedConsolidated.some(id => String(id) === String(joId))) {
+          updatedConsolidated = updatedConsolidated.map(id => String(id) === String(joId) ? targetId : id);
+          changed = true;
+        }
+
+        if (changed) {
+          return {
+            ...inv,
+            joId: updatedJoId,
+            consolidatedJOs: updatedConsolidated
+          };
+        }
+        return inv;
+      }));
+
+      setPurchaseOrders(prev => prev.map(po => {
+        if (String(po.joId) === String(joId)) {
+          return { ...po, joId: targetId };
+        }
+        return po;
+      }));
+    }
+
+    return targetId;
   };
 
   const completeJO = async (joId) => {
