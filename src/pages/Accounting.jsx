@@ -757,7 +757,7 @@ const Accounting = () => {
 
   const { 
     jobOrders = [], invoices = [], createInvoice, createCustomInvoice, settleInvoice, deleteInvoice, updateInvoice, createJO, deleteJO, 
-    receivables = [], vendors = [], purchaseOrders = [], updateJOStatus, updatePurchaseOrder, patchPurchaseOrderLocal,
+    receivables = [], vendors = [], purchaseOrders = [], updateJOStatus, updatePurchaseOrder, deletePurchaseOrder, patchPurchaseOrderLocal,
     quotations = [],
     salaries = [], addSalary, deleteSalary, updateSalary,
     otherExpenses = [], addOtherExpense, deleteOtherExpense, updateOtherExpense,
@@ -1889,6 +1889,155 @@ const Accounting = () => {
     const updatedCosts = jo.costs.filter((_, i) => i !== costIdx);
     await updateJOStatus(jo.id, { costs: updatedCosts });
     setCostModal(prev => prev ? { ...prev, costs: updatedCosts } : null);
+  };
+
+  const handleDeletePOFromModal = async (po) => {
+    if (!canWrite) return;
+    const isPaid = po.status === 'paid';
+    const msg = isPaid 
+      ? (isID 
+          ? `Purchase Order ${po.id} berstatus LUNAS/PAID. Yakin ingin menghapus PO ini dari sistem dan JO? Tindakan ini tidak dapat dibatalkan.` 
+          : `Purchase Order ${po.id} is marked as PAID. Are you sure you want to delete this PO from the system and JO? This action cannot be undone.`)
+      : (isID 
+          ? `Hapus Purchase Order ${po.id} (${po.vendorName}) dari sistem dan Job Order ini?` 
+          : `Delete Purchase Order ${po.id} (${po.vendorName}) from the system and this Job Order?`);
+
+    const confirmed = await confirm(msg, {
+      title: isID ? "Hapus Purchase Order" : "Delete Purchase Order",
+      confirmText: isID ? "Hapus" : "Delete",
+      cancelText: isID ? "Batal" : "Cancel",
+      isDanger: true
+    });
+
+    if (confirmed) {
+      try {
+        await deletePurchaseOrder(po.id);
+        toast.success(isID ? `PO ${po.id} berhasil dihapus` : `PO ${po.id} successfully deleted`);
+      } catch (err) {
+        toast.error((isID ? "Gagal menghapus PO: " : "Failed to delete PO: ") + err.message);
+      }
+    }
+  };
+
+  const handleUnlinkPOFromModal = async (po) => {
+    if (!canWrite || !costModal) return;
+    const confirmed = await confirm(
+      isID 
+        ? `Lepas kaitan PO ${po.id} dari JO ${costModal.id}? PO akan tetap tersimpan di modul Hutang tanpa terhubung ke JO ini.` 
+        : `Unlink PO ${po.id} from JO ${costModal.id}? The PO will remain in Payables without being tied to this JO.`,
+      {
+        title: isID ? "Lepas Kaitan PO" : "Unlink PO",
+        confirmText: isID ? "Lepas Kaitan" : "Unlink",
+        cancelText: isID ? "Batal" : "Cancel"
+      }
+    );
+
+    if (confirmed) {
+      try {
+        await updatePurchaseOrder(po.id, { joId: '-' });
+        toast.success(isID ? `Kaitan PO ${po.id} dilepas dari JO` : `PO ${po.id} unlinked from JO`);
+      } catch (err) {
+        toast.error((isID ? "Gagal melepas kaitan PO: " : "Failed to unlink PO: ") + err.message);
+      }
+    }
+  };
+
+  const handleRejectCostAppFromModal = async (ca) => {
+    if (!canWrite) return;
+    const confirmed = await confirm(
+      isID 
+        ? `Tolak pengajuan biaya ${ca.id} (${ca.employeeName || ca.requestedBy})? Biaya ini tidak akan dihitung lagi dalam Laba/Rugi JO.` 
+        : `Reject cost application ${ca.id} (${ca.employeeName || ca.requestedBy})? This cost will no longer be counted towards JO Profit/Loss.`,
+      {
+        title: isID ? "Tolak Pengajuan Biaya" : "Reject Cost Application",
+        confirmText: isID ? "Tolak" : "Reject",
+        cancelText: isID ? "Batal" : "Cancel",
+        isDanger: true
+      }
+    );
+
+    if (confirmed) {
+      try {
+        let parsed = {};
+        const rawDesc = ca.rawDescription || (ca.rawRecord && ca.rawRecord.description) || ca.description || '';
+        if (typeof rawDesc === 'string' && rawDesc.startsWith('{')) {
+          try { parsed = JSON.parse(rawDesc); } catch (e) {}
+        }
+        const updatedDescription = JSON.stringify({
+          ...parsed,
+          type: 'cost_application',
+          status: 'rejected'
+        });
+        await updateOtherExpense(ca.id, {
+          ...(ca.rawRecord || {}),
+          description: updatedDescription
+        });
+        toast.success(isID ? `Pengajuan ${ca.id} berhasil ditolak` : `Application ${ca.id} rejected`);
+      } catch (err) {
+        toast.error((isID ? "Gagal menolak pengajuan: " : "Failed to reject application: ") + err.message);
+      }
+    }
+  };
+
+  const handleUnlinkCostAppFromModal = async (ca) => {
+    if (!canWrite || !costModal) return;
+    const confirmed = await confirm(
+      isID 
+        ? `Lepas kaitan pengajuan biaya ${ca.id} dari JO ${costModal.id}? Pengajuan akan tetap tersimpan sebagai pengeluaran operasional umum.` 
+        : `Unlink cost application ${ca.id} from JO ${costModal.id}? The application will remain as a general operational expense.`,
+      {
+        title: isID ? "Lepas Kaitan Pengajuan" : "Unlink Cost Application",
+        confirmText: isID ? "Lepas Kaitan" : "Unlink",
+        cancelText: isID ? "Batal" : "Cancel"
+      }
+    );
+
+    if (confirmed) {
+      try {
+        let parsed = {};
+        const rawDesc = ca.rawDescription || (ca.rawRecord && ca.rawRecord.description) || ca.description || '';
+        if (typeof rawDesc === 'string' && rawDesc.startsWith('{')) {
+          try { parsed = JSON.parse(rawDesc); } catch (e) {}
+        }
+        const updatedDescription = JSON.stringify({
+          ...parsed,
+          type: 'cost_application',
+          costType: 'general',
+          joId: null
+        });
+        await updateOtherExpense(ca.id, {
+          ...(ca.rawRecord || {}),
+          description: updatedDescription
+        });
+        toast.success(isID ? `Pengajuan ${ca.id} dilepas dari JO` : `Application ${ca.id} unlinked from JO`);
+      } catch (err) {
+        toast.error((isID ? "Gagal melepas kaitan: " : "Failed to unlink application: ") + err.message);
+      }
+    }
+  };
+
+  const handleDeleteCostAppFromModal = async (ca) => {
+    if (!canWrite) return;
+    const confirmed = await confirm(
+      isID 
+        ? `Hapus permanen pengajuan biaya ${ca.id} (${ca.employeeName || ca.requestedBy}) dari sistem?` 
+        : `Permanently delete cost application ${ca.id} (${ca.employeeName || ca.requestedBy}) from the system?`,
+      {
+        title: isID ? "Hapus Pengajuan Biaya" : "Delete Cost Application",
+        confirmText: isID ? "Hapus" : "Delete",
+        cancelText: isID ? "Batal" : "Cancel",
+        isDanger: true
+      }
+    );
+
+    if (confirmed) {
+      try {
+        await deleteOtherExpense(ca.id);
+        toast.success(isID ? `Pengajuan ${ca.id} berhasil dihapus` : `Application ${ca.id} successfully deleted`);
+      } catch (err) {
+        toast.error((isID ? "Gagal menghapus pengajuan: " : "Failed to delete application: ") + err.message);
+      }
+    }
   };
 
 
@@ -3966,7 +4115,15 @@ const Accounting = () => {
                 <div style={{ marginBottom:'25px' }}>
                   <div style={{ fontSize:'0.75rem',color:'var(--secondary)',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',marginBottom:'10px' }}>{isID ? 'Biaya & Pengeluaran Tercatat' : 'Recorded Costs & Expenses'}</div>
                   <div className="table-container"><table style={{ width:'100%',borderCollapse:'collapse',fontSize:'0.875rem' }}>
-                    <thead><tr style={{ borderBottom:'1px solid var(--glass-border)',color:'var(--text-muted)' }}><th style={{padding:'8px',textAlign:'left'}}>{isID ? 'Vendor / Sumber' : 'Vendor / Source'}</th><th style={{padding:'8px',textAlign:'left'}}>{isID ? 'Layanan / Deskripsi' : 'Service / Description'}</th><th style={{padding:'8px',textAlign:'center'}}>Jenis</th><th style={{padding:'8px',textAlign:'right'}}>Total</th><th style={{padding:'8px'}}></th></tr></thead>
+                    <thead>
+                      <tr style={{ borderBottom:'1px solid var(--glass-border)',color:'var(--text-muted)' }}>
+                        <th style={{padding:'8px',textAlign:'left'}}>{isID ? 'Vendor / Sumber' : 'Vendor / Source'}</th>
+                        <th style={{padding:'8px',textAlign:'left'}}>{isID ? 'Layanan / Deskripsi' : 'Service / Description'}</th>
+                        <th style={{padding:'8px',textAlign:'center'}}>{isID ? 'Jenis' : 'Type'}</th>
+                        <th style={{padding:'8px',textAlign:'right'}}>Total</th>
+                        <th style={{padding:'8px',textAlign:'right'}}>{isID ? 'Aksi' : 'Action'}</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {manualCostsList.map((c, ci) => (
                         <tr key={`mc-${ci}`} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
@@ -3974,7 +4131,13 @@ const Accounting = () => {
                           <td className="word-wrap-cell" style={{padding:'8px'}}>{c.serviceDescription || c.customServiceDescription || '—'}</td>
                           <td style={{padding:'8px',textAlign:'center'}}><span style={{ fontSize: '0.62rem', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px solid rgba(212, 175, 55, 0.25)', padding: '2px 6px', borderRadius: '4px' }}>Manual</span></td>
                           <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color:'var(--secondary)'}}>Rp {(c.total||0).toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
-                          <td style={{padding:'8px'}}><button className="btn btn-sm btn-danger" onClick={() => handleDeleteCost(costModal, ci)}>{isID ? 'Hapus' : 'Delete'}</button></td>
+                          <td style={{padding:'8px',textAlign:'right'}}>
+                            {canWrite && (
+                              <button className="btn btn-sm btn-danger" style={{ padding: '4px 8px', fontSize: '0.72rem' }} onClick={() => handleDeleteCost(costModal, ci)}>
+                                {isID ? 'Hapus' : 'Delete'}
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                       {poCostsList.map((p, pi) => (
@@ -3983,7 +4146,28 @@ const Accounting = () => {
                           <td className="word-wrap-cell" style={{padding:'8px'}}>{p.items?.map(i => i.serviceDescription).join(', ') || (isID ? 'Layanan PO' : 'PO Services')}</td>
                           <td style={{padding:'8px',textAlign:'center'}}><span style={{ fontSize: '0.62rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '2px 6px', borderRadius: '4px' }}>PO: {p.poNumber || p.id}</span></td>
                           <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color:'#3b82f6'}}>Rp {(p.grandTotal||0).toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
-                          <td style={{padding:'8px'}}></td>
+                          <td style={{padding:'8px',textAlign:'right'}}>
+                            {canWrite && (
+                              <div style={{ display: 'flex', gap: '5px', justifyContent: 'flex-end' }}>
+                                <button 
+                                  className="btn btn-sm" 
+                                  style={{ padding: '4px 8px', fontSize: '0.72rem', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--warning)', border: '1px solid rgba(245, 158, 11, 0.3)' }}
+                                  onClick={() => handleUnlinkPOFromModal(p)}
+                                  title={isID ? "Lepas kaitan dari JO ini (PO tetap ada di Hutang)" : "Unlink from this JO (PO remains in Payables)"}
+                                >
+                                  {isID ? 'Lepas' : 'Unlink'}
+                                </button>
+                                <button 
+                                  className="btn btn-sm btn-danger" 
+                                  style={{ padding: '4px 8px', fontSize: '0.72rem' }}
+                                  onClick={() => handleDeletePOFromModal(p)}
+                                  title={isID ? "Hapus PO permanen dari sistem" : "Delete PO permanently"}
+                                >
+                                  {isID ? 'Hapus' : 'Delete'}
+                                </button>
+                              </div>
+                            )}
+                          </td>
                         </tr>
                       ))}
                       {costAppsList.map((ca, cai) => {
@@ -4004,7 +4188,38 @@ const Accounting = () => {
                               </div>
                             </td>
                             <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color: caStatus === 'rejected' ? 'var(--text-muted)' : '#a855f7', textDecoration: caStatus === 'rejected' ? 'line-through' : 'none'}}>Rp {(ca.amount||0).toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
-                            <td style={{padding:'8px'}}></td>
+                            <td style={{padding:'8px',textAlign:'right'}}>
+                              {canWrite && (
+                                <div style={{ display: 'flex', gap: '5px', justifyContent: 'flex-end' }}>
+                                  {caStatus !== 'rejected' && (
+                                    <button 
+                                      className="btn btn-sm" 
+                                      style={{ padding: '4px 8px', fontSize: '0.72rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', border: '1px solid rgba(239, 68, 68, 0.3)' }}
+                                      onClick={() => handleRejectCostAppFromModal(ca)}
+                                      title={isID ? "Tolak pengajuan biaya (tidak dihitung dalam Laba/Rugi)" : "Reject cost application (excluded from P&L)"}
+                                    >
+                                      {isID ? 'Tolak' : 'Reject'}
+                                    </button>
+                                  )}
+                                  <button 
+                                    className="btn btn-sm" 
+                                    style={{ padding: '4px 8px', fontSize: '0.72rem', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--warning)', border: '1px solid rgba(245, 158, 11, 0.3)' }}
+                                    onClick={() => handleUnlinkCostAppFromModal(ca)}
+                                    title={isID ? "Lepas kaitan dari JO ini (tetap ada sebagai pengeluaran operasional umum)" : "Unlink from this JO (remains as general operational expense)"}
+                                  >
+                                    {isID ? 'Lepas' : 'Unlink'}
+                                  </button>
+                                  <button 
+                                    className="btn btn-sm btn-danger" 
+                                    style={{ padding: '4px 8px', fontSize: '0.72rem' }}
+                                    onClick={() => handleDeleteCostAppFromModal(ca)}
+                                    title={isID ? "Hapus pengajuan permanen dari sistem" : "Delete application permanently"}
+                                  >
+                                    {isID ? 'Hapus' : 'Delete'}
+                                  </button>
+                                </div>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
