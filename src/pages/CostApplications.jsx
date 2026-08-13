@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -17,7 +17,8 @@ import {
   User,
   CreditCard,
   Building,
-  Info
+  Info,
+  ChevronDown
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
@@ -58,6 +59,7 @@ const defaultSubcategories = {
 const CostApplications = () => {
   const { 
     user, 
+    loading,
     language, 
     otherExpenses, 
     jobOrders, 
@@ -72,6 +74,18 @@ const CostApplications = () => {
   const navigate = useNavigate();
   const isID = language === 'id';
   const isAccountant = user?.role === 'owner' || hasAccess('accounting', true);
+  const canAccessPage = user?.role === 'owner' || hasAccess('costApplications');
+
+  useEffect(() => {
+    if (!loading && user && !canAccessPage) {
+      toast.error(isID ? 'Akses ditolak. Halaman ini hanya untuk Executor dan Accounting.' : 'Access denied. This page is only for Executor and Accounting.');
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, canAccessPage, loading, navigate, isID]);
+
+  if (!canAccessPage) {
+    return null;
+  }
 
   const handleCategoryChange = (val) => {
     setCategory(val);
@@ -157,6 +171,9 @@ const CostApplications = () => {
   const [formId, setFormId] = useState(null);
   const [costType, setCostType] = useState('operational');
   const [selectedJoId, setSelectedJoId] = useState('');
+  const [joSearchTerm, setJoSearchTerm] = useState('');
+  const [isJoDropdownOpen, setIsJoDropdownOpen] = useState(false);
+  const joDropdownRef = useRef(null);
   const [recipientBank, setRecipientBank] = useState('');
   const [recipientBankAccount, setRecipientBankAccount] = useState('');
   const [recipientName, setRecipientName] = useState(user?.name || '');
@@ -169,6 +186,53 @@ const CostApplications = () => {
   const [items, setItems] = useState([{ details: '', amount: '' }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Close JO dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (joDropdownRef.current && !joDropdownRef.current.contains(event.target)) {
+        setIsJoDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Filtered Job Orders for search
+  const filteredJobOrders = useMemo(() => {
+    if (!jobOrders || jobOrders.length === 0) return [];
+    if (!joSearchTerm.trim()) return jobOrders;
+
+    const selectedJo = jobOrders.find(j => j.id === selectedJoId);
+    const selectedLabel = selectedJo ? `${selectedJo.id} - ${selectedJo.customerName || ''}` : '';
+    if (selectedJo && joSearchTerm.trim() === selectedLabel.trim()) {
+      return jobOrders;
+    }
+
+    const term = joSearchTerm.toLowerCase();
+    return jobOrders.filter(jo => {
+      const idMatch = (jo.id || '').toLowerCase().includes(term);
+      const custMatch = (jo.customerName || '').toLowerCase().includes(term);
+      const vesselMatch = (jo.vessel || '').toLowerCase().includes(term);
+      const originMatch = (jo.origin || '').toLowerCase().includes(term);
+      const destMatch = (jo.destination || '').toLowerCase().includes(term);
+      return idMatch || custMatch || vesselMatch || originMatch || destMatch;
+    });
+  }, [jobOrders, joSearchTerm, selectedJoId]);
+
+  const handleSelectJo = (jo) => {
+    setSelectedJoId(jo.id);
+    setJoSearchTerm(`${jo.id} - ${jo.customerName || ''}`);
+    setIsJoDropdownOpen(false);
+  };
+
+  const handleClearJo = () => {
+    setSelectedJoId('');
+    setJoSearchTerm('');
+    setIsJoDropdownOpen(false);
+  };
+
   // Release Modal State
   const [companyBankAccountId, setCompanyBankAccountId] = useState('');
   const [customSourceTarget, setCustomSourceTarget] = useState('');
@@ -177,6 +241,8 @@ const CostApplications = () => {
     setFormId(null);
     setCostType('operational');
     setSelectedJoId('');
+    setJoSearchTerm('');
+    setIsJoDropdownOpen(false);
     setRecipientBank('');
     setRecipientBankAccount('');
     setRecipientName(user?.name || '');
@@ -194,6 +260,13 @@ const CostApplications = () => {
     setFormId(app.id);
     setCostType(app.costType || 'operational');
     setSelectedJoId(app.joId || '');
+    if (app.joId) {
+      const match = (jobOrders || []).find(j => j.id === app.joId);
+      setJoSearchTerm(match ? `${match.id} - ${match.customerName || ''}` : app.joId);
+    } else {
+      setJoSearchTerm('');
+    }
+    setIsJoDropdownOpen(false);
     setRecipientBank(app.bankName || '');
     setRecipientBankAccount(app.bankAccount || '');
     setRecipientName(app.employeeName || '');
@@ -761,22 +834,121 @@ const CostApplications = () => {
 
               {/* Job Order Selector (Operational only) */}
               {costType === 'operational' && (
-                <div>
+                <div ref={joDropdownRef} style={{ position: 'relative' }}>
                   <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                    {isID ? 'Hubungkan ke Job Order' : 'Link to Job Order'}
+                    {isID ? 'Hubungkan ke Job Order' : 'Link to Job Order'} <span style={{ color: 'var(--danger)' }}>*</span>
                   </label>
-                  <select 
-                    value={selectedJoId}
-                    onChange={e => setSelectedJoId(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)' }}
-                  >
-                    <option value="" style={{ color: 'var(--text-muted)' }}>-- {isID ? 'Pilih Job Order' : 'Select Job Order'} --</option>
-                    {(jobOrders || []).map(jo => (
-                      <option key={jo.id} value={jo.id}>
-                        {jo.id} - {jo.customerName}
-                      </option>
-                    ))}
-                  </select>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <Search size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                    <input 
+                      type="text"
+                      placeholder={isID ? "Cari nomor JO atau customer..." : "Search JO number or customer..."}
+                      value={joSearchTerm}
+                      onChange={e => {
+                        setJoSearchTerm(e.target.value);
+                        setSelectedJoId('');
+                        setIsJoDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsJoDropdownOpen(true)}
+                      style={{ 
+                        width: '100%', 
+                        padding: '10px 36px 10px 36px', 
+                        background: 'var(--input-bg)', 
+                        border: `1px solid ${selectedJoId ? 'var(--secondary)' : 'var(--border)'}`, 
+                        borderRadius: '8px', 
+                        color: 'var(--text)',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                    {joSearchTerm ? (
+                      <button 
+                        type="button"
+                        onClick={handleClearJo}
+                        style={{
+                          position: 'absolute',
+                          right: '10px',
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '4px'
+                        }}
+                        title={isID ? "Hapus pilihan" : "Clear selection"}
+                      >
+                        <X size={16} />
+                      </button>
+                    ) : (
+                      <ChevronDown size={16} style={{ position: 'absolute', right: '12px', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                    )}
+                  </div>
+
+                  {/* Dropdown list */}
+                  {isJoDropdownOpen && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 4px)',
+                      left: 0,
+                      right: 0,
+                      maxHeight: '220px',
+                      overflowY: 'auto',
+                      background: 'var(--surface-color, var(--card-bg, #1a1e29))',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                      zIndex: 1050,
+                      backdropFilter: 'blur(12px)'
+                    }}>
+                      {filteredJobOrders.length === 0 ? (
+                        <div style={{ padding: '14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                          {isID ? 'Tidak ada Job Order yang cocok.' : 'No matching Job Orders found.'}
+                        </div>
+                      ) : (
+                        filteredJobOrders.map(jo => {
+                          const isSelected = selectedJoId === jo.id;
+                          return (
+                            <div 
+                              key={jo.id}
+                              onClick={() => handleSelectJo(jo)}
+                              style={{
+                                padding: '10px 14px',
+                                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                cursor: 'pointer',
+                                background: isSelected ? 'rgba(212,175,55,0.15)' : 'transparent',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                transition: 'background 0.15s ease'
+                              }}
+                              onMouseEnter={e => {
+                                if (!isSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                              }}
+                              onMouseLeave={e => {
+                                if (!isSelected) e.currentTarget.style.background = 'transparent';
+                              }}
+                            >
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontWeight: 'bold', color: 'var(--secondary)', fontSize: '0.85rem' }}>{jo.id}</span>
+                                  <span style={{ fontSize: '0.82rem', color: 'var(--text)' }}>- {jo.customerName || 'N/A'}</span>
+                                </div>
+                                {(jo.origin || jo.destination || jo.vessel) && (
+                                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                    {[
+                                      jo.origin && jo.destination ? `${jo.origin} → ${jo.destination}` : (jo.origin || jo.destination),
+                                      jo.vessel ? `🚢 ${jo.vessel}` : ''
+                                    ].filter(Boolean).join(' • ')}
+                                  </div>
+                                )}
+                              </div>
+                              {isSelected && <Check size={16} style={{ color: 'var(--secondary)', flexShrink: 0 }} />}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

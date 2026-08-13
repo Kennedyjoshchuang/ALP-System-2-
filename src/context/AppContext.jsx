@@ -56,7 +56,14 @@ export const AppProvider = ({ children }) => {
   const hasAccess = (moduleKey, writeRequired = false) => {
     if (!user) return false;
     if (user.role === 'owner') return true;
-    if (moduleKey === 'costApplications') return true;
+    
+    if (moduleKey === 'costApplications') {
+      if (user.role === 'accounting' || user.role === 'executor') return true;
+      if (user.permissions) {
+        if (user.permissions.accounting || user.permissions.executor || user.permissions.costApplications) return true;
+      }
+      return false;
+    }
     
     if (user.permissions && user.permissions[moduleKey]) {
       const accessLevel = user.permissions[moduleKey];

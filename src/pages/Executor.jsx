@@ -977,12 +977,23 @@ const Executor = () => {
                           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                               <span style={{ fontSize: '1.2rem' }}>📁</span>
-                              <span style={{ fontWeight: '800', color: 'var(--secondary)' }}>
-                                {group.quotationId === 'direct' ? (isID ? 'Pekerjaan Langsung' : 'Direct Jobs') : group.quotationId}
-                              </span>
-                              <span style={{ color: 'var(--text)', fontWeight: '700', marginLeft: '5px' }}>
-                                🏢 {group.customerName}
-                              </span>
+                              {group.quotationId === 'direct' ? (
+                                <span style={{ fontWeight: '800', color: 'var(--secondary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                  <span>{isID ? 'JO Tanpa Penawaran' : 'Job Orders Without Quotation'}</span>
+                                  <span style={{ fontSize: '0.72rem', background: 'rgba(212, 175, 55, 0.15)', color: 'var(--secondary)', padding: '1px 7px', borderRadius: '4px', fontWeight: '600' }}>
+                                    {isID ? 'Langsung' : 'Direct'}
+                                  </span>
+                                </span>
+                              ) : (
+                                <>
+                                  <span style={{ fontWeight: '800', color: 'var(--secondary)' }}>
+                                    {group.quotationId}
+                                  </span>
+                                  <span style={{ color: 'var(--text)', fontWeight: '700', marginLeft: '5px' }}>
+                                    🏢 {group.customerName}
+                                  </span>
+                                </>
+                              )}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                               <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
@@ -1266,23 +1277,37 @@ const Executor = () => {
               }
 
               return groupedArray.map(group => {
-                const isGroupExpanded = !!expandedGroups[group.quotationId];
+                const isNoQuotation = group.quotationId === 'no-quotation';
+                const isGroupExpanded = isNoQuotation
+                  ? expandedGroups[group.quotationId] !== false
+                  : !!expandedGroups[group.quotationId];
                 return (
                   <React.Fragment key={group.quotationId}>
                     {/* Folder Header Row */}
                     <tr 
                       style={{ borderBottom: '1px solid var(--glass-border)', background: 'var(--secondary-bg)', cursor: 'pointer' }} 
                       className="table-row-hover" 
-                      onClick={() => setExpandedGroups(prev => ({ ...prev, [group.quotationId]: !prev[group.quotationId] }))}
+                      onClick={() => setExpandedGroups(prev => ({ ...prev, [group.quotationId]: !isGroupExpanded }))}
                     >
                       <td colSpan="8" style={{ padding: '15px', fontWeight: '800' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             {isGroupExpanded ? <ChevronDown size={16} style={{ color: 'var(--secondary)' }} /> : <ChevronRight size={16} style={{ color: 'var(--secondary)' }} />}
                             {isGroupExpanded ? <FolderOpen size={20} style={{ color: 'var(--secondary)' }} /> : <Folder size={20} style={{ color: 'var(--secondary)' }} />}
-                            <span style={{ color: 'var(--secondary)' }}>{group.quotationId}</span>
-                            <span style={{ color: 'var(--text-muted)' }}>|</span>
-                            <span>{group.customerName}</span>
+                            {isNoQuotation ? (
+                              <span style={{ color: 'var(--secondary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <span>{isID ? 'JO Tanpa Penawaran' : 'Job Orders Without Quotation'}</span>
+                                <span style={{ fontSize: '0.72rem', background: 'rgba(212, 175, 55, 0.15)', color: 'var(--secondary)', padding: '1px 7px', borderRadius: '4px', fontWeight: '600' }}>
+                                  {isID ? 'Langsung' : 'Direct'}
+                                </span>
+                              </span>
+                            ) : (
+                              <>
+                                <span style={{ color: 'var(--secondary)' }}>{group.quotationId}</span>
+                                <span style={{ color: 'var(--text-muted)' }}>|</span>
+                                <span>{group.customerName}</span>
+                              </>
+                            )}
                           </div>
                           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', background: 'rgba(255,255,255,0.05)', padding: '2px 10px', borderRadius: '20px' }}>
                             {group.jobOrders.length} {isID ? 'Aktivitas' : 'Activities'}
