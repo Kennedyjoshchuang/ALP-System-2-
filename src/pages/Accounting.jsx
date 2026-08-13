@@ -7585,34 +7585,95 @@ const Accounting = () => {
 
                 {Array.isArray(editingInvoice.items) && (
                   <div>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px', flexWrap:'wrap', gap:'8px' }}>
                       <label style={{ fontSize:'0.75rem', color:'var(--text-muted)', textTransform:'uppercase', fontWeight:'700' }}>
                         {isID ? 'Item Invoice (Per Item)' : 'Invoice Items'}
                       </label>
-                      <button 
-                        onClick={() => {
-                          const defaultJoId = joIds.length > 0 ? joIds[0] : '';
-                          const newItems = [...(editingInvoice.items || []), { 
-                            description: 'Freight Forwarding Services', 
-                            qty: 1, 
-                            rate: 0, 
-                            amount: 0,
-                            joId: defaultJoId,
-                            containerNo: [''],
-                            vehicleNo: [''],
-                            driverName: ['']
-                          }];
-                          const newSubtotal = newItems.reduce((sum, item) => sum + (parseFloat(item.qty || 0) * parseFloat(item.rate || 0)), 0);
-                          setEditingInvoice({
-                            ...editingInvoice,
-                            items: newItems,
-                            subtotal: newSubtotal
-                          });
-                        }}
-                        style={{ background:'var(--secondary-bg)', color:'var(--secondary)', border:'1px solid var(--secondary)', borderRadius:'6px', padding:'4px 10px', fontSize:'0.7rem', cursor:'pointer' }}
-                      >
-                        + {isID ? 'Tambah Item' : 'Add Item'}
-                      </button>
+                      <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            const defaultJoId = joIds.length > 0 ? joIds[0] : '';
+                            const newItems = [...(editingInvoice.items || []), { 
+                              description: 'Storage Demmurage', 
+                              qty: 1, 
+                              rate: '', 
+                              amount: 0,
+                              joId: defaultJoId,
+                              containerNo: [''],
+                              vehicleNo: [''],
+                              driverName: ['']
+                            }];
+                            const newSubtotal = newItems.reduce((sum, item) => sum + (parseFloat(item.qty || 0) * parseFloat(item.rate || 0)), 0);
+                            setEditingInvoice({
+                              ...editingInvoice,
+                              items: newItems,
+                              subtotal: newSubtotal
+                            });
+                          }}
+                          style={{ background:'rgba(212, 175, 55, 0.15)', color:'var(--secondary)', border:'1px solid var(--secondary)', borderRadius:'6px', padding:'4px 10px', fontSize:'0.7rem', fontWeight:'700', cursor:'pointer' }}
+                        >
+                          + Storage Demmurage
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            const defaultJoId = joIds.length > 0 ? joIds[0] : '';
+                            const newItems = [...(editingInvoice.items || []), { 
+                              description: 'Insurance Cost', 
+                              qty: 1, 
+                              rate: '', 
+                              amount: 0,
+                              joId: defaultJoId,
+                              containerNo: [''],
+                              vehicleNo: [''],
+                              driverName: ['']
+                            }];
+                            const newSubtotal = newItems.reduce((sum, item) => sum + (parseFloat(item.qty || 0) * parseFloat(item.rate || 0)), 0);
+                            setEditingInvoice({
+                              ...editingInvoice,
+                              items: newItems,
+                              subtotal: newSubtotal
+                            });
+                          }}
+                          style={{ background:'rgba(59, 130, 246, 0.15)', color:'#60a5fa', border:'1px solid #3b82f6', borderRadius:'6px', padding:'4px 10px', fontSize:'0.7rem', fontWeight:'700', cursor:'pointer' }}
+                        >
+                          + Insurance Cost
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            const defaultJoId = joIds.length > 0 ? joIds[0] : '';
+                            const newItems = [...(editingInvoice.items || []), { 
+                              description: 'Freight Forwarding Services', 
+                              qty: 1, 
+                              rate: 0, 
+                              amount: 0,
+                              joId: defaultJoId,
+                              containerNo: [''],
+                              vehicleNo: [''],
+                              driverName: ['']
+                            }];
+                            const newSubtotal = newItems.reduce((sum, item) => sum + (parseFloat(item.qty || 0) * parseFloat(item.rate || 0)), 0);
+                            setEditingInvoice({
+                              ...editingInvoice,
+                              items: newItems,
+                              subtotal: newSubtotal
+                            });
+                          }}
+                          style={{ background:'var(--secondary-bg)', color:'var(--secondary)', border:'1px solid var(--secondary)', borderRadius:'6px', padding:'4px 10px', fontSize:'0.7rem', cursor:'pointer' }}
+                        >
+                          + {isID ? 'Tambah Item' : 'Add Item'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Reminder Box */}
+                    <div style={{ background: 'rgba(212, 175, 55, 0.08)', border: '1px solid rgba(212, 175, 55, 0.3)', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '1rem' }}>💡</span>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text)', lineHeight: '1.4' }}>
+                        <strong>{isID ? 'Pengingat:' : 'Reminder:'}</strong> {isID ? 'Periksa apakah ada biaya rutin seperti Storage Demmurage atau Insurance Cost yang perlu dimasukkan ke dalam item layanan.' : 'Please verify if routine costs like Storage Demmurage or Insurance Cost need to be included in the service items.'}
+                      </span>
                     </div>
 
                     <div style={{ display:'grid', gap:'12px', maxHeight:'300px', overflowY:'auto', paddingRight:'5px', marginBottom: '10px' }}>
@@ -7676,6 +7737,7 @@ const Accounting = () => {
                               Rp {((item.qty || 0) * (item.rate || 0)).toLocaleString()}
                             </div>
                             <button 
+                              type="button"
                               onClick={() => {
                                 const newItems = (editingInvoice.items || []).filter((_, i) => i !== idx);
                                 const newSubtotal = newItems.reduce((sum, it) => sum + (parseFloat(it.qty || 0) * parseFloat(it.rate || 0)), 0);
@@ -7698,38 +7760,40 @@ const Accounting = () => {
                                       type="text"
                                       value={c}
                                       onChange={e => {
-                                        const list = [...(item.containerNo || [])];
-                                        list[cIdx] = e.target.value;
                                         const newItems = [...editingInvoice.items];
-                                        newItems[idx] = { ...newItems[idx], containerNo: list };
+                                        const newContainers = [...(newItems[idx].containerNo || [])];
+                                        newContainers[cIdx] = e.target.value;
+                                        newItems[idx] = { ...newItems[idx], containerNo: newContainers };
                                         setEditingInvoice({ ...editingInvoice, items: newItems });
                                       }}
-                                      placeholder="CSNU1234567"
-                                      style={{ flex: 1, padding: '4px 8px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '0.75rem' }}
+                                      placeholder="Container #"
+                                      style={{ width: '100%', padding: '4px 8px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text)', fontSize: '0.75rem' }}
                                     />
                                     <button
+                                      type="button"
                                       onClick={() => {
-                                        const list = (item.containerNo || []).filter((_, i) => i !== cIdx);
                                         const newItems = [...editingInvoice.items];
-                                        newItems[idx] = { ...newItems[idx], containerNo: list };
+                                        const newContainers = (newItems[idx].containerNo || []).filter((_, i) => i !== cIdx);
+                                        newItems[idx] = { ...newItems[idx], containerNo: newContainers };
                                         setEditingInvoice({ ...editingInvoice, items: newItems });
                                       }}
-                                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                      style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '2px' }}
                                     >
                                       <X size={12} />
                                     </button>
                                   </div>
                                 ))}
                                 <button
+                                  type="button"
                                   onClick={() => {
-                                    const list = [...(item.containerNo || []), ''];
                                     const newItems = [...editingInvoice.items];
-                                    newItems[idx] = { ...newItems[idx], containerNo: list };
+                                    const newContainers = [...(newItems[idx].containerNo || []), ''];
+                                    newItems[idx] = { ...newItems[idx], containerNo: newContainers };
                                     setEditingInvoice({ ...editingInvoice, items: newItems });
                                   }}
-                                  style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: 'none', borderRadius: '4px', padding: '2px 6px', fontSize: '0.65rem', cursor: 'pointer', alignSelf: 'flex-start', marginTop: '2px' }}
+                                  style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: '4px', color: 'var(--text-muted)', fontSize: '0.65rem', padding: '2px 6px', cursor: 'pointer' }}
                                 >
-                                  + Add Container
+                                  + Container
                                 </button>
                               </div>
                             </div>
@@ -7744,38 +7808,40 @@ const Accounting = () => {
                                       type="text"
                                       value={v}
                                       onChange={e => {
-                                        const list = [...(item.vehicleNo || [])];
-                                        list[vIdx] = e.target.value;
                                         const newItems = [...editingInvoice.items];
-                                        newItems[idx] = { ...newItems[idx], vehicleNo: list };
+                                        const newVehicles = [...(newItems[idx].vehicleNo || [])];
+                                        newVehicles[vIdx] = e.target.value;
+                                        newItems[idx] = { ...newItems[idx], vehicleNo: newVehicles };
                                         setEditingInvoice({ ...editingInvoice, items: newItems });
                                       }}
-                                      placeholder="BP 1234 XX"
-                                      style={{ flex: 1, padding: '4px 8px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '0.75rem' }}
+                                      placeholder="Plat Mobil #"
+                                      style={{ width: '100%', padding: '4px 8px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text)', fontSize: '0.75rem' }}
                                     />
                                     <button
+                                      type="button"
                                       onClick={() => {
-                                        const list = (item.vehicleNo || []).filter((_, i) => i !== vIdx);
                                         const newItems = [...editingInvoice.items];
-                                        newItems[idx] = { ...newItems[idx], vehicleNo: list };
+                                        const newVehicles = (newItems[idx].vehicleNo || []).filter((_, i) => i !== vIdx);
+                                        newItems[idx] = { ...newItems[idx], vehicleNo: newVehicles };
                                         setEditingInvoice({ ...editingInvoice, items: newItems });
                                       }}
-                                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                      style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '2px' }}
                                     >
                                       <X size={12} />
                                     </button>
                                   </div>
                                 ))}
                                 <button
+                                  type="button"
                                   onClick={() => {
-                                    const list = [...(item.vehicleNo || []), ''];
                                     const newItems = [...editingInvoice.items];
-                                    newItems[idx] = { ...newItems[idx], vehicleNo: list };
+                                    const newVehicles = [...(newItems[idx].vehicleNo || []), ''];
+                                    newItems[idx] = { ...newItems[idx], vehicleNo: newVehicles };
                                     setEditingInvoice({ ...editingInvoice, items: newItems });
                                   }}
-                                  style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: 'none', borderRadius: '4px', padding: '2px 6px', fontSize: '0.65rem', cursor: 'pointer', alignSelf: 'flex-start', marginTop: '2px' }}
+                                  style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: '4px', color: 'var(--text-muted)', fontSize: '0.65rem', padding: '2px 6px', cursor: 'pointer' }}
                                 >
-                                  + Add Vehicle
+                                  + Vehicle
                                 </button>
                               </div>
                             </div>
@@ -7790,45 +7856,48 @@ const Accounting = () => {
                                       type="text"
                                       value={d}
                                       onChange={e => {
-                                        const list = [...(item.driverName || [])];
-                                        list[dIdx] = e.target.value;
                                         const newItems = [...editingInvoice.items];
-                                        newItems[idx] = { ...newItems[idx], driverName: list };
+                                        const newDrivers = [...(newItems[idx].driverName || [])];
+                                        newDrivers[dIdx] = e.target.value;
+                                        newItems[idx] = { ...newItems[idx], driverName: newDrivers };
                                         setEditingInvoice({ ...editingInvoice, items: newItems });
                                       }}
-                                      placeholder="John Doe"
-                                      style={{ flex: 1, padding: '4px 8px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '0.75rem' }}
+                                      placeholder="Nama Driver"
+                                      style={{ width: '100%', padding: '4px 8px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text)', fontSize: '0.75rem' }}
                                     />
                                     <button
+                                      type="button"
                                       onClick={() => {
-                                        const list = (item.driverName || []).filter((_, i) => i !== dIdx);
                                         const newItems = [...editingInvoice.items];
-                                        newItems[idx] = { ...newItems[idx], driverName: list };
+                                        const newDrivers = (newItems[idx].driverName || []).filter((_, i) => i !== dIdx);
+                                        newItems[idx] = { ...newItems[idx], driverName: newDrivers };
                                         setEditingInvoice({ ...editingInvoice, items: newItems });
                                       }}
-                                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                      style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '2px' }}
                                     >
                                       <X size={12} />
                                     </button>
                                   </div>
                                 ))}
                                 <button
+                                  type="button"
                                   onClick={() => {
-                                    const list = [...(item.driverName || []), ''];
                                     const newItems = [...editingInvoice.items];
-                                    newItems[idx] = { ...newItems[idx], driverName: list };
+                                    const newDrivers = [...(newItems[idx].driverName || []), ''];
+                                    newItems[idx] = { ...newItems[idx], driverName: newDrivers };
                                     setEditingInvoice({ ...editingInvoice, items: newItems });
                                   }}
-                                  style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: 'none', borderRadius: '4px', padding: '2px 6px', fontSize: '0.65rem', cursor: 'pointer', alignSelf: 'flex-start', marginTop: '2px' }}
+                                  style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: '4px', color: 'var(--text-muted)', fontSize: '0.65rem', padding: '2px 6px', cursor: 'pointer' }}
                                 >
-                                  + Add Driver
+                                  + Driver
                                 </button>
                               </div>
                             </div>
 
+                            {/* Column 4: Job Order Selector (For Consolidated Invoices) */}
                             {joIds.length > 1 && (
                               <div>
-                                <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '5px', fontWeight: '600' }}>Job Order ID</label>
+                                <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--secondary)', marginBottom: '5px', fontWeight: '700' }}>Linked JO</label>
                                 <select
                                   value={item.joId || ''}
                                   onChange={e => {
@@ -7836,10 +7905,13 @@ const Accounting = () => {
                                     newItems[idx] = { ...newItems[idx], joId: e.target.value };
                                     setEditingInvoice({ ...editingInvoice, items: newItems });
                                   }}
-                                  style={{ width: '100%', padding: '4px 8px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '0.75rem' }}
+                                  style={{ width: '100%', padding: '4px 8px', background: 'var(--input-bg)', border: '1px solid var(--secondary)', borderRadius: '4px', color: 'var(--text)', fontSize: '0.75rem', fontWeight: '600' }}
                                 >
-                                  {joIds.map(id => (
-                                    <option key={id} value={id}>{id}</option>
+                                  <option value="">-- General / All JOs --</option>
+                                  {joIds.map(jid => (
+                                    <option key={jid} value={jid} style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+                                      JO #{jid}
+                                    </option>
                                   ))}
                                 </select>
                               </div>
@@ -7860,6 +7932,7 @@ const Accounting = () => {
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' }}>
                     <label style={{ fontSize:'0.75rem', color:'var(--text-muted)', textTransform:'uppercase', fontWeight:'700' }}>Biaya Tambahan (Extra Charges)</label>
                     <button 
+                      type="button"
                       onClick={() => setEditingInvoice({...editingInvoice, extra_charges: [...(editingInvoice.extra_charges || []), { description: '', amount: 0 }]})}
                       style={{ background:'var(--secondary-bg)', color:'var(--secondary)', border:'1px solid var(--secondary)', borderRadius:'6px', padding:'4px 10px', fontSize:'0.7rem', cursor:'pointer' }}
                     >
@@ -8211,15 +8284,31 @@ const Accounting = () => {
 
               {/* Items Section */}
               <div style={{ marginTop:'30px', marginBottom:'20px' }}>
-                <h4 style={{ borderBottom:'1px solid var(--glass-border)', paddingBottom:'8px', color:'var(--text)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <h4 style={{ borderBottom:'1px solid var(--glass-border)', paddingBottom:'8px', color:'var(--text)', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'8px' }}>
                   <span>{isID ? 'Item Layanan' : 'Service Items'}</span>
-                  <button 
-                    type="button" 
-                    onClick={addCustomInvoiceItem}
-                    style={{ background:'var(--success-bg)', color:'var(--success)', border:'1px solid var(--success)', borderRadius:'6px', padding:'4px 10px', fontSize:'0.75rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'4px' }}
-                  >
-                    <Plus size={14}/> {isID ? 'Tambah Item' : 'Add Item'}
-                  </button>
+                  <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
+                    <button 
+                      type="button"
+                      onClick={() => setCustomInvoiceForm(prev => ({ ...prev, items: [...prev.items, { description: 'Storage Demmurage', qty: 1, rate: '' }] }))}
+                      style={{ background:'rgba(212, 175, 55, 0.15)', color:'var(--secondary)', border:'1px solid var(--secondary)', borderRadius:'6px', padding:'4px 10px', fontSize:'0.75rem', fontWeight:'700', cursor:'pointer' }}
+                    >
+                      + Storage Demmurage
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setCustomInvoiceForm(prev => ({ ...prev, items: [...prev.items, { description: 'Insurance Cost', qty: 1, rate: '' }] }))}
+                      style={{ background:'rgba(59, 130, 246, 0.15)', color:'#60a5fa', border:'1px solid #3b82f6', borderRadius:'6px', padding:'4px 10px', fontSize:'0.75rem', fontWeight:'700', cursor:'pointer' }}
+                    >
+                      + Insurance Cost
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={addCustomInvoiceItem}
+                      style={{ background:'var(--success-bg)', color:'var(--success)', border:'1px solid var(--success)', borderRadius:'6px', padding:'4px 10px', fontSize:'0.75rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'4px' }}
+                    >
+                      <Plus size={14}/> {isID ? 'Tambah Item' : 'Add Item'}
+                    </button>
+                  </div>
                 </h4>
 
                 <div style={{ display:'flex', flexDirection:'column', gap:'12px', marginTop:'15px' }}>
@@ -9856,6 +9945,7 @@ const Accounting = () => {
           setF({ items: next });
         };
         const addItem = () => setF({ items: [...f.items, { description: '', qty: 1, rate: 0 }] });
+        const addPresetItem = (desc) => setF({ items: [...f.items, { description: desc, qty: 1, rate: '' }] });
         const removeItem = (idx) => setF({ items: f.items.filter((_, i) => i !== idx) });
 
         const updateExtra = (idx, field, val) => {
@@ -9954,8 +10044,42 @@ const Accounting = () => {
               </div>
 
               {/* Line Items */}
-              <div style={{ marginBottom: '16px' }}>
-                <p style={{ ...labelStyle, fontSize: '0.72rem', color: 'var(--text)', marginBottom: '10px' }}>📦 {isID ? 'Item Layanan' : 'Service Items'}</p>
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                  <p style={{ ...labelStyle, fontSize: '0.72rem', color: 'var(--text)', margin: 0 }}>📦 {isID ? 'Item Layanan' : 'Service Items'}</p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => addPresetItem('Storage Demmurage')}
+                      style={{ background: 'rgba(212, 175, 55, 0.15)', color: 'var(--secondary)', border: '1px solid var(--secondary)', borderRadius: '6px', padding: '4px 10px', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      + Storage Demmurage
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addPresetItem('Insurance Cost')}
+                      style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid #3b82f6', borderRadius: '6px', padding: '4px 10px', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      + Insurance Cost
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addItem}
+                      style={{ background: 'var(--secondary-bg)', color: 'var(--secondary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 10px', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <Plus size={13} /> {isID ? 'Tambah Item' : 'Add Item'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Reminder Box */}
+                <div style={{ background: 'rgba(212, 175, 55, 0.08)', border: '1px solid rgba(212, 175, 55, 0.3)', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '1rem' }}>💡</span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text)', lineHeight: '1.4' }}>
+                    <strong>{isID ? 'Pengingat:' : 'Reminder:'}</strong> {isID ? 'Periksa apakah ada biaya rutin seperti Storage Demmurage atau Insurance Cost yang perlu dimasukkan ke dalam item layanan.' : 'Please verify if routine costs like Storage Demmurage or Insurance Cost need to be included in the service items.'}
+                  </span>
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 140px 32px', gap: '6px', marginBottom: '6px' }}>
                   {['Deskripsi', 'Qty', 'Harga Satuan', ''].map((h, i) => (
                     <span key={i} style={{ fontSize: '0.65rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</span>
@@ -9965,15 +10089,12 @@ const Accounting = () => {
                   <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 140px 32px', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
                     <input style={inputStyle} value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)} placeholder="Deskripsi layanan..." />
                     <input type="number" style={{ ...inputStyle, textAlign: 'center' }} value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)} min="1" step="any" />
-                    <input type="number" style={{ ...inputStyle, textAlign: 'right' }} value={item.rate} onChange={e => updateItem(idx, 'rate', e.target.value)} min="0" step="any" />
+                    <input type="number" style={{ ...inputStyle, textAlign: 'right' }} value={item.rate} onChange={e => updateItem(idx, 'rate', e.target.value)} placeholder="Rp" min="0" step="any" />
                     <button onClick={() => removeItem(idx)} disabled={f.items.length === 1} style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: '6px', color: 'var(--danger)', cursor: f.items.length === 1 ? 'not-allowed' : 'pointer', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: f.items.length === 1 ? 0.4 : 1 }}>
                       <X size={14} />
                     </button>
                   </div>
                 ))}
-                <button onClick={addItem} style={{ marginTop: '4px', background: 'none', border: '1px dashed var(--border)', borderRadius: '8px', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Plus size={14} /> {isID ? 'Tambah Item' : 'Add Item'}
-                </button>
               </div>
 
               {/* Extra Charges */}
@@ -9990,7 +10111,7 @@ const Accounting = () => {
                   <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 140px 32px', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
                     <input style={inputStyle} value={ec.description} onChange={e => updateExtra(idx, 'description', e.target.value)} placeholder="Biaya tambahan..." />
                     <input type="number" style={{ ...inputStyle, textAlign: 'center' }} value={ec.qty} onChange={e => updateExtra(idx, 'qty', e.target.value)} min="1" step="any" />
-                    <input type="number" style={{ ...inputStyle, textAlign: 'right' }} value={ec.rate} onChange={e => updateExtra(idx, 'rate', e.target.value)} min="0" step="any" />
+                    <input type="number" style={{ ...inputStyle, textAlign: 'right' }} value={ec.rate} onChange={e => updateExtra(idx, 'rate', e.target.value)} placeholder="Rp" min="0" step="any" />
                     <button onClick={() => removeExtra(idx)} style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: '6px', color: 'var(--danger)', cursor: 'pointer', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <X size={14} />
                     </button>
