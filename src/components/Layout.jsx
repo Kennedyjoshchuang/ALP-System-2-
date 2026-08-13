@@ -20,12 +20,17 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getTaskCounts } from '../utils/taskCounts';
 
 const Layout = ({ children }) => {
   const location = useLocation();
-  const { logout, user, hasAccess, t, language, toggleLanguage, theme, toggleTheme, loading } = useApp();
+  const context = useApp();
+  const { logout, user, hasAccess, t, language, toggleLanguage, theme, toggleTheme, loading } = context;
+  const isID = language === 'id';
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [windowWidth, setWindowWidth] = React.useState(window.innerWidth);
+
+  const taskCounts = React.useMemo(() => getTaskCounts(context), [context]);
 
   React.useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -112,6 +117,9 @@ const Layout = ({ children }) => {
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
+            const badges = taskCounts[item.moduleKey] || [];
+            const tooltipText = badges.map(b => `${b.count} ${isID ? b.labelId : b.labelEn}`).join(' • ');
+
             return (
               <Link 
                 key={item.path} 
@@ -134,7 +142,20 @@ const Layout = ({ children }) => {
               >
                 <Icon size={isLaptop ? 17 : 20} style={{ opacity: isActive ? 1 : 0.6, flexShrink: 0 }} />
                 <span style={{ fontWeight: isActive ? '600' : '400', fontSize: isLaptop ? '0.82rem' : '0.95rem' }}>{item.label}</span>
-                {isActive && <ChevronRight size={14} style={{ marginLeft: 'auto', opacity: 0.5 }} />}
+                {badges.length > 0 && (
+                  <div className="sidebar-badge-cluster" title={tooltipText}>
+                    {badges.map((badge, bIdx) => (
+                      <span 
+                        key={bIdx} 
+                        className={`sidebar-badge-pill sidebar-badge-${badge.type}`}
+                        aria-label={`${badge.count} ${isID ? badge.labelId : badge.labelEn}`}
+                      >
+                        {badge.count > 99 ? '99+' : badge.count}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {isActive && <ChevronRight size={14} style={{ marginLeft: badges.length > 0 ? '4px' : 'auto', opacity: 0.5, flexShrink: 0 }} />}
               </Link>
             );
           })}
