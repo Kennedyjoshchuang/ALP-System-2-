@@ -560,16 +560,24 @@ export const AppProvider = ({ children }) => {
   const cleanNumber = (val) => {
     if (typeof val === 'number') return isNaN(val) ? 0 : val;
     if (!val) return 0;
-    // Handle Indonesian format: dot as thousands separator, comma as decimal
-    // First, check if it's already a clean string number
-    if (/^\d+(\.\d+)?$/.test(String(val))) return parseFloat(val);
     
-    // Otherwise, strip everything except digits, comma and dot
-    let str = String(val).replace(/[^\d.,-]/g, '');
+    const strVal = String(val).trim();
+    // Check if it's already a clean standard number (e.g. "1.2", "123.45", "-50.5")
+    if (/^-?\d+(\.\d+)?$/.test(strVal)) return parseFloat(strVal);
     
-    // If it has both dot and comma, or just comma, it's likely Indonesian format (1.000,00)
+    // Strip everything except digits, comma, dot, and minus
+    let str = strVal.replace(/[^\d.,-]/g, '');
+    
     if (str.includes(',') && str.includes('.')) {
-      str = str.replace(/\./g, '').replace(/,/g, '.');
+      const lastDot = str.lastIndexOf('.');
+      const lastComma = str.lastIndexOf(',');
+      if (lastDot > lastComma) {
+        // US format: 1,200.50 -> remove commas
+        str = str.replace(/,/g, '');
+      } else {
+        // Indonesian format: 1.200,50 -> remove dots and convert comma to dot
+        str = str.replace(/\./g, '').replace(/,/g, '.');
+      }
     } else if (str.includes(',')) {
       str = str.replace(/,/g, '.');
     }

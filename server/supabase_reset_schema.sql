@@ -130,6 +130,10 @@ CREATE TABLE receivables (
     extra_charges JSONB DEFAULT '[]'::jsonb,
     balance NUMERIC,
     status TEXT,
+    "paymentProofPhoto" TEXT,
+    tax_deduction NUMERIC DEFAULT 0,
+    tax_deduction_proof TEXT,
+    taxes_deducted JSONB DEFAULT '[]'::jsonb,
     "paidDate" TEXT
 );
 
