@@ -666,12 +666,19 @@ export const AppProvider = ({ children }) => {
 
     const newInvoiceId = `INV-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
     const consolidatedJOs = targetJOs.map(j => j.id);
+    const quotation = jo.quotationId ? quotations.find(q => String(q.id) === String(jo.quotationId)) : null;
+    const customerObj = customers.find(c => c.name === (jo.customerName || ''));
 
     const newInvoice = {
       id: newInvoiceId,
       joId, // Primary JO reference
       consolidatedJOs, // Array of consolidated JO IDs
       customerName: jo.customerName || 'Pelanggan',
+      customerAddress: quotation?.companyAddress || jo?.address || customerObj?.address || '',
+      customerPic: quotation?.pic || customerObj?.pic || customerObj?.contactPerson || '',
+      customerPhone: quotation?.phone || customerObj?.phone || '',
+      customerEmail: quotation?.email || customerObj?.email || '',
+      bankAccountId: invoiceData?.bankAccountId || (companyBankAccounts.length > 0 ? companyBankAccounts[0].id : null),
       amount: totalAmount,
       subtotal: totalAmount,
       tax: 0,
@@ -722,16 +729,18 @@ export const AppProvider = ({ children }) => {
       ? invoiceData.consolidatedJOs
       : invoiceData.joId ? [invoiceData.joId] : [];
 
+    const customerObj = customers.find(c => c.name === (invoiceData.customerName || ''));
     const items = invoiceData.items || [];
     const newInvoice = {
       id: newInvoiceId,
       joId: invoiceData.joId || null,
       consolidatedJOs,
       customerName: invoiceData.customerName || 'Pelanggan',
-      customerAddress: invoiceData.customerAddress || '',
-      customerPic: invoiceData.customerPic || '',
-      customerPhone: invoiceData.customerPhone || '',
-      customerEmail: invoiceData.customerEmail || '',
+      customerAddress: invoiceData.customerAddress || customerObj?.address || '',
+      customerPic: invoiceData.customerPic || customerObj?.pic || customerObj?.contactPerson || '',
+      customerPhone: invoiceData.customerPhone || customerObj?.phone || '',
+      customerEmail: invoiceData.customerEmail || customerObj?.email || '',
+      bankAccountId: invoiceData.bankAccountId || (companyBankAccounts.length > 0 ? companyBankAccounts[0].id : null),
       amount: cleanNumber(invoiceData.amount),
       subtotal: cleanNumber(invoiceData.subtotal || invoiceData.amount),
       tax: cleanNumber(invoiceData.tax || 0),

@@ -4,7 +4,7 @@ import ExtraDocsUploader from '../components/ExtraDocsUploader';
 import { useApp } from '../context/AppContext';
 
 const PrintInvoice = () => {
-  const { invoices = [], jobOrders = [], quotations = [], companyBankAccounts = [], updateInvoice } = useApp() || {};
+  const { invoices = [], jobOrders = [], quotations = [], companyBankAccounts = [], customers = [], updateInvoice } = useApp() || {};
   const [localData, setLocalData] = useState(null);
   const [dueDays, setDueDays] = useState(() => parseInt(localStorage.getItem('invoice_due_days') || '14', 10));
   const [extraDocs, setExtraDocs] = useState([]);
@@ -48,7 +48,7 @@ const PrintInvoice = () => {
     ? contextConsolidated
     : (localData?.consolidatedJOs || []);
   const quotation = contextQuotation || localData?.quotation;
-  const bankAccount = contextBankAccount || localData?.bankAccount;
+  const bankAccount = contextBankAccount || (invoice?.bankAccountId ? companyBankAccounts.find(b => b.id === invoice.bankAccountId) : null) || localData?.bankAccount || (companyBankAccounts.length > 0 ? companyBankAccounts[0] : null);
 
   useEffect(() => {
     if (invoice) {
@@ -192,11 +192,13 @@ const PrintInvoice = () => {
 
   const grandTotal = parseFloat(invoice?.amount || invoice?.subtotal || 0);
 
-  // Address: prefer invoice.customerAddress → quotation companyAddress → fallback
-  const customerAddress = invoice?.customerAddress || quotation?.companyAddress || jo?.address || '';
-  const customerPic = invoice?.customerPic || quotation?.pic || '';
-  const customerPhone = invoice?.customerPhone || quotation?.phone || '';
-  const customerEmail = invoice?.customerEmail || quotation?.email || '';
+  // Customer info: prefer invoice -> localData -> quotation -> jo -> customers master fallback
+  const customerObj = customers.find(c => c.name === (invoice?.customerName || localData?.invoice?.customerName || jo?.customerName || ''));
+  const customerName = invoice?.customerName || localData?.invoice?.customerName || jo?.customerName || '—';
+  const customerAddress = invoice?.customerAddress || localData?.invoice?.customerAddress || quotation?.companyAddress || jo?.address || customerObj?.address || '';
+  const customerPic = invoice?.customerPic || localData?.invoice?.customerPic || quotation?.pic || customerObj?.pic || customerObj?.contactPerson || '';
+  const customerPhone = invoice?.customerPhone || localData?.invoice?.customerPhone || quotation?.phone || customerObj?.phone || '';
+  const customerEmail = invoice?.customerEmail || localData?.invoice?.customerEmail || quotation?.email || customerObj?.email || '';
 
   const handleOpenAttachment = () => {
     window.open('/print/invoice-attachment', '_blank');
@@ -315,7 +317,7 @@ const PrintInvoice = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '40px', marginBottom: '36px' }}>
           <div>
             <p style={{ margin: '0 0 6px 0', fontSize: '0.65rem', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1.5px' }}>DITAGIHKAN KEPADA:</p>
-            <p style={{ margin: '0 0 4px 0', fontSize: '1.4rem', fontWeight: '900', color: '#1e293b', lineHeight: 1.1 }}>{invoice?.customerName}</p>
+            <p style={{ margin: '0 0 4px 0', fontSize: '1.4rem', fontWeight: '900', color: '#1e293b', lineHeight: 1.1 }}>{customerName}</p>
             {customerAddress && <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#475569', fontWeight: '600' }}>{customerAddress}</p>}
             {customerPic && <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: '600' }}>Attn: {customerPic}</p>}
             {customerPhone && <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: '600' }}>Telp: {customerPhone}</p>}

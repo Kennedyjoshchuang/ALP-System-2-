@@ -84,6 +84,11 @@ db.exec(`
     id TEXT PRIMARY KEY,
     joId TEXT,
     customerName TEXT,
+    customerAddress TEXT,
+    customerPic TEXT,
+    customerPhone TEXT,
+    customerEmail TEXT,
+    bankAccountId TEXT,
     amount REAL,
     subtotal REAL,
     tax REAL,
@@ -91,6 +96,9 @@ db.exec(`
     status TEXT,
     notes TEXT,
     paidDate TEXT,
+    items TEXT DEFAULT '[]',
+    extra_charges TEXT DEFAULT '[]',
+    consolidatedJOs TEXT DEFAULT '[]',
     FOREIGN KEY(joId) REFERENCES job_orders(id)
   );
 
@@ -262,6 +270,14 @@ try {
   db.prepare("ALTER TABLE invoices ADD COLUMN paidDate TEXT").run();
   console.log('Added paidDate to invoices');
 } catch (e) { /* column likely exists */ }
+
+const invoiceCols = ['customerAddress', 'customerPic', 'customerPhone', 'customerEmail', 'bankAccountId', 'items', 'extra_charges', 'consolidatedJOs'];
+for (const col of invoiceCols) {
+  try {
+    db.prepare(`ALTER TABLE invoices ADD COLUMN ${col} TEXT`).run();
+    console.log(`Added ${col} to invoices`);
+  } catch (e) { /* column likely exists */ }
+}
 
 try {
   db.prepare("ALTER TABLE receivables ADD COLUMN paidDate TEXT").run();

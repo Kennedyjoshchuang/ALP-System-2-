@@ -3,7 +3,7 @@ import DigitalSignatureController from '../components/DigitalSignatureController
 import { useApp } from '../context/AppContext';
 
 const PrintInvoiceDelivery = () => {
-  const { invoices = [], jobOrders = [], companyBankAccounts = [] } = useApp() || {};
+  const { invoices = [], jobOrders = [], companyBankAccounts = [], customers = [] } = useApp() || {};
   const [localData, setLocalData] = useState(null);
   const [sigConfig, setSigConfig] = useState({
     type: 'none',
@@ -43,7 +43,8 @@ const PrintInvoiceDelivery = () => {
   const consolidatedJOs = (contextInvoice && contextInvoice.consolidatedJOs && contextConsolidated.length > 0)
     ? contextConsolidated
     : (localData?.consolidatedJOs || []);
-  const bankAccount = contextBankAccount || localData?.bankAccount;
+  const bankAccount = contextBankAccount || (invoice?.bankAccountId ? companyBankAccounts.find(b => b.id === invoice.bankAccountId) : null) || localData?.bankAccount || (companyBankAccounts.length > 0 ? companyBankAccounts[0] : null);
+  const customerName = invoice?.customerName || localData?.invoice?.customerName || jo?.customerName || '—';
 
   if (!invoice) return (
     <div style={{ padding: '60px', textAlign: 'center', fontFamily: 'sans-serif', color: '#64748b' }}>
@@ -116,7 +117,7 @@ const PrintInvoiceDelivery = () => {
             <tbody>
               {[
                 ['Nomor Invoice', invoice?.id],
-                ['Nama Customer', invoice?.customerName],
+                ['Nama Customer', customerName],
                 ['Tanggal Invoice', fmtDate(invoice?.date)],
                 ['Nominal Tagihan', `Rp ${parseFloat(invoice?.amount || 0).toLocaleString('id-ID')}`],
                 ['Referensi JO', Array.isArray(consolidatedJOs) && consolidatedJOs.length > 0 ? consolidatedJOs.map(j => j.id).join(', ') : invoice?.joId],

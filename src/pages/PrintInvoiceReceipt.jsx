@@ -3,7 +3,7 @@ import DigitalSignatureController from '../components/DigitalSignatureController
 import { useApp } from '../context/AppContext';
 
 const PrintInvoiceReceipt = () => {
-  const { invoices = [], companyBankAccounts = [] } = useApp() || {};
+  const { invoices = [], companyBankAccounts = [], customers = [] } = useApp() || {};
   const [localData, setLocalData] = useState(null);
   const [sigConfig, setSigConfig] = useState({
     type: 'none',
@@ -35,7 +35,8 @@ const PrintInvoiceReceipt = () => {
   const contextBankAccount = contextInvoice ? companyBankAccounts.find(b => b.id === contextInvoice.bankAccountId) : null;
 
   const invoice = contextInvoice || localData?.invoice;
-  const bankAccount = contextBankAccount || localData?.bankAccount;
+  const bankAccount = contextBankAccount || (invoice?.bankAccountId ? companyBankAccounts.find(b => b.id === invoice.bankAccountId) : null) || localData?.bankAccount || (companyBankAccounts.length > 0 ? companyBankAccounts[0] : null);
+  const customerName = invoice?.customerName || localData?.invoice?.customerName || '—';
 
   if (!invoice) return <div style={{ padding: '50px', textAlign: 'center' }}>Loading Receipt Draft...</div>;
   const totalAmount = parseFloat(invoice?.amount || 0);
@@ -128,7 +129,7 @@ const PrintInvoiceReceipt = () => {
 
         <div className="receipt-row">
           <div className="receipt-label">Telah Terima Dari</div>
-          <div className="receipt-value" style={{ fontWeight: '800', fontSize: '16px' }}>{invoice?.customerName}</div>
+          <div className="receipt-value" style={{ fontWeight: '800', fontSize: '16px' }}>{customerName}</div>
         </div>
 
         <div className="receipt-row">

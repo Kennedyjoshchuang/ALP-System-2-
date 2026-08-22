@@ -1181,7 +1181,10 @@ app.get('/api/invoices', async (req, res) => {
 });
 
 app.post('/api/invoices', async (req, res) => {
-  let { id, joId, customerName, amount, subtotal, tax, extra_charges, date, status, notes, consolidatedJOs } = req.body;
+  let { 
+    id, joId, customerName, customerAddress, customerPic, customerPhone, customerEmail, bankAccountId,
+    amount, subtotal, tax, extra_charges, date, status, notes, consolidatedJOs 
+  } = req.body;
   
   try {
     // Generate sequential ID if the incoming ID is a client-side temporary ID or missing
@@ -1195,6 +1198,11 @@ app.post('/api/invoices', async (req, res) => {
     // 1. Create Invoice — try with all columns, fallback if schema is old
     const invoiceData = {
       id, joId, customerName,
+      customerAddress: customerAddress || null,
+      customerPic: customerPic || null,
+      customerPhone: customerPhone || null,
+      customerEmail: customerEmail || null,
+      bankAccountId: bankAccountId || null,
       amount: parseFloat(amount) || 0,
       subtotal: parseFloat(subtotal) || 0,
       tax: parseFloat(tax) || 0,
@@ -1218,8 +1226,12 @@ app.post('/api/invoices', async (req, res) => {
       invErr.code === '42703' || 
       invErr.code === 'PGRST204'
     )) {
-      console.warn(`[POST /invoices] Schema mismatch for ${id} (Code: ${invErr.code}). Retrying without tracking columns...`);
-      const { signedReceiptPhoto, signedInvoicePhoto, deliveryStatus, notes: _, items: _1, consolidatedJOs: _2, ...legacyData } = invoiceData;
+      console.warn(`[POST /invoices] Schema mismatch for ${id} (Code: ${invErr.code}). Retrying without extended columns...`);
+      const { 
+        signedReceiptPhoto, signedInvoicePhoto, deliveryStatus, notes: _, items: _1, consolidatedJOs: _2,
+        customerAddress: _3, customerPic: _4, customerPhone: _5, customerEmail: _6, bankAccountId: _7,
+        ...legacyData 
+      } = invoiceData;
       console.log(`[POST /invoices] Retrying with keys: ${Object.keys(legacyData).join(', ')}`);
       const { error: retryErr } = await supabase.from('invoices').insert(legacyData);
       invErr = retryErr;

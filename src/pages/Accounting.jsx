@@ -471,6 +471,7 @@ const Accounting = () => {
           customerPic: splitForm.customerPic,
           customerPhone: splitForm.customerPhone,
           customerEmail: splitForm.customerEmail,
+          bankAccountId: splitForm.bankAccountId || null,
           date: splitForm.invoiceDate,
           amount,
           subtotal,
@@ -2283,6 +2284,8 @@ const Accounting = () => {
         console.error('Failed to fetch next invoice ID:', err);
       }
 
+      const linkedCustomer = customers.find(c => c.name === (linkedJO?.customerName || ''));
+
       setInvoiceConfirmData({
         joId,
         bankAccount,
@@ -2291,10 +2294,10 @@ const Accounting = () => {
         form: {
           id: suggestedInvoiceId,
           customerName: linkedJO.customerName || '',
-          customerAddress: linkedQuo?.companyAddress || linkedJO?.address || customers.find(c => c.name === (linkedJO?.customerName || ''))?.address || '',
-          customerPic: linkedQuo?.pic || '',
-          customerPhone: linkedQuo?.phone || '',
-          customerEmail: linkedQuo?.email || '',
+          customerAddress: linkedQuo?.companyAddress || linkedJO?.address || linkedCustomer?.address || '',
+          customerPic: linkedQuo?.pic || linkedCustomer?.pic || linkedCustomer?.contactPerson || '',
+          customerPhone: linkedQuo?.phone || linkedCustomer?.phone || '',
+          customerEmail: linkedQuo?.email || linkedCustomer?.email || '',
           date: new Date().toISOString().substring(0, 10),
           items,
           extraCharges: targetJOs.reduce((acc, jo) => {
@@ -2366,6 +2369,7 @@ const Accounting = () => {
         customerPic: f.customerPic,
         customerPhone: f.customerPhone,
         customerEmail: f.customerEmail,
+        bankAccountId: f.bankAccountId,
         date: f.date,
         amount: grandTotal,
         subtotal,
@@ -2383,11 +2387,16 @@ const Accounting = () => {
       const linkedQuo = linkedJO?.quotationId
         ? quotations.find(q => String(q.id) === String(linkedJO.quotationId))
         : null;
-      const customerObj = customers.find(c => c.name === (linkedJO?.customerName || ''));
+      const customerObj = customers.find(c => c.name === (newInv.customerName || linkedJO?.customerName || ''));
       const printData = {
         invoice: {
           ...newInv,
-          customerAddress: newInv.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customerObj?.address || ''
+          customerName: newInv.customerName || f.customerName,
+          customerAddress: newInv.customerAddress || f.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customerObj?.address || '',
+          customerPic: newInv.customerPic || f.customerPic || linkedQuo?.pic || customerObj?.pic || customerObj?.contactPerson || '',
+          customerPhone: newInv.customerPhone || f.customerPhone || linkedQuo?.phone || customerObj?.phone || '',
+          customerEmail: newInv.customerEmail || f.customerEmail || linkedQuo?.email || customerObj?.email || '',
+          bankAccountId: f.bankAccountId || bank?.id,
         },
         jo: linkedJO || null,
         consolidatedJOs: linkedJOs || [],
@@ -2395,6 +2404,7 @@ const Accounting = () => {
         bankAccount: bank,
       };
       localStorage.setItem('print_invoice_data_' + newInv.id, JSON.stringify(printData));
+      localStorage.setItem('print_invoice_data', JSON.stringify(printData));
 
       setActiveTab('billing');
       setIsIssuedCollapsed(false);
@@ -2606,15 +2616,26 @@ const Accounting = () => {
       : linkedJO ? [linkedJO] : [];
 
     const customerObj = customers.find(c => c.name === (enrichedInv.customerName || ''));
-    localStorage.setItem('print_invoice_data_' + enrichedInv.id, JSON.stringify({ 
+    const bankAccount = (enrichedInv.bankAccountId)
+      ? companyBankAccounts.find(b => b.id === enrichedInv.bankAccountId)
+      : (companyBankAccounts.length > 0 ? companyBankAccounts[0] : null);
+
+    const printData = { 
       invoice: {
         ...enrichedInv,
-        customerAddress: enrichedInv.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customerObj?.address || ''
+        customerAddress: enrichedInv.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customerObj?.address || '',
+        customerPic: enrichedInv.customerPic || linkedQuo?.pic || customerObj?.pic || customerObj?.contactPerson || '',
+        customerPhone: enrichedInv.customerPhone || linkedQuo?.phone || customerObj?.phone || '',
+        customerEmail: enrichedInv.customerEmail || linkedQuo?.email || customerObj?.email || '',
+        bankAccountId: enrichedInv.bankAccountId || bankAccount?.id,
       }, 
       jo: linkedJO, 
       consolidatedJOs: consolidatedJOs,
-      quotation: linkedQuo 
-    }));
+      quotation: linkedQuo,
+      bankAccount: bankAccount
+    };
+    localStorage.setItem('print_invoice_data_' + enrichedInv.id, JSON.stringify(printData));
+    localStorage.setItem('print_invoice_data', JSON.stringify(printData));
 
     // 1. Main Invoice
     window.open('/print/invoice?id=' + enrichedInv.id, '_blank');
@@ -5739,15 +5760,25 @@ const Accounting = () => {
                                                 const linkedQuo = linkedJO ? quotations.find(q => String(q.id) === String(linkedJO.quotationId)) : null;
                                                 const consolidatedJOs = inv.consolidatedJOs ? jobOrders.filter(j => inv.consolidatedJOs.map(String).includes(String(j.id))) : linkedJO ? [linkedJO] : [];
                                                 const customerObj = customers.find(c => c.name === (inv.customerName || ''));
-                                                localStorage.setItem('print_invoice_data_' + inv.id, JSON.stringify({ 
+                                                const bankAccount = (inv.bankAccountId)
+                                                  ? companyBankAccounts.find(b => b.id === inv.bankAccountId)
+                                                  : (companyBankAccounts.length > 0 ? companyBankAccounts[0] : null);
+                                                const printPayload = { 
                                                   invoice: {
                                                     ...inv,
-                                                    customerAddress: inv.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customerObj?.address || ''
+                                                    customerAddress: inv.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customerObj?.address || '',
+                                                    customerPic: inv.customerPic || linkedQuo?.pic || customerObj?.pic || customerObj?.contactPerson || '',
+                                                    customerPhone: inv.customerPhone || linkedQuo?.phone || customerObj?.phone || '',
+                                                    customerEmail: inv.customerEmail || linkedQuo?.email || customerObj?.email || '',
+                                                    bankAccountId: inv.bankAccountId || bankAccount?.id,
                                                   }, 
                                                   jo: linkedJO, 
                                                   consolidatedJOs, 
-                                                  quotation: linkedQuo 
-                                                }));
+                                                  quotation: linkedQuo,
+                                                  bankAccount: bankAccount
+                                                };
+                                                localStorage.setItem('print_invoice_data_' + inv.id, JSON.stringify(printPayload));
+                                                localStorage.setItem('print_invoice_data', JSON.stringify(printPayload));
                                                 window.open('/print/invoice-delivery?id=' + inv.id, '_blank');
                                               }}>
                                                 <FileText size={12} /> STT
@@ -6001,15 +6032,25 @@ const Accounting = () => {
                                 ? jobOrders.filter(j => inv.consolidatedJOs.map(String).includes(String(j.id)))
                                 : linkedJO ? [linkedJO] : [];
                               const customerObj = customers.find(c => c.name === (inv.customerName || ''));
-                              localStorage.setItem('print_invoice_data_' + inv.id, JSON.stringify({ 
+                              const bankAccount = (inv.bankAccountId)
+                                ? companyBankAccounts.find(b => b.id === inv.bankAccountId)
+                                : (companyBankAccounts.length > 0 ? companyBankAccounts[0] : null);
+                              const printPayload = { 
                                 invoice: {
                                   ...inv,
-                                  customerAddress: inv.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customerObj?.address || ''
+                                  customerAddress: inv.customerAddress || linkedQuo?.companyAddress || linkedJO?.address || customerObj?.address || '',
+                                  customerPic: inv.customerPic || linkedQuo?.pic || customerObj?.pic || customerObj?.contactPerson || '',
+                                  customerPhone: inv.customerPhone || linkedQuo?.phone || customerObj?.phone || '',
+                                  customerEmail: inv.customerEmail || linkedQuo?.email || customerObj?.email || '',
+                                  bankAccountId: inv.bankAccountId || bankAccount?.id,
                                 }, 
                                 jo: linkedJO, 
                                 consolidatedJOs, 
-                                quotation: linkedQuo 
-                              }));
+                                quotation: linkedQuo,
+                                bankAccount: bankAccount
+                              };
+                              localStorage.setItem('print_invoice_data_' + inv.id, JSON.stringify(printPayload));
+                              localStorage.setItem('print_invoice_data', JSON.stringify(printPayload));
                               window.open('/print/invoice-delivery?id=' + inv.id, '_blank');
                             }}
                           >
