@@ -2462,6 +2462,7 @@ const Accounting = () => {
         tax,
         items: parsedItems,
         extra_charges: [],
+        extraDocuments: customInvoiceForm.extraDocuments || [],
         notes: notes || null
       };
 
@@ -2476,10 +2477,11 @@ const Accounting = () => {
         date: new Date().toISOString().substring(0, 10),
         taxPercent: 0,
         items: [{ description: '', qty: 1, rate: 0 }],
-        notes: ''
+        notes: '',
+        extraDocuments: []
       });
       setShowCustomInvoiceModal(false);
-      toast.error(isID ? "Invoice kustom berhasil dibuat!" : "Custom invoice created successfully!");
+      toast.success(isID ? "Invoice kustom berhasil dibuat!" : "Custom invoice created successfully!");
     } catch (err) {
       console.error("Error creating custom invoice:", err);
       toast.error("Error: " + (err.message || "Failed to create custom invoice"));

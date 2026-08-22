@@ -722,14 +722,6 @@ export const AppProvider = ({ children }) => {
       ? invoiceData.consolidatedJOs
       : invoiceData.joId ? [invoiceData.joId] : [];
 
-    // Verify that all consolidated JOs have shipmentStatus === 'done'
-    for (const id of consolidatedJOs) {
-      const targetJo = jobOrders.find(j => String(j.id) === String(id));
-      if (targetJo && targetJo.shipmentStatus !== 'done') {
-        throw new Error(`Job Order ${id} shipment status must be marked as Done before generating an invoice.`);
-      }
-    }
-
     const items = invoiceData.items || [];
     const newInvoice = {
       id: newInvoiceId,
