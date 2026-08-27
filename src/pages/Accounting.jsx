@@ -825,7 +825,7 @@ const Accounting = () => {
   };
 
   const getAggregatedContainers = (associatedJOs, invoice = null) => {
-    const counts = {};
+    const containerSet = new Set();
     
     // 1. Try to get container numbers from invoice.items
     if (invoice && Array.isArray(invoice.items) && invoice.items.length > 0) {
@@ -834,11 +834,11 @@ const Accounting = () => {
         if (Array.isArray(cNo)) {
           cNo.filter(Boolean).forEach(num => {
             const clean = String(num).trim();
-            if (clean) counts[clean] = (counts[clean] || 0) + 1;
+            if (clean) containerSet.add(clean);
           });
         } else if (cNo && String(cNo).trim()) {
           const clean = String(cNo).trim();
-          counts[clean] = (counts[clean] || 0) + 1;
+          if (clean) containerSet.add(clean);
         }
       });
     }
@@ -872,15 +872,13 @@ const Accounting = () => {
         list.forEach(num => {
           const clean = String(num).trim();
           if (clean) {
-            counts[clean] = (counts[clean] || 0) + 1;
+            containerSet.add(clean);
           }
         });
       });
     }
 
-    return Object.entries(counts).map(([num, count]) => {
-      return count > 1 ? `${num} (${count}x)` : num;
-    });
+    return Array.from(containerSet);
   };
 
   const canWrite = hasAccess ? hasAccess('accounting', true) : false;
