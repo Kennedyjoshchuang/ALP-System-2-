@@ -4,7 +4,7 @@ import { useConfirm } from '../context/ConfirmContext';
 import React, { useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { CreditCard, Download, Receipt, Wallet, CheckCircle, Plus, X, XCircle, DollarSign, Search, FileSpreadsheet, RotateCcw, Edit3, Save, Image, ChevronDown, ChevronUp, User, Briefcase, Banknote, Calendar, FileText, Trash2, Settings, ExternalLink, ShieldCheck, ShieldAlert, GitMerge } from 'lucide-react';
+import { CreditCard, Download, Receipt, Wallet, CheckCircle, Check, Plus, X, XCircle, DollarSign, Search, FileSpreadsheet, RotateCcw, Edit3, Save, Image, ChevronDown, ChevronUp, User, Briefcase, Banknote, Calendar, FileText, Trash2, Settings, ExternalLink, ShieldCheck, ShieldAlert, GitMerge } from 'lucide-react';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
 import ExtraDocsUploader from '../components/ExtraDocsUploader';
@@ -151,6 +151,12 @@ const Accounting = () => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [costModal, setCostModal] = useState(null); // holds the JO being costed
   const [costLines, setCostLines] = useState([{ vendorId: '', serviceIdx: '', qty: 1, customVendorName: '', customServiceDescription: '', customPrice: '', targetItemIdx: '' }]);
+  const [editingManualCostIdx, setEditingManualCostIdx] = useState(null);
+  const [editingManualCostForm, setEditingManualCostForm] = useState({ serviceDescription: '', unitPrice: '', qty: 1, total: 0 });
+  const [editingCostAppId, setEditingCostAppId] = useState(null);
+  const [editingCostAppForm, setEditingCostAppForm] = useState({ amount: '' });
+  const [editingPOId, setEditingPOId] = useState(null);
+  const [editingPOForm, setEditingPOForm] = useState({ amount: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [joSortBy, setJoSortBy] = useState('created_desc');
   const [invoiceSortBy, setInvoiceSortBy] = useState('inv_no_desc');
@@ -1253,6 +1259,26 @@ const Accounting = () => {
       toast.error('Gagal mengubah status: ' + err.message);
     }
   };
+  const getPOCostForJO = (jo, po) => {
+    if (!jo || !po) return 0;
+    let overrides = jo.poCostOverrides;
+    if (typeof overrides === 'string') {
+      try { overrides = JSON.parse(overrides); } catch (e) { overrides = null; }
+    }
+    if (overrides && overrides[po.id] !== undefined && overrides[po.id] !== null && overrides[po.id] !== '') {
+      return parseFloat(overrides[po.id]) || 0;
+    }
+    return parseFloat(po.grandTotal || po.amount || 0);
+  };
+
+  const isPOCostOverridden = (jo, po) => {
+    if (!jo || !po) return false;
+    let overrides = jo.poCostOverrides;
+    if (typeof overrides === 'string') {
+      try { overrides = JSON.parse(overrides); } catch (e) { overrides = null; }
+    }
+    return overrides && overrides[po.id] !== undefined && overrides[po.id] !== null && overrides[po.id] !== '';
+  };
 
   const poMap = React.useMemo(() => {
     const map = {};
@@ -1352,7 +1378,7 @@ const Accounting = () => {
   const plFinancials = React.useMemo(() => {
     return activeJOs.reduce((acc, j) => {
       const manualCost = Array.isArray(j.costs) ? j.costs.reduce((a, c) => a + parseFloat(c.total || 0), 0) : 0;
-      const poCost = (poMap[j.id] || []).reduce((a, p) => a + parseFloat(p.grandTotal || 0), 0);
+      const poCost = (poMap[j.id] || []).reduce((a, p) => a + getPOCostForJO(j, p), 0);
       const costAppCost = (costAppMap[String(j.id)] || [])
         .filter(ca => ca.status !== 'rejected')
         .reduce((a, ca) => a + (parseFloat(ca.amount) || 0), 0);
@@ -1432,7 +1458,7 @@ const Accounting = () => {
 
       group.jobOrders.forEach(jo => {
         const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + parseFloat(c.total || 0), 0) : 0;
-        const poCost = (poMap[jo.id] || []).reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
+        const poCost = (poMap[jo.id] || []).reduce((s, p) => s + getPOCostForJO(jo, p), 0);
         const costAppCost = (costAppMap[String(jo.id)] || [])
           .filter(ca => ca.status !== 'rejected')
           .reduce((a, ca) => a + (parseFloat(ca.amount) || 0), 0);
@@ -1643,7 +1669,7 @@ const Accounting = () => {
     if (activeTab === 'costing') {
       dataToExport = activeJOs.map(jo => {
         const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s,c)=>s+(c.total||0),0) : 0;
-        const poCost = (purchaseOrders || []).filter(po => po.joId === jo.id).reduce((s,p)=>s+(p.grandTotal||0),0);
+        const poCost = (purchaseOrders || []).filter(po => po.joId === jo.id).reduce((s,p)=>s + getPOCostForJO(jo, p), 0);
         const costAppCost = (costAppMap[String(jo.id)] || [])
           .filter(ca => ca.status !== 'rejected')
           .reduce((s, ca) => s + (parseFloat(ca.amount) || 0), 0);
@@ -1891,6 +1917,152 @@ const Accounting = () => {
     const updatedCosts = jo.costs.filter((_, i) => i !== costIdx);
     await updateJOStatus(jo.id, { costs: updatedCosts });
     setCostModal(prev => prev ? { ...prev, costs: updatedCosts } : null);
+  };
+
+  const handleStartEditManualCost = (c, ci) => {
+    setEditingManualCostIdx(ci);
+    const qty = parseFloat(c.qty) || 1;
+    const total = parseFloat(c.total || 0);
+    const unitPrice = c.unitPrice !== undefined && c.unitPrice !== null && c.unitPrice !== '' 
+      ? parseFloat(c.unitPrice) 
+      : (qty > 0 ? total / qty : total);
+    setEditingManualCostForm({
+      serviceDescription: c.serviceDescription || c.customServiceDescription || '',
+      unitPrice: unitPrice,
+      qty: qty,
+      total: total
+    });
+  };
+
+  const handleSaveEditManualCost = async (jo, costIdx) => {
+    if (!canWrite || !jo) return;
+    const qty = parseFloat(editingManualCostForm.qty) || 1;
+    const unitPrice = parseFloat(editingManualCostForm.unitPrice) || 0;
+    const total = unitPrice * qty;
+
+    const existingCosts = Array.isArray(jo.costs) ? [...jo.costs] : [];
+    if (!existingCosts[costIdx]) return;
+
+    existingCosts[costIdx] = {
+      ...existingCosts[costIdx],
+      serviceDescription: editingManualCostForm.serviceDescription || existingCosts[costIdx].serviceDescription,
+      unitPrice: unitPrice,
+      qty: qty,
+      total: total
+    };
+
+    try {
+      await updateJOStatus(jo.id, { costs: existingCosts });
+      setCostModal(prev => prev ? { ...prev, costs: existingCosts } : null);
+      setEditingManualCostIdx(null);
+      toast.success(isID ? "Biaya manual berhasil diperbarui" : "Manual cost successfully updated");
+    } catch (err) {
+      toast.error((isID ? "Gagal memperbarui biaya manual: " : "Failed to update manual cost: ") + err.message);
+    }
+  };
+
+  const handleStartEditCostApp = (ca) => {
+    setEditingCostAppId(ca.id);
+    setEditingCostAppForm({ amount: parseFloat(ca.amount || 0) });
+  };
+
+  const handleSaveEditCostApp = async (ca) => {
+    if (!canWrite || !ca) return;
+    const newAmount = parseFloat(editingCostAppForm.amount) || 0;
+    const targetId = ca.rawRecord?.id || ca.id;
+
+    try {
+      let parsed = {};
+      const rawDesc = ca.rawDescription || (ca.rawRecord && ca.rawRecord.description) || ca.description || '';
+      if (typeof rawDesc === 'string' && rawDesc.startsWith('{')) {
+        try { parsed = JSON.parse(rawDesc); } catch (e) {}
+      }
+
+      let updatedItems = parsed.items;
+      if (Array.isArray(updatedItems) && updatedItems.length > 0) {
+        if (updatedItems.length === 1) {
+          updatedItems = [{ ...updatedItems[0], amount: newAmount }];
+        } else {
+          const oldSum = updatedItems.reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+          if (oldSum > 0) {
+            updatedItems = updatedItems.map(it => ({
+              ...it,
+              amount: ((parseFloat(it.amount) || 0) / oldSum) * newAmount
+            }));
+          } else {
+            updatedItems = [{ ...updatedItems[0], amount: newAmount }];
+          }
+        }
+      } else {
+        updatedItems = [{ details: ca.notes || 'Biaya Operasional', amount: newAmount }];
+      }
+
+      const updatedDescription = JSON.stringify({
+        ...parsed,
+        amount: newAmount,
+        items: updatedItems
+      });
+
+      await updateOtherExpense(targetId, {
+        ...(ca.rawRecord || {}),
+        amount: newAmount,
+        totalAfterTax: newAmount,
+        description: updatedDescription
+      });
+
+      setEditingCostAppId(null);
+      toast.success(isID ? `Nominal pengajuan ${ca.id || targetId} berhasil diperbarui` : `Cost application ${ca.id || targetId} amount updated`);
+    } catch (err) {
+      toast.error((isID ? "Gagal memperbarui nominal pengajuan: " : "Failed to update cost application: ") + err.message);
+    }
+  };
+
+  const handleStartEditPOCost = (jo, po) => {
+    setEditingPOId(po.id);
+    setEditingPOForm({ amount: getPOCostForJO(jo, po) });
+  };
+
+  const handleSaveEditPOCost = async (jo, poId) => {
+    if (!canWrite || !jo) return;
+    const newAmount = parseFloat(editingPOForm.amount) || 0;
+
+    let existingOverrides = jo.poCostOverrides;
+    if (typeof existingOverrides === 'string') {
+      try { existingOverrides = JSON.parse(existingOverrides); } catch (e) { existingOverrides = {}; }
+    } else {
+      existingOverrides = existingOverrides ? { ...existingOverrides } : {};
+    }
+
+    existingOverrides[poId] = newAmount;
+
+    try {
+      await updateJOStatus(jo.id, { poCostOverrides: existingOverrides });
+      setCostModal(prev => prev ? { ...prev, poCostOverrides: existingOverrides } : null);
+      setEditingPOId(null);
+      toast.success(isID ? `Nominal biaya PO untuk JO ${jo.id} berhasil disesuaikan` : `PO cost for JO ${jo.id} successfully overridden`);
+    } catch (err) {
+      toast.error((isID ? "Gagal menyesuaikan nominal PO: " : "Failed to override PO cost: ") + err.message);
+    }
+  };
+
+  const handleResetPOCost = async (jo, poId) => {
+    if (!canWrite || !jo) return;
+    let existingOverrides = jo.poCostOverrides;
+    if (typeof existingOverrides === 'string') {
+      try { existingOverrides = JSON.parse(existingOverrides); } catch (e) { existingOverrides = {}; }
+    } else {
+      existingOverrides = existingOverrides ? { ...existingOverrides } : {};
+    }
+
+    delete existingOverrides[poId];
+
+    try {
+      await updateJOStatus(jo.id, { poCostOverrides: existingOverrides });
+      setCostModal(prev => prev ? { ...prev, poCostOverrides: existingOverrides } : null);
+      toast.success(isID ? `Nominal biaya PO dikembalikan ke semula` : `PO cost returned to default`);
+    } catch (err) {
+      toast.error((isID ? "Gagal mengembalikan nominal PO: " : "Failed to reset PO cost: ") + err.message);
+    }
   };
 
   const handleDeletePOFromModal = async (po) => {
@@ -4117,7 +4289,7 @@ const Accounting = () => {
       {costModal && (
         <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px' }}>
           <div className="glass-card" style={{ width:'100%',maxWidth:'700px',padding:'35px',maxHeight:'90vh',overflowY:'auto',position:'relative' }}>
-            <button onClick={() => { setCostModal(null); setCostLines([{vendorId:'',serviceIdx:'',qty:1,customVendorName:'',customServiceDescription:'',customPrice:'',targetItemIdx:''}]); }} style={{ position:'absolute',top:'15px',right:'15px',background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer' }}><X size={20}/></button>
+            <button onClick={() => { setCostModal(null); setCostLines([{vendorId:'',serviceIdx:'',qty:1,customVendorName:'',customServiceDescription:'',customPrice:'',targetItemIdx:''}]); setEditingManualCostIdx(null); setEditingCostAppId(null); setEditingPOId(null); }} style={{ position:'absolute',top:'15px',right:'15px',background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer' }}><X size={20}/></button>
             <h3 style={{ color:'var(--secondary)',marginBottom:'8px',fontSize:'1.3rem' }}>{isID ? 'Input Biaya' : 'Input Cost'} — {costModal.id}</h3>
             <p style={{ color:'var(--text-muted)',fontSize:'0.85rem',marginBottom:'25px' }}>{isID ? 'Pelanggan:' : 'Customer:'} <strong style={{color:'var(--text)'}}>{costModal.customerName}</strong></p>
 
@@ -4131,7 +4303,7 @@ const Accounting = () => {
               if (!hasRecordedCosts) return null;
 
               const manualTotal = manualCostsList.reduce((s, c) => s + parseFloat(c.total || 0), 0);
-              const poTotal = poCostsList.reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
+              const poTotal = poCostsList.reduce((s, p) => s + getPOCostForJO(costModal, p), 0);
               const costAppTotal = costAppsList.filter(ca => ca.status !== 'rejected').reduce((s, ca) => s + parseFloat(ca.amount || 0), 0);
               const grandTotal = manualTotal + poTotal + costAppTotal;
 
@@ -4149,57 +4321,293 @@ const Accounting = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {manualCostsList.map((c, ci) => (
-                        <tr key={`mc-${ci}`} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                          <td className="word-wrap-cell" style={{padding:'8px',color:'var(--text-muted)'}}>{c.vendorName || c.customVendorName || (isID ? 'Vendor Kustom' : 'Custom Vendor')}</td>
-                          <td className="word-wrap-cell" style={{padding:'8px'}}>{c.serviceDescription || c.customServiceDescription || '—'}</td>
-                          <td style={{padding:'8px',textAlign:'center'}}><span style={{ fontSize: '0.62rem', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px solid rgba(212, 175, 55, 0.25)', padding: '2px 6px', borderRadius: '4px' }}>Manual</span></td>
-                          <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color:'var(--secondary)'}}>Rp {(c.total||0).toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
-                          <td style={{padding:'8px',textAlign:'right'}}>
-                            {canWrite && (
-                              <button className="btn btn-sm btn-danger" style={{ padding: '4px 8px', fontSize: '0.72rem' }} onClick={() => handleDeleteCost(costModal, ci)}>
-                                {isID ? 'Hapus' : 'Delete'}
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                      {poCostsList.map((p, pi) => (
-                        <tr key={`po-${pi}`} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                          <td className="word-wrap-cell" style={{padding:'8px',color:'var(--text-muted)'}}>{p.vendorName || 'PO Vendor'}</td>
-                          <td className="word-wrap-cell" style={{padding:'8px'}}>{p.items?.map(i => i.serviceDescription).join(', ') || (isID ? 'Layanan PO' : 'PO Services')}</td>
-                          <td style={{padding:'8px',textAlign:'center'}}><span style={{ fontSize: '0.62rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '2px 6px', borderRadius: '4px' }}>PO: {p.poNumber || p.id}</span></td>
-                          <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color:'#3b82f6'}}>Rp {(p.grandTotal||0).toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
-                          <td style={{padding:'8px',textAlign:'right'}}>
-                            {canWrite && (
-                              <div style={{ display: 'flex', gap: '5px', justifyContent: 'flex-end' }}>
-                                <button 
-                                  className="btn btn-sm" 
-                                  style={{ padding: '4px 8px', fontSize: '0.72rem', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--warning)', border: '1px solid rgba(245, 158, 11, 0.3)' }}
-                                  onClick={() => handleUnlinkPOFromModal(p)}
-                                  title={isID ? "Lepas kaitan dari JO ini (PO tetap ada di Hutang)" : "Unlink from this JO (PO remains in Payables)"}
-                                >
-                                  {isID ? 'Lepas' : 'Unlink'}
-                                </button>
-                                <button 
-                                  className="btn btn-sm btn-danger" 
-                                  style={{ padding: '4px 8px', fontSize: '0.72rem' }}
-                                  onClick={() => handleDeletePOFromModal(p)}
-                                  title={isID ? "Hapus PO permanen dari sistem" : "Delete PO permanently"}
-                                >
-                                  {isID ? 'Hapus' : 'Delete'}
-                                </button>
+                      {manualCostsList.map((c, ci) => {
+                        const isEditingThis = editingManualCostIdx === ci;
+                        if (isEditingThis) {
+                          const currentQty = parseFloat(editingManualCostForm.qty) || 0;
+                          const currentPrice = parseFloat(editingManualCostForm.unitPrice) || 0;
+                          const currentTotal = currentQty * currentPrice;
+
+                          return (
+                            <tr key={`mc-${ci}`} style={{ borderBottom:'1px solid rgba(255,255,255,0.08)', background: 'rgba(212, 175, 55, 0.05)' }}>
+                              <td className="word-wrap-cell" style={{padding:'8px',color:'var(--text-muted)'}}>
+                                <div>{c.vendorName || c.customVendorName || (isID ? 'Vendor Kustom' : 'Custom Vendor')}</div>
+                                <span style={{ fontSize: '0.62rem', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px solid rgba(212, 175, 55, 0.25)', padding: '2px 6px', borderRadius: '4px' }}>Manual</span>
+                              </td>
+                              <td style={{padding:'8px'}}>
+                                <input 
+                                  type="text" 
+                                  value={editingManualCostForm.serviceDescription} 
+                                  onChange={e => setEditingManualCostForm(prev => ({ ...prev, serviceDescription: e.target.value }))}
+                                  placeholder={isID ? "Deskripsi Layanan" : "Service Description"}
+                                  style={{ width: '100%', padding: '6px 8px', fontSize: '0.78rem', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--glass-border)', borderRadius: '4px', color: 'var(--text)' }}
+                                />
+                                <div style={{ display: 'flex', gap: '8px', marginTop: '6px', alignItems: 'center' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Qty:</span>
+                                    <input 
+                                      type="number" 
+                                      min="1"
+                                      step="any"
+                                      value={editingManualCostForm.qty} 
+                                      onChange={e => {
+                                        const q = e.target.value;
+                                        setEditingManualCostForm(prev => ({ ...prev, qty: q }));
+                                      }}
+                                      style={{ width: '60px', padding: '4px 6px', fontSize: '0.78rem', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--glass-border)', borderRadius: '4px', color: 'var(--text)' }}
+                                    />
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{isID ? 'Harga:' : 'Price:'}</span>
+                                    <FormattedNumberInput
+                                      value={editingManualCostForm.unitPrice}
+                                      onChange={e => {
+                                        setEditingManualCostForm(prev => ({ ...prev, unitPrice: e.target.value }));
+                                      }}
+                                      placeholder="Rp 0"
+                                      style={{ width: '100%', padding: '4px 6px', fontSize: '0.78rem', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--glass-border)', borderRadius: '4px', color: 'var(--text)' }}
+                                    />
+                                  </div>
+                                </div>
+                              </td>
+                              <td style={{padding:'8px',textAlign:'center'}}>
+                                <span style={{ fontSize: '0.62rem', background: 'rgba(212, 175, 55, 0.15)', color: 'var(--secondary)', border: '1px solid rgba(212, 175, 55, 0.3)', padding: '2px 6px', borderRadius: '4px' }}>{isID ? 'Mengubah' : 'Editing'}</span>
+                              </td>
+                              <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color:'var(--secondary)'}}>
+                                Rp {currentTotal.toLocaleString(isID ? 'id-ID' : 'en-US')}
+                              </td>
+                              <td style={{padding:'8px',textAlign:'right'}}>
+                                <div style={{ display: 'flex', gap: '5px', justifyContent: 'flex-end' }}>
+                                  <button 
+                                    className="btn btn-sm btn-gold" 
+                                    style={{ padding: '4px 8px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
+                                    onClick={() => handleSaveEditManualCost(costModal, ci)}
+                                    title={isID ? "Simpan Perubahan" : "Save Changes"}
+                                  >
+                                    <Check size={12} /> {isID ? 'Simpan' : 'Save'}
+                                  </button>
+                                  <button 
+                                    className="btn btn-sm" 
+                                    style={{ padding: '4px 8px', fontSize: '0.72rem', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid var(--border)' }} 
+                                    onClick={() => setEditingManualCostIdx(null)}
+                                    title={isID ? "Batal" : "Cancel"}
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return (
+                          <tr key={`mc-${ci}`} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                            <td className="word-wrap-cell" style={{padding:'8px',color:'var(--text-muted)'}}>{c.vendorName || c.customVendorName || (isID ? 'Vendor Kustom' : 'Custom Vendor')}</td>
+                            <td className="word-wrap-cell" style={{padding:'8px'}}>
+                              <div>{c.serviceDescription || c.customServiceDescription || '—'}</div>
+                              {c.qty > 1 && (
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                  {c.qty} x Rp {parseFloat(c.unitPrice || (c.total / c.qty) || 0).toLocaleString()}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{padding:'8px',textAlign:'center'}}><span style={{ fontSize: '0.62rem', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px solid rgba(212, 175, 55, 0.25)', padding: '2px 6px', borderRadius: '4px' }}>Manual</span></td>
+                            <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color:'var(--secondary)'}}>Rp {(c.total||0).toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
+                            <td style={{padding:'8px',textAlign:'right'}}>
+                              {canWrite && (
+                                <div style={{ display: 'flex', gap: '5px', justifyContent: 'flex-end' }}>
+                                  <button 
+                                    className="btn btn-sm" 
+                                    style={{ padding: '4px 8px', fontSize: '0.72rem', background: 'rgba(212, 175, 55, 0.1)', color: 'var(--secondary)', border: '1px solid rgba(212, 175, 55, 0.25)' }} 
+                                    onClick={() => handleStartEditManualCost(c, ci)}
+                                    title={isID ? "Ubah Biaya Manual" : "Edit Manual Cost"}
+                                  >
+                                    <Edit3 size={12} /> {isID ? 'Ubah' : 'Edit'}
+                                  </button>
+                                  <button className="btn btn-sm btn-danger" style={{ padding: '4px 8px', fontSize: '0.72rem' }} onClick={() => handleDeleteCost(costModal, ci)}>
+                                    {isID ? 'Hapus' : 'Delete'}
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {poCostsList.map((p, pi) => {
+                        const isOverridden = isPOCostOverridden(costModal, p);
+                        const poAmount = getPOCostForJO(costModal, p);
+                        const isEditingThisPO = editingPOId === p.id;
+
+                        if (isEditingThisPO) {
+                          return (
+                            <tr key={`po-${pi}`} style={{ borderBottom:'1px solid rgba(255,255,255,0.08)', background: 'rgba(59, 130, 246, 0.05)' }}>
+                              <td className="word-wrap-cell" style={{padding:'8px',color:'var(--text-muted)'}}>
+                                <div>{p.vendorName || 'PO Vendor'}</div>
+                                <span style={{ fontSize: '0.62rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '2px 6px', borderRadius: '4px' }}>PO: {p.poNumber || p.id}</span>
+                              </td>
+                              <td className="word-wrap-cell" style={{padding:'8px'}}>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>{p.items?.map(i => i.serviceDescription).join(', ') || (isID ? 'Layanan PO' : 'PO Services')}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{isID ? 'Nominal Khusus JO:' : 'Custom JO Nominal:'}</span>
+                                  <FormattedNumberInput
+                                    value={editingPOForm.amount}
+                                    onChange={e => setEditingPOForm({ amount: e.target.value })}
+                                    placeholder="Rp 0"
+                                    style={{ width: '140px', padding: '4px 6px', fontSize: '0.78rem', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--glass-border)', borderRadius: '4px', color: 'var(--text)' }}
+                                  />
+                                </div>
+                              </td>
+                              <td style={{padding:'8px',textAlign:'center'}}>
+                                <span style={{ fontSize: '0.62rem', background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '2px 6px', borderRadius: '4px' }}>{isID ? 'Mengubah' : 'Editing'}</span>
+                              </td>
+                              <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color:'#3b82f6'}}>
+                                Rp {(parseFloat(editingPOForm.amount) || 0).toLocaleString(isID ? 'id-ID' : 'en-US')}
+                              </td>
+                              <td style={{padding:'8px',textAlign:'right'}}>
+                                <div style={{ display: 'flex', gap: '5px', justifyContent: 'flex-end' }}>
+                                  <button 
+                                    className="btn btn-sm btn-gold" 
+                                    style={{ padding: '4px 8px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
+                                    onClick={() => handleSaveEditPOCost(costModal, p.id)}
+                                    title={isID ? "Simpan Perubahan Nominal PO" : "Save PO Nominal"}
+                                  >
+                                    <Check size={12} /> {isID ? 'Simpan' : 'Save'}
+                                  </button>
+                                  <button 
+                                    className="btn btn-sm" 
+                                    style={{ padding: '4px 8px', fontSize: '0.72rem', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid var(--border)' }} 
+                                    onClick={() => setEditingPOId(null)}
+                                    title={isID ? "Batal" : "Cancel"}
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return (
+                          <tr key={`po-${pi}`} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                            <td className="word-wrap-cell" style={{padding:'8px',color:'var(--text-muted)'}}>{p.vendorName || 'PO Vendor'}</td>
+                            <td className="word-wrap-cell" style={{padding:'8px'}}>
+                              <div>{p.items?.map(i => i.serviceDescription).join(', ') || (isID ? 'Layanan PO' : 'PO Services')}</div>
+                              {isOverridden && (
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                  {isID ? 'Asli PO:' : 'Original PO:'} Rp {(parseFloat(p.grandTotal || p.amount || 0)).toLocaleString()}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{padding:'8px',textAlign:'center'}}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.62rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '2px 6px', borderRadius: '4px' }}>PO: {p.poNumber || p.id}</span>
+                                {isOverridden && (
+                                  <span style={{ fontSize: '0.58rem', background: 'rgba(234, 179, 8, 0.15)', color: '#eab308', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '1px 4px', borderRadius: '3px' }}>
+                                    {isID ? 'Disesuaikan' : 'Overridden'}
+                                  </span>
+                                )}
                               </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color:'#3b82f6'}}>Rp {poAmount.toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
+                            <td style={{padding:'8px',textAlign:'right'}}>
+                              {canWrite && (
+                                <div style={{ display: 'flex', gap: '5px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                  <button 
+                                    className="btn btn-sm" 
+                                    style={{ padding: '4px 8px', fontSize: '0.72rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)' }} 
+                                    onClick={() => handleStartEditPOCost(costModal, p)}
+                                    title={isID ? "Sesuaikan nominal biaya PO untuk JO ini" : "Override PO cost nominal for this JO"}
+                                  >
+                                    <Edit3 size={12} /> {isID ? 'Ubah' : 'Edit'}
+                                  </button>
+                                  {isOverridden && (
+                                    <button 
+                                      className="btn btn-sm" 
+                                      style={{ padding: '4px 8px', fontSize: '0.72rem', background: 'rgba(234, 179, 8, 0.1)', color: '#eab308', border: '1px solid rgba(234, 179, 8, 0.3)', display: 'inline-flex', alignItems: 'center', gap: '3px' }} 
+                                      onClick={() => handleResetPOCost(costModal, p.id)}
+                                      title={isID ? "Kembalikan nominal ke nilai asli PO" : "Reset cost to original PO amount"}
+                                    >
+                                      <RotateCcw size={12} /> {isID ? 'Semula' : 'Reset'}
+                                    </button>
+                                  )}
+                                  <button 
+                                    className="btn btn-sm" 
+                                    style={{ padding: '4px 8px', fontSize: '0.72rem', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--warning)', border: '1px solid rgba(245, 158, 11, 0.3)' }}
+                                    onClick={() => handleUnlinkPOFromModal(p)}
+                                    title={isID ? "Lepas kaitan dari JO ini (PO tetap ada di Hutang)" : "Unlink from this JO (PO remains in Payables)"}
+                                  >
+                                    {isID ? 'Lepas' : 'Unlink'}
+                                  </button>
+                                  <button 
+                                    className="btn btn-sm btn-danger" 
+                                    style={{ padding: '4px 8px', fontSize: '0.72rem' }}
+                                    onClick={() => handleDeletePOFromModal(p)}
+                                    title={isID ? "Hapus PO permanen dari sistem" : "Delete PO permanently"}
+                                  >
+                                    {isID ? 'Hapus' : 'Delete'}
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                       {costAppsList.map((ca, cai) => {
                         const caStatus = ca.status || 'pending';
                         const statusBg = caStatus === 'paid' || caStatus === 'released' ? 'rgba(34, 197, 94, 0.1)' : caStatus === 'approved' ? 'rgba(59, 130, 246, 0.1)' : caStatus === 'rejected' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)';
                         const statusColor = caStatus === 'paid' || caStatus === 'released' ? '#22c55e' : caStatus === 'approved' ? '#3b82f6' : caStatus === 'rejected' ? '#ef4444' : '#f59e0b';
                         const statusLabel = caStatus === 'paid' || caStatus === 'released' ? (isID ? 'Cair' : 'Released') : caStatus === 'approved' ? (isID ? 'Disetujui' : 'Approved') : caStatus === 'rejected' ? (isID ? 'Ditolak' : 'Rejected') : (isID ? 'Menunggu' : 'Pending');
                         const itemDesc = Array.isArray(ca.items) ? ca.items.map(it => it.details).filter(Boolean).join(', ') : (ca.notes || '—');
+                        const isEditingThisCA = editingCostAppId === ca.id;
+
+                        if (isEditingThisCA) {
+                          return (
+                            <tr key={`ca-${cai}`} style={{ borderBottom:'1px solid rgba(255,255,255,0.08)', background: 'rgba(168, 85, 247, 0.05)' }}>
+                              <td className="word-wrap-cell" style={{padding:'8px',color:'var(--text-muted)'}}>
+                                <div>{ca.employeeName || ca.requestedBy || (isID ? 'Pengajuan Biaya' : 'Cost App')}</div>
+                                <span style={{ fontSize: '0.62rem', background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7', border: '1px solid rgba(168, 85, 247, 0.25)', padding: '2px 6px', borderRadius: '4px' }}>Cost App: {ca.id}</span>
+                              </td>
+                              <td className="word-wrap-cell" style={{padding:'8px'}}>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>{itemDesc}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{isID ? 'Nominal Baru:' : 'New Amount:'}</span>
+                                  <FormattedNumberInput
+                                    value={editingCostAppForm.amount}
+                                    onChange={e => setEditingCostAppForm({ amount: e.target.value })}
+                                    placeholder="Rp 0"
+                                    style={{ width: '140px', padding: '4px 6px', fontSize: '0.78rem', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--glass-border)', borderRadius: '4px', color: 'var(--text)' }}
+                                  />
+                                </div>
+                              </td>
+                              <td style={{padding:'8px',textAlign:'center'}}>
+                                <span style={{ fontSize: '0.62rem', background: 'rgba(168, 85, 247, 0.15)', color: '#a855f7', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2px 6px', borderRadius: '4px' }}>{isID ? 'Mengubah' : 'Editing'}</span>
+                              </td>
+                              <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color:'#a855f7'}}>
+                                Rp {(parseFloat(editingCostAppForm.amount) || 0).toLocaleString(isID ? 'id-ID' : 'en-US')}
+                              </td>
+                              <td style={{padding:'8px',textAlign:'right'}}>
+                                <div style={{ display: 'flex', gap: '5px', justifyContent: 'flex-end' }}>
+                                  <button 
+                                    className="btn btn-sm btn-gold" 
+                                    style={{ padding: '4px 8px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
+                                    onClick={() => handleSaveEditCostApp(ca)}
+                                    title={isID ? "Simpan Perubahan Nominal" : "Save Nominal"}
+                                  >
+                                    <Check size={12} /> {isID ? 'Simpan' : 'Save'}
+                                  </button>
+                                  <button 
+                                    className="btn btn-sm" 
+                                    style={{ padding: '4px 8px', fontSize: '0.72rem', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid var(--border)' }} 
+                                    onClick={() => setEditingCostAppId(null)}
+                                    title={isID ? "Batal" : "Cancel"}
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
 
                         return (
                           <tr key={`ca-${cai}`} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
@@ -4214,11 +4622,19 @@ const Accounting = () => {
                             <td style={{padding:'8px',textAlign:'right',fontWeight:'700',color: caStatus === 'rejected' ? 'var(--text-muted)' : '#a855f7', textDecoration: caStatus === 'rejected' ? 'line-through' : 'none'}}>Rp {(ca.amount||0).toLocaleString(isID ? 'id-ID' : 'en-US')}</td>
                             <td style={{padding:'8px',textAlign:'right'}}>
                               {canWrite && (
-                                <div style={{ display: 'flex', gap: '5px', justifyContent: 'flex-end' }}>
+                                <div style={{ display: 'flex', gap: '5px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                  <button 
+                                    className="btn btn-sm" 
+                                    style={{ padding: '4px 8px', fontSize: '0.72rem', background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7', border: '1px solid rgba(168, 85, 247, 0.25)' }} 
+                                    onClick={() => handleStartEditCostApp(ca)}
+                                    title={isID ? "Ubah nominal pengajuan biaya" : "Edit cost application amount"}
+                                  >
+                                    <Edit3 size={12} /> {isID ? 'Ubah' : 'Edit'}
+                                  </button>
                                   {caStatus !== 'rejected' && (
                                     <button 
                                       className="btn btn-sm" 
-                                      style={{ padding: '4px 8px', fontSize: '0.72rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', border: '1px solid rgba(239, 68, 68, 0.3)' }}
+                                      style={{ padding: '4px 8px', fontSize: '0.72rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', border: '1px solid rgba(239, 68, 68, 0.3)' }} 
                                       onClick={() => handleRejectCostAppFromModal(ca)}
                                       title={isID ? "Tolak pengajuan biaya (tidak dihitung dalam Laba/Rugi)" : "Reject cost application (excluded from P&L)"}
                                     >
@@ -4657,7 +5073,7 @@ const Accounting = () => {
 
                     if (hasItems) {
                       const manualCostTotal = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + parseFloat(c.total || 0), 0) : 0;
-                      const poCostTotal = (poMap[jo.id] || []).reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
+                      const poCostTotal = (poMap[jo.id] || []).reduce((s, p) => s + getPOCostForJO(jo, p), 0);
                       const costAppTotal = (costAppMap[String(jo.id)] || []).filter(ca => ca.status !== 'rejected').reduce((s, ca) => s + (parseFloat(ca.amount) || 0), 0);
                       const totalCost = manualCostTotal + poCostTotal + costAppTotal;
 
@@ -4883,15 +5299,22 @@ const Accounting = () => {
                                               <tr key={`po-${pIdx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.78rem' }}>
                                                 <td style={{ padding: '8px 0', fontWeight: '500' }}>
                                                   <div>{p.vendorName || (isID ? 'Vendor PO' : 'PO Vendor')}</div>
-                                                  <span style={{ fontSize: '0.58rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '1px 4px', borderRadius: '3px', marginTop: '3px', display: 'inline-block' }}>
-                                                    PO: {p.poNumber || p.id}
-                                                  </span>
+                                                  <div style={{ display: 'flex', gap: '4px', marginTop: '3px' }}>
+                                                    <span style={{ fontSize: '0.58rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '1px 4px', borderRadius: '3px', display: 'inline-block' }}>
+                                                      PO: {p.poNumber || p.id}
+                                                    </span>
+                                                    {isPOCostOverridden(jo, p) && (
+                                                      <span style={{ fontSize: '0.58rem', background: 'rgba(234, 179, 8, 0.15)', color: '#eab308', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '1px 4px', borderRadius: '3px', display: 'inline-block' }}>
+                                                        {isID ? 'Disesuaikan' : 'Overridden'}
+                                                      </span>
+                                                    )}
+                                                  </div>
                                                 </td>
                                                 <td style={{ padding: '8px 0', color: 'var(--text-muted)' }}>
                                                   {p.items?.map(pi => pi.serviceDescription).join(', ') || (isID ? 'Layanan PO' : 'PO Services')}
                                                 </td>
                                                 <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: '700', color: '#ef4444' }}>
-                                                  Rp {parseFloat(p.grandTotal || 0).toLocaleString()}
+                                                  Rp {parseFloat(getPOCostForJO(jo, p) || 0).toLocaleString()}
                                                 </td>
                                               </tr>
                                             ))}
@@ -4909,7 +5332,7 @@ const Accounting = () => {
                     }
 
                     const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + parseFloat(c.total || 0), 0) : 0;
-                    const poCost = (poMap[jo.id] || []).reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
+                    const poCost = (poMap[jo.id] || []).reduce((s, p) => s + getPOCostForJO(jo, p), 0);
                     const costAppCost = (costAppMap[String(jo.id)] || []).filter(ca => ca.status !== 'rejected').reduce((s, ca) => s + (parseFloat(ca.amount) || 0), 0);
                     const totalCost = manualCost + poCost + costAppCost;
                     
@@ -5028,7 +5451,7 @@ const Accounting = () => {
                         
                         if (hasItems) {
                           const manualCostTotal = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + parseFloat(c.total || 0), 0) : 0;
-                          const poCostTotal = (poMap[jo.id] || []).reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
+                          const poCostTotal = (poMap[jo.id] || []).reduce((s, p) => s + getPOCostForJO(jo, p), 0);
                           const costAppTotal = (costAppMap[String(jo.id)] || []).filter(ca => ca.status !== 'rejected').reduce((s, ca) => s + (parseFloat(ca.amount) || 0), 0);
                           const totalCost = manualCostTotal + poCostTotal + costAppTotal;
 
@@ -5260,15 +5683,22 @@ const Accounting = () => {
                                               <tr key={`po-${pIdx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '0.78rem' }}>
                                                 <td style={{ padding: '8px 0', fontWeight: '500' }}>
                                                   <div>{p.vendorName || (isID ? 'Vendor PO' : 'PO Vendor')}</div>
-                                                  <span style={{ fontSize: '0.58rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '1px 4px', borderRadius: '3px', marginTop: '3px', display: 'inline-block' }}>
-                                                    PO: {p.poNumber || p.id}
-                                                  </span>
+                                                  <div style={{ display: 'flex', gap: '4px', marginTop: '3px' }}>
+                                                    <span style={{ fontSize: '0.58rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '1px 4px', borderRadius: '3px', display: 'inline-block' }}>
+                                                      PO: {p.poNumber || p.id}
+                                                    </span>
+                                                    {isPOCostOverridden(jo, p) && (
+                                                      <span style={{ fontSize: '0.58rem', background: 'rgba(234, 179, 8, 0.15)', color: '#eab308', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '1px 4px', borderRadius: '3px', display: 'inline-block' }}>
+                                                        {isID ? 'Disesuaikan' : 'Overridden'}
+                                                      </span>
+                                                    )}
+                                                  </div>
                                                 </td>
                                                 <td style={{ padding: '8px 0', color: 'var(--text-muted)' }}>
                                                   {p.items?.map(pi => pi.serviceDescription).join(', ') || (isID ? 'Layanan PO' : 'PO Services')}
                                                 </td>
                                                 <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: '700', color: '#ef4444' }}>
-                                                  Rp {parseFloat(p.grandTotal || 0).toLocaleString()}
+                                                  Rp {parseFloat(getPOCostForJO(jo, p) || 0).toLocaleString()}
                                                 </td>
                                               </tr>
                                             ))}
@@ -5286,7 +5716,7 @@ const Accounting = () => {
                         }
 
                         const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + parseFloat(c.total || 0), 0) : 0;
-                        const poCost = (poMap[jo.id] || []).reduce((s, p) => s + parseFloat(p.grandTotal || 0), 0);
+                        const poCost = (poMap[jo.id] || []).reduce((s, p) => s + getPOCostForJO(jo, p), 0);
                         const costAppCost = (costAppMap[String(jo.id)] || []).filter(ca => ca.status !== 'rejected').reduce((s, ca) => s + (parseFloat(ca.amount) || 0), 0);
                         const totalCost = manualCost + poCost + costAppCost;
                         
@@ -8099,8 +8529,13 @@ const Accounting = () => {
                                         <div>
                                           <span>{p.vendorName || (isID ? 'Vendor PO' : 'PO Vendor')}</span>
                                           <span style={{ fontSize: '0.58rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '1px 4px', borderRadius: '3px', marginLeft: '6px' }}>PO: {p.poNumber || p.id}</span>
+                                          {isPOCostOverridden(jo, p) && (
+                                            <span style={{ fontSize: '0.58rem', background: 'rgba(234, 179, 8, 0.15)', color: '#eab308', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '1px 4px', borderRadius: '3px', marginLeft: '4px' }}>
+                                              {isID ? 'Disesuaikan' : 'Overridden'}
+                                            </span>
+                                          )}
                                         </div>
-                                        <span style={{ fontWeight: '700', color: '#ef4444' }}>Rp {parseFloat(p.grandTotal || 0).toLocaleString()}</span>
+                                        <span style={{ fontWeight: '700', color: '#ef4444' }}>Rp {parseFloat(getPOCostForJO(jo, p) || 0).toLocaleString()}</span>
                                       </div>
                                     ))}
                                     {costAppsList.map((ca, caIdx) => {
