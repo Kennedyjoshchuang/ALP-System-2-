@@ -1,3 +1,4 @@
+import FormattedNumberInput from '../components/FormattedNumberInput';
 import React, { useEffect, useState } from 'react';
 import DigitalSignatureController from '../components/DigitalSignatureController';
 import ExtraDocsUploader from '../components/ExtraDocsUploader';
@@ -248,8 +249,8 @@ const PrintInvoice = () => {
           <div style={{ width: '1px', height: '24px', background: '#e2e8f0' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '4px 10px' }}>
             <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#64748b' }}>Tempo:</span>
-            <input 
-              type="number" 
+            <FormattedNumberInput 
+              allowDecimal={false}
               value={dueDays} 
               onChange={(e) => {
                 const val = parseInt(e.target.value, 10) || 0;

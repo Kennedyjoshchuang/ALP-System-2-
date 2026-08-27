@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
+import FormattedNumberInput from '../components/FormattedNumberInput';
 
 const defaultSubcategories = {
   'Gaji': [
@@ -1012,9 +1013,7 @@ const CostApplications = () => {
                         onChange={e => handleItemChange(idx, 'details', e.target.value)}
                         style={{ flex: 2, padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.85rem' }}
                       />
-                      <input 
-                        type="number"
-                        step="any"
+                      <FormattedNumberInput 
                         placeholder={isID ? "Nominal (Rp)" : "Amount (IDR)"}
                         value={item.amount}
                         onChange={e => handleItemChange(idx, 'amount', e.target.value)}

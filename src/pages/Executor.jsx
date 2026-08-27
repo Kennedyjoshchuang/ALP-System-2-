@@ -5,9 +5,9 @@ import { Truck, Camera, CheckCircle2, Package, History, PlayCircle, X, Search, F
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
+import FormattedNumberInput from '../components/FormattedNumberInput';
 import toast from 'react-hot-toast';
 
-;
 
 const toDatetimeLocal = (isoString) => {
   if (!isoString) return '';
@@ -1968,18 +1968,15 @@ const Executor = () => {
                                                 onChange={e => handleExtraChargeChange(jo.id, idx, 'description', e.target.value)}
                                                 style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.85rem' }}
                                               />
-                                              <input 
+                                              <FormattedNumberInput 
                                                 disabled={!canWrite}
-                                                type="number" 
                                                 placeholder="Qty" 
                                                 value={charge.qty} 
                                                 onChange={e => handleExtraChargeChange(jo.id, idx, 'qty', e.target.value)}
                                                 style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.85rem', textAlign: 'center' }}
                                               />
-                                              <input 
+                                              <FormattedNumberInput 
                                                 disabled={!canWrite}
-                                                type="number" 
-                                                step="any" 
                                                 placeholder="Rp / Rate" 
                                                 value={charge.rate} 
                                                 onChange={e => handleExtraChargeChange(jo.id, idx, 'rate', e.target.value)}

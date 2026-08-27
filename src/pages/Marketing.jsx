@@ -7,9 +7,8 @@ import { exportQuotationsFolder } from '../utils/quotationPdfUtils.jsx';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
 import ExportProgressModal from '../components/ExportProgressModal';
 import ExportFilterModal from '../components/ExportFilterModal';
+import FormattedNumberInput from '../components/FormattedNumberInput';
 import toast from 'react-hot-toast';
-
-;
 
 const Marketing = () => {
   const context = useApp();
@@ -831,8 +830,8 @@ const Marketing = () => {
                 {quoteItems.map((item, index) => (
                   <div key={index} className="grid-quote-items" style={{ gap: '15px', marginBottom: '15px' }}>
                     <input required type="text" value={item.description} onChange={e => updateQuoteItem(index, 'description', e.target.value)} placeholder="Service description..." aria-label={t('activity') || 'Deskripsi Pekerjaan'} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
-                    <input required type="number" step="any" value={item.rate} onChange={e => updateQuoteItem(index, 'rate', e.target.value)} aria-label={t('ratePerTrip') || 'Tarif'} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
-                    <input required type="number" step="any" value={item.quantity} onChange={e => updateQuoteItem(index, 'quantity', e.target.value)} aria-label={t('quantity') || 'Jumlah'} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
+                    <FormattedNumberInput required value={item.rate} onChange={e => updateQuoteItem(index, 'rate', e.target.value)} placeholder="0" aria-label={t('ratePerTrip') || 'Tarif'} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
+                    <FormattedNumberInput required value={item.quantity} onChange={e => updateQuoteItem(index, 'quantity', e.target.value)} placeholder="0" aria-label={t('quantity') || 'Jumlah'} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
                     <input type="text" value={item.unit} onChange={e => updateQuoteItem(index, 'unit', e.target.value)} placeholder="Trip/Kg/..." aria-label="Satuan" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
                     <button type="button" onClick={() => removeQuoteItem(index)} aria-label="Remove Item" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                   </div>
@@ -978,8 +977,8 @@ const Marketing = () => {
                 {editQuoteItems.map((item, index) => (
                   <div key={index} className="grid-quote-items" style={{ gap: '15px', marginBottom: '15px' }}>
                     <input required type="text" value={item.description} onChange={e => updateEditQuoteItem(index, 'description', e.target.value)} placeholder="Service description..." aria-label={t('activity') || 'Deskripsi Pekerjaan'} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
-                    <input required type="number" step="any" value={item.rate} onChange={e => updateEditQuoteItem(index, 'rate', e.target.value)} aria-label={t('ratePerTrip') || 'Tarif'} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
-                    <input required type="number" step="any" value={item.quantity} onChange={e => updateEditQuoteItem(index, 'quantity', e.target.value)} aria-label={t('quantity') || 'Jumlah'} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
+                    <FormattedNumberInput required value={item.rate} onChange={e => updateEditQuoteItem(index, 'rate', e.target.value)} placeholder="0" aria-label={t('ratePerTrip') || 'Tarif'} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
+                    <FormattedNumberInput required value={item.quantity} onChange={e => updateEditQuoteItem(index, 'quantity', e.target.value)} placeholder="0" aria-label={t('quantity') || 'Jumlah'} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
                     <input type="text" value={item.unit} onChange={e => updateEditQuoteItem(index, 'unit', e.target.value)} placeholder="Trip/Kg/..." aria-label="Satuan" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '10px' }} />
                     <button type="button" onClick={() => removeEditQuoteItem(index)} aria-label="Remove Item" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                   </div>

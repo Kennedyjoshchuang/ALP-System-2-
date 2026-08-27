@@ -1,3 +1,4 @@
+import FormattedNumberInput from '../components/FormattedNumberInput';
 import toast from 'react-hot-toast';
 import { useConfirm } from '../context/ConfirmContext';
 import React, { useState, useRef } from 'react';
@@ -3481,7 +3482,7 @@ const Accounting = () => {
                             <option value="" style={{color:'var(--text-muted)', background: 'var(--bg)'}}>-- {isID ? 'Pilih Layanan' : 'Select Service'} --</option>
                             {vendor?.services?.map((s,si)=><option key={si} value={si} style={{color:'var(--text)', background:'var(--bg)'}}>{s.description} — Rp {parseFloat(s.price||0).toLocaleString(isID ? 'id-ID' : 'en-US')}</option>)}
                           </select>
-                          <input type="number" min="1" step="any" value={item.qty} onChange={e=>updatePOItem(i,'qty',e.target.value)} style={{padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--text)',fontSize:'0.85rem',textAlign:'center'}}/>
+                          <FormattedNumberInput value={item.qty} onChange={e=>updatePOItem(i,'qty',e.target.value)} style={{padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--text)',fontSize:'0.85rem',textAlign:'center'}}/>
                           <div style={{padding:'9px',background:'rgba(255,255,255,0.03)',border:'1px solid var(--glass-border)',borderRadius:'8px',fontSize:'0.85rem',fontWeight:'700',color:'var(--secondary)',textAlign:'right'}}>{svc?`Rp ${sub.toLocaleString(isID ? 'id-ID' : 'en-US')}`:'Rp 0'}</div>
                           <button type="button" onClick={()=>removePOItem(i)} disabled={poItems.length===1} style={{background:'var(--danger-bg)',color:'var(--danger)',border:'none',borderRadius:'8px',height:'36px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}><X size={13}/></button>
                         </div>
@@ -4309,7 +4310,7 @@ const Accounting = () => {
                          </select>
                        )}
 
-                       <input type="number" min="1" step="any" value={line.qty} onChange={e=>updateCostLine(i,'qty',e.target.value)} placeholder="Qty" style={{ padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--text)',fontSize:'0.85rem',textAlign:'center',width:'100%' }}/>
+                       <FormattedNumberInput value={line.qty} onChange={e=>updateCostLine(i,'qty',e.target.value)} placeholder="Qty" style={{ padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--text)',fontSize:'0.85rem',textAlign:'center',width:'100%' }}/>
                       
                        <div style={{ fontSize:'0.85rem',color:'var(--secondary)',fontWeight:'600',padding:'9px',background:'rgba(255,255,255,0.03)',borderRadius:'8px',border:'1px solid var(--glass-border)',width:'100%',boxSizing:'border-box',textAlign:'center' }}>
                         Rp {lineTotal.toLocaleString(isID ? 'id-ID' : 'en-US')}
@@ -4345,12 +4346,7 @@ const Accounting = () => {
                         </div>
                         <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
                           <span style={{ fontSize:'0.65rem', color:'var(--text-muted)', fontWeight:'600', textTransform:'uppercase' }}>{isID ? 'Harga Satuan' : 'Unit Price'}</span>
-                          <input 
-                            type="number" 
-                            min="0" 
-                            step="any" 
-                            value={line.customPrice || ''} 
-                            onChange={e=>updateCostLine(i,'customPrice',e.target.value)} 
+                          <FormattedNumberInput value={line.customPrice || ''} onChange={e=>updateCostLine(i,'customPrice',e.target.value)} 
                             placeholder={isID ? "Harga Satuan (Rp)" : "Unit Price (Rp)"} 
                             style={{ padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.8rem' }}
                           />
@@ -7615,11 +7611,7 @@ const Accounting = () => {
                   <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>Base Amount (Revenue)</label>
                   <div style={{ position:'relative' }}>
                     <span style={{ position:'absolute', left:'15px', top:'50%', transform:'translateY(-50%)', color:'var(--secondary)', fontWeight:'700' }}>Rp</span>
-                    <input 
-                      type="number" 
-                      step="any" 
-                      value={editingInvoice.subtotal || editingInvoice.amount} 
-                      onChange={e => setEditingInvoice({...editingInvoice, subtotal: e.target.value})}
+                    <FormattedNumberInput value={editingInvoice.subtotal || editingInvoice.amount} onChange={e => setEditingInvoice({...editingInvoice, subtotal: e.target.value})}
                       disabled={Array.isArray(editingInvoice.items)}
                       style={{ width:'100%', padding:'12px 15px 12px 45px', background: Array.isArray(editingInvoice.items) ? 'rgba(255,255,255,0.02)' : 'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'10px', color: Array.isArray(editingInvoice.items) ? 'var(--text-muted)' : 'var(--text)', fontSize:'1.1rem', fontWeight:'700', cursor: Array.isArray(editingInvoice.items) ? 'not-allowed' : 'auto' }}
                     />
@@ -7737,10 +7729,7 @@ const Accounting = () => {
                               />
                             </div>
                             <div>
-                              <input 
-                                type="number" 
-                                placeholder="Qty" 
-                                value={item.qty || 0} 
+                              <FormattedNumberInput placeholder="Qty" value={item.qty || 0} 
                                 onChange={e => {
                                   const val = parseFloat(e.target.value || 0);
                                   const newItems = [...editingInvoice.items];
@@ -7757,10 +7746,7 @@ const Accounting = () => {
                               />
                             </div>
                             <div>
-                              <input 
-                                type="number" 
-                                placeholder="Rate" 
-                                value={item.rate || 0} 
+                              <FormattedNumberInput placeholder="Rate" value={item.rate || 0} 
                                 onChange={e => {
                                   const val = parseFloat(e.target.value || 0);
                                   const newItems = [...editingInvoice.items];
@@ -7997,9 +7983,7 @@ const Accounting = () => {
                           }}
                           style={{ padding:'8px 12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontSize:'0.85rem' }}
                         />
-                        <input 
-                          type="number" 
-                          step="any" 
+                        <FormattedNumberInput 
                           placeholder="Rp" 
                           value={charge.amount} 
                           onChange={e => {
@@ -8301,13 +8285,7 @@ const Accounting = () => {
                 </div>
                 <div>
                   <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Pajak / PPN (%)' : 'Tax / VAT (%)'}</label>
-                  <input 
-                    type="number" 
-                    min="0" 
-                    max="100" 
-                    step="any"
-                    value={customInvoiceForm.taxPercent} 
-                    onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, taxPercent: parseFloat(e.target.value) || 0 })}
+                  <FormattedNumberInput value={customInvoiceForm.taxPercent} onChange={e => setCustomInvoiceForm({ ...customInvoiceForm, taxPercent: e.target.value })}
                     style={{ width:'100%', padding:'10px 12px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontSize:'0.9rem' }}
                   />
                 </div>
@@ -8372,27 +8350,11 @@ const Accounting = () => {
                         </div>
                         <div style={{ width: '80px' }}>
                           <label style={{ display:'block', fontSize:'0.65rem', color:'var(--text-muted)', marginBottom:'4px', textTransform:'uppercase' }}>{isID ? 'Jumlah' : 'Qty'}</label>
-                          <input 
-                            type="number"
-                            min="0.01"
-                            step="any"
-                            value={item.qty}
-                            onChange={e => updateCustomInvoiceItem(idx, 'qty', e.target.value)}
-                            style={{ width:'100%', padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }}
-                            required
-                          />
+                          <FormattedNumberInput value={item.qty} onChange={e => updateCustomInvoiceItem(idx, 'qty', e.target.value)} style={{ width:'100%', padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }} required />
                         </div>
                         <div style={{ width: '150px' }}>
                           <label style={{ display:'block', fontSize:'0.65rem', color:'var(--text-muted)', marginBottom:'4px', textTransform:'uppercase' }}>{isID ? 'Harga Satuan' : 'Unit Rate'}</label>
-                          <input 
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={item.rate}
-                            onChange={e => updateCustomInvoiceItem(idx, 'rate', e.target.value)}
-                            style={{ width:'100%', padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }}
-                            required
-                          />
+                          <FormattedNumberInput placeholder="Rp" value={item.rate} onChange={e => updateCustomInvoiceItem(idx, 'rate', e.target.value)} style={{ width:'100%', padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }} required />
                         </div>
                         <div style={{ width: '130px', textAlign:'right', paddingBottom:'10px' }}>
                           <span style={{ display:'block', fontSize:'0.65rem', color:'var(--text-muted)', marginBottom:'4px', textTransform:'uppercase' }}>Total</span>
@@ -8526,7 +8488,7 @@ const Accounting = () => {
             <div className="grid-responsive-2" style={{ gap:'20px', marginBottom:'20px' }}>
               <div>
                 <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Nominal Gaji Pokok' : 'Base Salary Amount'}</label>
-                <input type="number" step="any" value={salaryForm.baseSalary} onChange={e => setSalaryForm({...salaryForm, baseSalary: e.target.value})} style={{ width:'100%', padding:'10px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontWeight:'700' }} />
+                <FormattedNumberInput value={salaryForm.baseSalary} onChange={e => setSalaryForm({...salaryForm, baseSalary: e.target.value})} style={{ width:'100%', padding:'10px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontWeight:'700' }} />
               </div>
               <div>
                 <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Periode Bulan' : 'Monthly Period'}</label>
@@ -8553,7 +8515,7 @@ const Accounting = () => {
               {salaryForm.taxes.map((tax, idx) => (
                 <div key={idx} style={{ display:'grid', gridTemplateColumns:'1fr 120px 32px', gap:'10px', marginBottom:'8px' }}>
                   <input type="text" placeholder={isID ? "Deskripsi (misal PPh21)" : "Description (e.g. Tax PPh21)"} value={tax.name} onChange={e => { const n=[...salaryForm.taxes]; n[idx].name=e.target.value; setSalaryForm({...salaryForm, taxes:n}); }} style={{ padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }} />
-                  <input type="number" step="any" placeholder={isID ? "Nominal" : "Amount"} value={tax.amount} onChange={e => { const n=[...salaryForm.taxes]; n[idx].amount=e.target.value; setSalaryForm({...salaryForm, taxes:n}); }} style={{ padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }} />
+                  <FormattedNumberInput placeholder={isID ? "Nominal" : "Amount"} value={tax.amount} onChange={e => { const n=[...salaryForm.taxes]; n[idx].amount=e.target.value; setSalaryForm({...salaryForm, taxes:n}); }} style={{ padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }} />
                   <button onClick={() => setSalaryForm({...salaryForm, taxes: salaryForm.taxes.filter((_,i)=>i!==idx)})} style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'none', borderRadius:'6px', cursor:'pointer' }}><X size={14}/></button>
                 </div>
               ))}
@@ -8647,8 +8609,7 @@ const Accounting = () => {
                     placeholder={isID ? 'Detail biaya (Misal: Ongkos Taxi)' : 'Item details (e.g., Taxi Fare)'}
                     style={{ flex: 2, padding: '10px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)' }}
                   />
-                  <input
-                    type="number"
+                  <FormattedNumberInput
                     value={item.amount}
                     onChange={e => { const items = [...reimbursementForm.items]; items[idx].amount = e.target.value; setReimbursementForm({ ...reimbursementForm, items }); }}
                     placeholder="Rp"
@@ -9044,7 +9005,7 @@ const Accounting = () => {
             <div className="grid-responsive-2" style={{ gap:'20px', marginBottom:'20px' }}>
               <div>
                 <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Nominal (Rp)' : 'Amount (IDR)'}</label>
-                <input type="number" step="any" value={otherExpenseForm.amount || ''} onChange={e => setOtherExpenseForm({...otherExpenseForm, amount: e.target.value})} style={{ width:'100%', padding:'10px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontWeight:'700' }} />
+                <FormattedNumberInput value={otherExpenseForm.amount || ''} onChange={e => setOtherExpenseForm({...otherExpenseForm, amount: e.target.value})} style={{ width:'100%', padding:'10px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontWeight:'700' }} />
               </div>
               <div>
                 <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'8px', textTransform:'uppercase', fontWeight:'700' }}>{isID ? 'Tanggal Transaksi' : 'Transaction Date'}</label>
@@ -9061,7 +9022,7 @@ const Accounting = () => {
               {(otherExpenseForm.taxes || []).map((tax, idx) => (
                 <div key={idx} style={{ display:'grid', gridTemplateColumns:'1fr 120px 32px', gap:'10px', marginBottom:'8px' }}>
                   <input type="text" placeholder={isID ? 'Deskripsi Potongan' : 'Deduction Description'} value={tax.name} onChange={e => { const n=[...otherExpenseForm.taxes]; n[idx].name=e.target.value; setOtherExpenseForm({...otherExpenseForm, taxes:n}); }} style={{ padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }} />
-                  <input type="number" step="any" placeholder={isID ? 'Nominal' : 'Amount'} value={tax.amount} onChange={e => { const n=[...otherExpenseForm.taxes]; n[idx].amount=e.target.value; setOtherExpenseForm({...otherExpenseForm, taxes:n}); }} style={{ padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }} />
+                  <FormattedNumberInput placeholder={isID ? 'Nominal' : 'Amount'} value={tax.amount} onChange={e => { const n=[...otherExpenseForm.taxes]; n[idx].amount=e.target.value; setOtherExpenseForm({...otherExpenseForm, taxes:n}); }} style={{ padding:'8px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'6px', color:'var(--text)', fontSize:'0.85rem' }} />
                   <button onClick={() => setOtherExpenseForm({...otherExpenseForm, taxes: otherExpenseForm.taxes.filter((_,i)=>i!==idx)})} style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'none', borderRadius:'6px', cursor:'pointer' }}><X size={14}/></button>
                 </div>
               ))}
@@ -9299,8 +9260,7 @@ const Accounting = () => {
                 </div>
                 <div>
                   <label style={{ display:'block', fontSize:'0.7rem', color:'var(--text-muted)', marginBottom:'5px' }}>{isID ? 'Nominal Pajak (Rp)' : 'Tax Amount (Rp)'}</label>
-                  <input 
-                    type="number" 
+                  <FormattedNumberInput 
                     value={settlePayableForm.taxAmount} 
                     onChange={e => setSettlePayableForm({...settlePayableForm, taxAmount: e.target.value})}
                     placeholder="0"
@@ -9653,8 +9613,7 @@ const Accounting = () => {
                     }}
                     style={{ padding:'10px', background:'var(--input-bg)', border:'1px solid var(--border)', borderRadius:'8px', color:'var(--text)', fontSize:'0.9rem' }}
                   />
-                  <input 
-                    type="number" 
+                  <FormattedNumberInput 
                     placeholder={isID ? 'Nominal' : 'Amount'} 
                     value={tax.amount} 
                     onChange={e => {
@@ -10131,8 +10090,8 @@ const Accounting = () => {
                 {f.items.map((item, idx) => (
                   <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 140px 32px', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
                     <input style={inputStyle} value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)} placeholder="Deskripsi layanan..." />
-                    <input type="number" style={{ ...inputStyle, textAlign: 'center' }} value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)} min="1" step="any" />
-                    <input type="number" style={{ ...inputStyle, textAlign: 'right' }} value={item.rate} onChange={e => updateItem(idx, 'rate', e.target.value)} placeholder="Rp" min="0" step="any" />
+                    <FormattedNumberInput style={{ ...inputStyle, textAlign: 'center' }} value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)} />
+                    <FormattedNumberInput style={{ ...inputStyle, textAlign: 'right' }} value={item.rate} onChange={e => updateItem(idx, 'rate', e.target.value)} placeholder="Rp" />
                     <button onClick={() => removeItem(idx)} disabled={f.items.length === 1} style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: '6px', color: 'var(--danger)', cursor: f.items.length === 1 ? 'not-allowed' : 'pointer', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: f.items.length === 1 ? 0.4 : 1 }}>
                       <X size={14} />
                     </button>
@@ -10153,8 +10112,8 @@ const Accounting = () => {
                 {f.extraCharges.map((ec, idx) => (
                   <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 140px 32px', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
                     <input style={inputStyle} value={ec.description} onChange={e => updateExtra(idx, 'description', e.target.value)} placeholder="Biaya tambahan..." />
-                    <input type="number" style={{ ...inputStyle, textAlign: 'center' }} value={ec.qty} onChange={e => updateExtra(idx, 'qty', e.target.value)} min="1" step="any" />
-                    <input type="number" style={{ ...inputStyle, textAlign: 'right' }} value={ec.rate} onChange={e => updateExtra(idx, 'rate', e.target.value)} placeholder="Rp" min="0" step="any" />
+                    <FormattedNumberInput style={{ ...inputStyle, textAlign: 'center' }} value={ec.qty} onChange={e => updateExtra(idx, 'qty', e.target.value)} />
+                    <FormattedNumberInput style={{ ...inputStyle, textAlign: 'right' }} value={ec.rate} onChange={e => updateExtra(idx, 'rate', e.target.value)} placeholder="Rp" />
                     <button onClick={() => removeExtra(idx)} style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: '6px', color: 'var(--danger)', cursor: 'pointer', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <X size={14} />
                     </button>
@@ -10170,7 +10129,7 @@ const Accounting = () => {
                 {/* Tax */}
                 <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', borderRadius: '10px', padding: '16px' }}>
                   <label style={labelStyle}>{isID ? 'Pajak (%)' : 'Tax (%)'}</label>
-                  <input type="number" style={{ ...inputStyle, width: '100px' }} value={f.taxPercent} onChange={e => setF({ taxPercent: e.target.value })} min="0" max="100" step="0.1" />
+                  <FormattedNumberInput style={{ ...inputStyle, width: '100px' }} value={f.taxPercent} onChange={e => setF({ taxPercent: e.target.value })} />
                   <div style={{ marginTop: '12px' }}>
                     <label style={labelStyle}>{isID ? 'Rekening Bank' : 'Bank Account'}</label>
                     <select
@@ -10431,32 +10390,29 @@ const Accounting = () => {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'12px' }}>
                 <div>
                   <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>{isID ? 'Tarif (Rp)' : 'Rate (Rp)'}</label>
-                  <input 
-                    type="number" 
+                  <FormattedNumberInput 
                     className="form-control" 
                     style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
                     value={splitForm.rate}
-                    onChange={e => setSplitForm({ ...splitForm, rate: parseFloat(e.target.value) || 0 })}
+                    onChange={e => setSplitForm({ ...splitForm, rate: e.target.value })}
                   />
                 </div>
                 <div>
                   <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>Qty</label>
-                  <input 
-                    type="number" 
+                  <FormattedNumberInput 
                     className="form-control" 
                     style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
                     value={splitForm.quantity}
-                    onChange={e => setSplitForm({ ...splitForm, quantity: parseInt(e.target.value) || 0 })}
+                    onChange={e => setSplitForm({ ...splitForm, quantity: e.target.value })}
                   />
                 </div>
                 <div>
                   <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>{isID ? 'Qty Realisasi' : 'Issue Qty'}</label>
-                  <input 
-                    type="number" 
+                  <FormattedNumberInput 
                     className="form-control" 
                     style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
                     value={splitForm.issueQuantity}
-                    onChange={e => setSplitForm({ ...splitForm, issueQuantity: parseInt(e.target.value) || 0 })}
+                    onChange={e => setSplitForm({ ...splitForm, issueQuantity: e.target.value })}
                   />
                 </div>
               </div>
@@ -10520,13 +10476,12 @@ const Accounting = () => {
                     </div>
                     <div>
                       <label style={{ display:'block', fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'5px', fontWeight:'700', textTransform:'uppercase' }}>{isID ? 'Pajak (%)' : 'Tax (%)'}</label>
-                      <input 
-                        type="number" 
-                        className="form-control" 
-                        style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
-                        value={splitForm.taxPercent}
-                        onChange={e => setSplitForm({ ...splitForm, taxPercent: parseFloat(e.target.value) || 0 })}
-                      />
+                      <FormattedNumberInput 
+                    className="form-control" 
+                    style={{ width:'100%', padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--glass-border)', color:'var(--text)', borderRadius:'6px' }}
+                    value={splitForm.taxPercent}
+                    onChange={e => setSplitForm({ ...splitForm, taxPercent: e.target.value })}
+                  />
                     </div>
                   </div>
 

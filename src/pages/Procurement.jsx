@@ -4,9 +4,9 @@ import { Plus, Trash2, Edit2, Check, X, Package, ChevronDown, ChevronUp, Truck, 
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
+import FormattedNumberInput from '../components/FormattedNumberInput';
 import toast from 'react-hot-toast';
 
-;
 
 const emptyVendor = { name: '', phone: '', email: '', address: '', bankName: '', bankAccount: '', services: [{ description: '', price: '' }], assets: [''] };
 
@@ -168,7 +168,7 @@ const Procurement = () => {
                   <div key={i} className="grid-vendor-services" style={{ marginBottom: '10px' }}>
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--secondary)' }} />
                     <input required type="text" value={s.description} onChange={e => updateService(i, 'description', e.target.value)} placeholder={isID ? "Contoh: Trucking 20ft Tanjung Priok" : "Example: Trucking 20ft Tanjung Priok"} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '9px 12px' }} />
-                    <input required type="number" step="any" value={s.price} onChange={e => updateService(i, 'price', e.target.value)} placeholder={isID ? "Harga" : "Price"} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '9px 12px' }} />
+                    <FormattedNumberInput required value={s.price} onChange={e => updateService(i, 'price', e.target.value)} placeholder={isID ? "Harga" : "Price"} style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', padding: '9px 12px' }} />
                     <button type="button" onClick={() => removeService(i)} style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
                   </div>
                 ))}

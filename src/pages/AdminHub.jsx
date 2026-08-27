@@ -5,9 +5,9 @@ import { Send, CheckCircle, Plus, X, FileText, ShoppingCart, Trash2, FileCheck, 
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
+import FormattedNumberInput from '../components/FormattedNumberInput';
 import toast from 'react-hot-toast';
 
-;
 
 const AdminHub = () => {
   const context = useApp();
@@ -848,7 +848,7 @@ const AdminHub = () => {
                             <option value="" style={{color:'var(--text-muted)', background: 'var(--bg)'}}>-- {isID ? 'Pilih Layanan' : 'Select Service'} --</option>
                             {poVendor.services.map((s,si)=><option key={si} value={si} style={{color:'var(--text)', background:'var(--bg)'}}>{s.description} — Rp {parseFloat(s.price||0).toLocaleString('id-ID')}</option>)}
                           </select>
-                          <input type="number" min="1" step="any" value={item.qty} onChange={e=>updatePOItem(i,'qty',e.target.value)} style={{padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--text)',fontSize:'0.85rem',textAlign:'center'}}/>
+                          <FormattedNumberInput value={item.qty} onChange={e=>updatePOItem(i,'qty',e.target.value)} style={{padding:'9px',background:'var(--input-bg)',border:'1px solid var(--border)',borderRadius:'8px',color:'var(--text)',fontSize:'0.85rem',textAlign:'center'}}/>
                           <div style={{padding:'9px',background:'rgba(255,255,255,0.03)',border:'1px solid var(--glass-border)',borderRadius:'8px',fontSize:'0.85rem',fontWeight:'700',color:'var(--secondary)',textAlign:'right'}}>{svc?`Rp ${sub.toLocaleString('id-ID')}`:'Rp 0'}</div>
                           <button type="button" onClick={()=>removePOItem(i)} disabled={poItems.length===1} style={{background:'var(--danger-bg)',color:'var(--danger)',border:'none',borderRadius:'8px',height:'36px',cursor:'pointer',display: 'flex', flexWrap: 'wrap',alignItems:'center',justifyContent:'center'}}><X size={13}/></button>
                         </div>
@@ -1142,12 +1142,7 @@ const AdminHub = () => {
                                     <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
                                       {isID ? 'Jumlah Issue:' : 'Issue Qty:'}
                                     </label>
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      step="any"
-                                      value={currentQty}
-                                      disabled={!isChecked}
+                                    <FormattedNumberInput value={currentQty} disabled={!isChecked}
                                       onChange={(e) => {
                                         setSelectedActivities(prev => ({
                                           ...prev,
@@ -1173,13 +1168,7 @@ const AdminHub = () => {
                               {isID ? 'Maks Kontrak: ' : 'Contract Max: '}{q.quantity || 1}
                             </span>
                           </label>
-                          <input
-                            required
-                            type="number"
-                            min="1"
-                            step="any"
-                            value={issueQuantity}
-                            onChange={e => setIssueQuantity(e.target.value)}
+                          <FormattedNumberInput required value={issueQuantity} onChange={e => setIssueQuantity(e.target.value)}
                             style={{
                               width: '100%',
                               padding: '12px 15px',
@@ -1247,12 +1236,7 @@ const AdminHub = () => {
                           />
                         </div>
                         <div style={{ flex: 1, minWidth: '100px' }}>
-                          <input
-                            type="number"
-                            required
-                            min="0"
-                            placeholder={isID ? "Harga Satuan" : "Unit Rate"}
-                            value={ec.rate}
+                          <FormattedNumberInput required placeholder={isID ? "Harga Satuan" : "Unit Rate"} value={ec.rate}
                             onChange={e => {
                               const next = [...quoteJOExtraCharges];
                               next[idx].rate = e.target.value;
@@ -1262,12 +1246,7 @@ const AdminHub = () => {
                           />
                         </div>
                         <div style={{ width: '80px' }}>
-                          <input
-                            type="number"
-                            required
-                            min="1"
-                            placeholder={isID ? "Jumlah" : "Qty"}
-                            value={ec.quantity}
+                          <FormattedNumberInput required placeholder={isID ? "Jumlah" : "Qty"} value={ec.quantity}
                             onChange={e => {
                               const next = [...quoteJOExtraCharges];
                               next[idx].quantity = parseInt(e.target.value) || 1;
@@ -1452,12 +1431,7 @@ const AdminHub = () => {
                           />
                         </div>
                         <div style={{ flex: 1, minWidth: '100px' }}>
-                          <input
-                            type="number"
-                            required
-                            min="0"
-                            placeholder={isID ? "Harga Satuan" : "Unit Rate"}
-                            value={item.rate}
+                          <FormattedNumberInput required placeholder={isID ? "Harga Satuan" : "Unit Rate"} value={item.rate}
                             onChange={e => {
                               const newItems = [...directJOForm.items];
                               newItems[idx].rate = e.target.value;
@@ -1467,12 +1441,7 @@ const AdminHub = () => {
                           />
                         </div>
                         <div style={{ width: '80px' }}>
-                          <input
-                            type="number"
-                            required
-                            min="1"
-                            placeholder={isID ? "Jumlah" : "Qty"}
-                            value={item.quantity}
+                          <FormattedNumberInput required placeholder={isID ? "Jumlah" : "Qty"} value={item.quantity}
                             onChange={e => {
                               const newItems = [...directJOForm.items];
                               newItems[idx].quantity = parseInt(e.target.value) || 1;
@@ -1542,12 +1511,7 @@ const AdminHub = () => {
                           />
                         </div>
                         <div style={{ flex: 1, minWidth: '100px' }}>
-                          <input
-                            type="number"
-                            required
-                            min="0"
-                            placeholder={isID ? "Harga Satuan" : "Unit Rate"}
-                            value={ec.rate}
+                          <FormattedNumberInput required placeholder={isID ? "Harga Satuan" : "Unit Rate"} value={ec.rate}
                             onChange={e => {
                               const next = [...directJOForm.extraCharges];
                               next[idx].rate = e.target.value;
@@ -1557,12 +1521,7 @@ const AdminHub = () => {
                           />
                         </div>
                         <div style={{ width: '80px' }}>
-                          <input
-                            type="number"
-                            required
-                            min="1"
-                            placeholder={isID ? "Jumlah" : "Qty"}
-                            value={ec.quantity}
+                          <FormattedNumberInput required placeholder={isID ? "Jumlah" : "Qty"} value={ec.quantity}
                             onChange={e => {
                               const next = [...directJOForm.extraCharges];
                               next[idx].quantity = parseInt(e.target.value) || 1;
@@ -1854,12 +1813,7 @@ const AdminHub = () => {
                                       </span>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{isID ? 'Kirim:' : 'Dispatch:'}</span>
-                                        <input
-                                          type="number"
-                                          min="1"
-                                          step="any"
-                                          disabled={!canWrite}
-                                          value={qtyVal}
+                                        <FormattedNumberInput disabled={!canWrite} value={qtyVal}
                                           onChange={(e) => {
                                             const currentQtyMap = dispatchQuantities[jo.id] || {};
                                             setDispatchQuantities({
@@ -1890,12 +1844,7 @@ const AdminHub = () => {
                         {(!jo.items || jo.items.length === 0) && (
                           <div className="input-group" style={{ marginBottom: '15px' }}>
                             <label style={{ fontSize: '0.75rem', marginBottom: '4px', display: 'block' }}>{isID ? 'Jumlah Pekerjaan (Unit)' : 'Work Quantity (Units)'}</label>
-                            <input
-                              type="number"
-                              min="1"
-                              step="any"
-                              disabled={!canWrite}
-                              value={quantities[jo.id] || jo.quantity || ''}
+                            <FormattedNumberInput disabled={!canWrite} value={quantities[jo.id] || jo.quantity || ''}
                               onChange={e => setQuantities({ ...quantities, [jo.id]: e.target.value })}
                               placeholder={isID ? "Masukkan jumlah..." : "Enter quantity..."}
                               style={{ borderRadius: '8px', padding: '6px 12px', fontSize: '0.9rem' }}
