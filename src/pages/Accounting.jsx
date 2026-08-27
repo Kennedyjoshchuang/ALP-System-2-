@@ -9703,7 +9703,57 @@ const Accounting = () => {
 
       {/* Salary Slip Print View */}
       {salarySlip && (
-        <div style={{ position:'fixed', inset:0, background:'white', zIndex:30000, color:'black', padding:'40px', overflowY:'auto' }}>
+        <div id="salary-slip-modal" style={{ position:'fixed', inset:0, background:'white', zIndex:30000, color:'black', padding:'40px', overflowY:'auto' }}>
+          <style>{`
+            @media print {
+              @page {
+                size: A4 portrait;
+                margin: 0;
+              }
+              html, body, #root, .layout, main, .accounting-container {
+                height: 100% !important;
+                max-height: 297mm !important;
+                overflow: hidden !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+              }
+              body * {
+                visibility: hidden;
+              }
+              #salary-slip-modal, #salary-slip-modal * {
+                visibility: visible;
+              }
+              #salary-slip-modal {
+                position: fixed !important;
+                inset: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                max-height: 297mm !important;
+                margin: 0 !important;
+                padding: 12mm 10mm 10mm 10mm !important;
+                box-sizing: border-box !important;
+                background: white !important;
+                overflow: hidden !important;
+                z-index: 999999 !important;
+                display: flex !important;
+                justify-content: center !important;
+              }
+              #salary-slip-print {
+                width: 100% !important;
+                max-width: 190mm !important;
+                margin: 0 auto !important;
+                padding: 8mm 10mm !important;
+                border: 1.5px solid #333 !important;
+                box-shadow: none !important;
+                page-break-inside: avoid !important;
+                page-break-after: avoid !important;
+                page-break-before: avoid !important;
+                box-sizing: border-box !important;
+              }
+              .no-print { display: none !important; }
+            }
+          `}</style>
           <div className="no-print" style={{ display:'flex', justifyContent:'space-between', marginBottom:'30px', background:'#f8fafc', padding:'15px', borderRadius:'12px', border:'1px solid #e2e8f0' }}>
              <div style={{ display:'flex', alignItems:'center', gap:'10px', color:'#64748b' }}>
                <FileText size={20}/>
@@ -9715,50 +9765,50 @@ const Accounting = () => {
              </div>
           </div>
 
-          <div style={{ maxWidth:'800px', margin:'0 auto', border:'2px solid #333', padding:'40px', background:'white' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', borderBottom:'4px solid #333', paddingBottom:'20px', marginBottom:'30px' }}>
+          <div id="salary-slip-print" style={{ maxWidth:'800px', margin:'0 auto', border:'2px solid #333', padding:'35px 35px 25px 35px', background:'white', boxSizing:'border-box' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', borderBottom:'3px solid #333', paddingBottom:'15px', marginBottom:'20px' }}>
               <div>
-                <h1 style={{ margin:0, fontSize:'1.8rem', letterSpacing:'1px' }}>{isID ? 'SLIP GAJI KARYAWAN' : 'EMPLOYEE SALARY SLIP'}</h1>
-                <div style={{ color:'#666', marginTop:'5px' }}>{isID ? 'Nomor Ref' : 'Ref Number'}: {salarySlip.id}</div>
+                <h1 style={{ margin:0, fontSize:'1.6rem', letterSpacing:'1px' }}>{isID ? 'SLIP GAJI KARYAWAN' : 'EMPLOYEE SALARY SLIP'}</h1>
+                <div style={{ color:'#666', marginTop:'4px', fontSize:'0.85rem' }}>{isID ? 'Nomor Ref' : 'Ref Number'}: {salarySlip.id}</div>
               </div>
               <div style={{ textAlign:'right' }}>
-                <div style={{ fontWeight:'900', fontSize:'1.2rem' }}>PT. ALPHA LOGISTICS PRAKARSA</div>
-                <div style={{ fontSize:'0.85rem', color:'#444' }}>Logistics & Transportation Excellence</div>
-                <div style={{ marginTop:'10px', fontWeight:'700' }}>{isID ? 'Periode' : 'Period'}: {salarySlip.period}</div>
+                <div style={{ fontWeight:'900', fontSize:'1.1rem' }}>PT. ALPHA LOGISTICS PRAKARSA</div>
+                <div style={{ fontSize:'0.8rem', color:'#444' }}>Logistics & Transportation Excellence</div>
+                <div style={{ marginTop:'6px', fontWeight:'700', fontSize:'0.85rem' }}>{isID ? 'Periode' : 'Period'}: {salarySlip.period}</div>
               </div>
             </div>
 
-            <div className="grid-responsive-2" style={{ gap:'40px', marginBottom:'40px', background:'#f9f9f9', padding:'20px', border:'1px solid #eee' }}>
+            <div className="grid-responsive-2" style={{ gap:'20px', marginBottom:'25px', background:'#f9f9f9', padding:'15px', border:'1px solid #eee', borderRadius:'4px' }}>
                <div>
-                 <div style={{ fontSize:'0.75rem', color:'#888', textTransform:'uppercase', marginBottom:'5px' }}>{isID ? 'Informasi Karyawan:' : 'Employee Information:'}</div>
-                 <div style={{ fontWeight:'800', fontSize:'1.2rem' }}>{salarySlip.name}</div>
-                 <div style={{ fontSize:'1rem', color:'#333', display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '4px' }}>
+                 <div style={{ fontSize:'0.7rem', color:'#888', textTransform:'uppercase', marginBottom:'4px', fontWeight:'600' }}>{isID ? 'Informasi Karyawan:' : 'Employee Information:'}</div>
+                 <div style={{ fontWeight:'800', fontSize:'1.1rem' }}>{salarySlip.name}</div>
+                 <div style={{ fontSize:'0.9rem', color:'#333', display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '4px' }}>
                     {salarySlip.position ? salarySlip.position.split(',').map((p, idx) => (
-                      <span key={idx} style={{ background: '#e2e8f0', color: '#1e293b', padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: '600' }}>
+                      <span key={idx} style={{ background: '#e2e8f0', color: '#1e293b', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600' }}>
                         {p.trim()}
                       </span>
                     )) : '-'}
                   </div>
-                 <div style={{ marginTop:'10px', fontSize:'0.85rem' }}>NIK: {salarySlip.nik || '-'}</div>
-                 <div style={{ fontSize:'0.85rem' }}>NPWP: {salarySlip.npwp || '-'}</div>
+                 <div style={{ marginTop:'8px', fontSize:'0.8rem' }}>NIK: {salarySlip.nik || '-'}</div>
+                 <div style={{ fontSize:'0.8rem' }}>NPWP: {salarySlip.npwp || '-'}</div>
                </div>
                <div style={{ textAlign:'right' }}>
-                 <div style={{ fontSize:'0.75rem', color:'#888', textTransform:'uppercase', marginBottom:'5px' }}>{isID ? 'Informasi Pembayaran:' : 'Payment Information:'}</div>
-                 <div style={{ fontWeight:'700' }}>{salarySlip.bankName}</div>
-                 <div style={{ fontSize:'1.1rem', letterSpacing:'1px' }}>{salarySlip.bankAccount}</div>
-                 <div style={{ marginTop:'10px', fontSize:'0.85rem' }}>{isID ? 'Tanggal Bayar' : 'Payment Date'}: {new Date(salarySlip.expenseDate).toLocaleDateString(isID ? 'id-ID' : 'en-US', {day:'numeric', month:'long', year:'numeric'})}</div>
+                 <div style={{ fontSize:'0.7rem', color:'#888', textTransform:'uppercase', marginBottom:'4px', fontWeight:'600' }}>{isID ? 'Informasi Pembayaran:' : 'Payment Information:'}</div>
+                 <div style={{ fontWeight:'700', fontSize:'0.95rem' }}>{salarySlip.bankName}</div>
+                 <div style={{ fontSize:'1rem', letterSpacing:'1px', fontWeight:'600' }}>{salarySlip.bankAccount}</div>
+                 <div style={{ marginTop:'8px', fontSize:'0.8rem' }}>{isID ? 'Tanggal Bayar' : 'Payment Date'}: {new Date(salarySlip.expenseDate).toLocaleDateString(isID ? 'id-ID' : 'en-US', {day:'numeric', month:'long', year:'numeric'})}</div>
                </div>
             </div>
 
-            <div className="grid-responsive-2" style={{ gap:'30px' }}>
+            <div className="grid-responsive-2" style={{ gap:'25px' }}>
                {/* Earnings */}
                <div>
-                 <h4 style={{ borderBottom:'2px solid #333', paddingBottom:'8px', marginBottom:'15px' }}>{isID ? 'PENGHASILAN' : 'EARNINGS'}</h4>
-                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'10px' }}>
+                 <h4 style={{ borderBottom:'2px solid #333', paddingBottom:'6px', marginBottom:'12px', fontSize:'0.95rem' }}>{isID ? 'PENGHASILAN' : 'EARNINGS'}</h4>
+                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'8px', fontSize:'0.85rem' }}>
                    <span>{isID ? 'Gaji Pokok' : 'Base Salary'}</span>
                    <span style={{ fontWeight:'600' }}>Rp {parseFloat(salarySlip.baseSalary).toLocaleString(isID ? 'id-ID' : 'en-US')}</span>
                  </div>
-                 <div style={{ borderTop:'1px solid #eee', paddingTop:'10px', marginTop:'20px', display:'flex', justifyContent:'space-between', fontWeight:'800' }}>
+                 <div style={{ borderTop:'1px solid #eee', paddingTop:'8px', marginTop:'15px', display:'flex', justifyContent:'space-between', fontWeight:'800', fontSize:'0.9rem' }}>
                    <span>{isID ? 'Total Penghasilan' : 'Total Earnings'}</span>
                    <span>Rp {parseFloat(salarySlip.baseSalary).toLocaleString(isID ? 'id-ID' : 'en-US')}</span>
                  </div>
@@ -9766,41 +9816,41 @@ const Accounting = () => {
 
                {/* Deductions */}
                <div>
-                 <h4 style={{ borderBottom:'2px solid var(--danger)', paddingBottom:'8px', marginBottom:'15px' }}>{isID ? 'POTONGAN' : 'DEDUCTIONS'}</h4>
+                 <h4 style={{ borderBottom:'2px solid var(--danger)', paddingBottom:'6px', marginBottom:'12px', fontSize:'0.95rem' }}>{isID ? 'POTONGAN' : 'DEDUCTIONS'}</h4>
                  {salarySlip.taxes.map((t, idx) => (
-                   <div key={idx} style={{ display:'flex', justifyContent:'space-between', marginBottom:'10px' }}>
+                   <div key={idx} style={{ display:'flex', justifyContent:'space-between', marginBottom:'8px', fontSize:'0.85rem' }}>
                      <span>{t.name}</span>
                      <span style={{ color:'var(--danger)' }}>- Rp {parseFloat(t.amount).toLocaleString(isID ? 'id-ID' : 'en-US')}</span>
                    </div>
                  ))}
-                 {salarySlip.taxes.length === 0 && <div style={{ color:'#888', fontStyle:'italic', fontSize:'0.85rem' }}>{isID ? 'Tidak ada potongan.' : 'No deductions.'}</div>}
+                 {salarySlip.taxes.length === 0 && <div style={{ color:'#888', fontStyle:'italic', fontSize:'0.8rem' }}>{isID ? 'Tidak ada potongan.' : 'No deductions.'}</div>}
                  
-                 <div style={{ borderTop:'1px solid #eee', paddingTop:'10px', marginTop:'20px', display:'flex', justifyContent:'space-between', fontWeight:'800' }}>
+                 <div style={{ borderTop:'1px solid #eee', paddingTop:'8px', marginTop:'15px', display:'flex', justifyContent:'space-between', fontWeight:'800', fontSize:'0.9rem' }}>
                    <span>{isID ? 'Total Potongan' : 'Total Deductions'}</span>
                    <span style={{ color:'var(--danger)' }}>Rp {salarySlip.taxes.reduce((acc, t) => acc + parseFloat(t.amount), 0).toLocaleString(isID ? 'id-ID' : 'en-US')}</span>
                  </div>
                </div>
             </div>
 
-            <div style={{ marginTop:'50px', background:'#333', color:'white', padding:'25px', display:'flex', justifyContent:'space-between', alignItems:'center', borderRadius:'4px' }}>
-               <div style={{ fontSize:'0.9rem', fontWeight:'600', textTransform:'uppercase' }}>{isID ? 'Take Home Pay (Total Diterima)' : 'Take Home Pay (Total Received)'}</div>
-               <div style={{ fontSize:'2rem', fontWeight:'900', letterSpacing:'1px' }}>Rp {parseFloat(salarySlip.totalToPay).toLocaleString(isID ? 'id-ID' : 'en-US')}</div>
+            <div style={{ marginTop:'30px', background:'#1e293b', color:'white', padding:'18px 25px', display:'flex', justifyContent:'space-between', alignItems:'center', borderRadius:'4px' }}>
+               <div style={{ fontSize:'0.85rem', fontWeight:'600', textTransform:'uppercase', letterSpacing:'0.5px' }}>{isID ? 'Take Home Pay (Total Diterima)' : 'Take Home Pay (Total Received)'}</div>
+               <div style={{ fontSize:'1.6rem', fontWeight:'900', letterSpacing:'1px' }}>Rp {parseFloat(salarySlip.totalToPay).toLocaleString(isID ? 'id-ID' : 'en-US')}</div>
             </div>
 
-            <div style={{ marginTop:'60px', display:'flex', justifyContent:'space-between' }}>
-               <div style={{ textAlign:'center', width:'200px' }}>
-                 <div style={{ fontSize:'0.85rem', marginBottom:'80px' }}>{isID ? 'Dibuat Oleh,' : 'Prepared By,'}</div>
-                 <div style={{ borderBottom:'1px solid #333', fontWeight:'700' }}>{isID ? 'Bagian Keuangan' : 'Finance Department'}</div>
-                 <div style={{ fontSize:'0.75rem', color:'#666' }}>PT. Alpha Logistics Prakarsa</div>
+            <div style={{ marginTop:'40px', display:'flex', justifyContent:'space-between' }}>
+               <div style={{ textAlign:'center', width:'180px' }}>
+                 <div style={{ fontSize:'0.8rem', marginBottom:'50px' }}>{isID ? 'Dibuat Oleh,' : 'Prepared By,'}</div>
+                 <div style={{ borderBottom:'1px solid #333', fontWeight:'700', paddingBottom:'4px', fontSize:'0.85rem' }}>{isID ? 'Bagian Keuangan' : 'Finance Department'}</div>
+                 <div style={{ fontSize:'0.7rem', color:'#666', marginTop:'2px' }}>PT. Alpha Logistics Prakarsa</div>
                </div>
-               <div style={{ textAlign:'center', width:'200px' }}>
-                 <div style={{ fontSize:'0.85rem', marginBottom:'80px' }}>{isID ? 'Diterima Oleh,' : 'Received By,'}</div>
-                 <div style={{ borderBottom:'1px solid #333', fontWeight:'700' }}>{salarySlip.name}</div>
-                 <div style={{ fontSize:'0.75rem', color:'#666' }}>{isID ? 'Karyawan' : 'Employee'}</div>
+               <div style={{ textAlign:'center', width:'180px' }}>
+                 <div style={{ fontSize:'0.8rem', marginBottom:'50px' }}>{isID ? 'Diterima Oleh,' : 'Received By,'}</div>
+                 <div style={{ borderBottom:'1px solid #333', fontWeight:'700', paddingBottom:'4px', fontSize:'0.85rem' }}>{salarySlip.name}</div>
+                 <div style={{ fontSize:'0.7rem', color:'#666', marginTop:'2px' }}>{isID ? 'Karyawan' : 'Employee'}</div>
                </div>
             </div>
 
-            <div style={{ marginTop:'40px', fontSize:'0.7rem', color:'#999', textAlign:'center', borderTop:'1px dashed #ccc', paddingTop:'15px' }}>
+            <div style={{ marginTop:'25px', fontSize:'0.68rem', color:'#888', textAlign:'center', borderTop:'1px dashed #ccc', paddingTop:'10px' }}>
               {isID ? 'Dokumen ini diterbitkan secara elektronik melalui PT. Alpha Logistics Prakarsa dan sah tanpa tanda tangan basah.' : 'This document is electronically issued by PT. Alpha Logistics Prakarsa and is valid without a physical signature.'}
             </div>
           </div>
@@ -9944,7 +9994,50 @@ const Accounting = () => {
 
       {/* Financial Report PDF Preview */}
       {financialReport && (
-        <div style={{ position:'fixed', inset:0, background:'white', zIndex:30000, color:'black', padding:'40px', overflowY:'auto' }}>
+        <div id="financial-report-modal" style={{ position:'fixed', inset:0, background:'white', zIndex:30000, color:'black', padding:'40px', overflowY:'auto' }}>
+          <style>{`
+            @media print {
+              @page {
+                size: A4 portrait;
+                margin: 0;
+              }
+              html, body, #root, .layout, main, .accounting-container {
+                min-height: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+              }
+              body * {
+                visibility: hidden;
+              }
+              #financial-report-modal, #financial-report-modal * {
+                visibility: visible;
+              }
+              #financial-report-modal {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                height: auto !important;
+                min-height: 100% !important;
+                margin: 0 !important;
+                padding: 12mm 10mm !important;
+                box-sizing: border-box !important;
+                background: white !important;
+                overflow: visible !important;
+                z-index: 999999 !important;
+              }
+              #financial-report-print {
+                width: 100% !important;
+                max-width: 210mm !important;
+                margin: 0 auto !important;
+                padding: 5mm 5mm !important;
+                box-shadow: none !important;
+                box-sizing: border-box !important;
+              }
+              .no-print { display: none !important; }
+            }
+          `}</style>
           <div className="no-print" style={{ display:'flex', justifyContent:'space-between', marginBottom:'30px', background:'#f8fafc', padding:'15px', borderRadius:'12px', border:'1px solid #e2e8f0' }}>
              <div style={{ display:'flex', alignItems:'center', gap:'10px', color:'#64748b' }}>
                <FileText size={20}/>
@@ -9956,7 +10049,7 @@ const Accounting = () => {
              </div>
           </div>
 
-          <div style={{ maxWidth:'1000px', margin:'0 auto', border:'1px solid #333', padding:'50px', background:'white' }}>
+          <div id="financial-report-print" style={{ maxWidth:'1000px', margin:'0 auto', border:'1px solid #333', padding:'50px', background:'white' }}>
             <div style={{ display:'flex', justifyContent:'space-between', borderBottom:'4px solid #333', paddingBottom:'25px', marginBottom:'40px' }}>
               <div>
                 <h1 style={{ margin:0, fontSize:'2.2rem', letterSpacing:'1px', fontWeight:'900' }}>{isID ? 'LAPORAN RINGKASAN KEUANGAN' : 'FINANCIAL SUMMARY REPORT'}</h1>
