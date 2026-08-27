@@ -387,6 +387,18 @@ app.post('/api/quotations', async (req, res) => {
   }
 });
 
+app.put('/api/quotations/:id/approve', async (req, res) => {
+  const { error } = await supabase.from('quotations').update({ status: 'approved' }).eq('id', req.params.id);
+  if (error) return handleError(res, error, 'approve quotation');
+  res.sendStatus(200);
+});
+
+app.put('/api/quotations/:id/unapprove', async (req, res) => {
+  const { error } = await supabase.from('quotations').update({ status: 'pending' }).eq('id', req.params.id);
+  if (error) return handleError(res, error, 'unapprove quotation');
+  res.sendStatus(200);
+});
+
 app.put('/api/quotations/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -401,18 +413,6 @@ app.put('/api/quotations/:id', async (req, res) => {
     console.error('Update Quotation Error:', err);
     res.status(500).json({ error: err.message });
   }
-});
-
-app.put('/api/quotations/:id/approve', async (req, res) => {
-  const { error } = await supabase.from('quotations').update({ status: 'approved' }).eq('id', req.params.id);
-  if (error) return handleError(res, error, 'approve quotation');
-  res.sendStatus(200);
-});
-
-app.put('/api/quotations/:id/unapprove', async (req, res) => {
-  const { error } = await supabase.from('quotations').update({ status: 'pending' }).eq('id', req.params.id);
-  if (error) return handleError(res, error, 'unapprove quotation');
-  res.sendStatus(200);
 });
 
 app.delete('/api/quotations/:id', async (req, res) => {
@@ -1321,6 +1321,87 @@ app.post('/api/invoices', async (req, res) => {
   }
 });
 
+app.put('/api/invoices/*id/settle', async (req, res) => {
+  const id = Array.isArray(req.params.id) ? req.params.id.join('/') : req.params.id;
+  const { paymentProofPhoto, taxesDeducted, taxDeductionProof, paidDate } = req.body;
+  
+  // Calculate total tax from the array
+  const taxesArr = Array.isArray(taxesDeducted) ? taxesDeducted : [];
+  const totalTax = taxesArr.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+  const taxesJson = JSON.stringify(taxesArr);
+  const paymentProofVal = Array.isArray(paymentProofPhoto) ? JSON.stringify(paymentProofPhoto) : (paymentProofPhoto || null);
+  const taxProofVal = Array.isArray(taxDeductionProof) ? JSON.stringify(taxDeductionProof) : (taxDeductionProof || null);
+  const settlePaidDate = paidDate || new Date().toISOString();
+  
+  try {
+    // 1. Update Invoice status
+    const { error: invErr } = await supabase.from('invoices').update({ 
+      status: 'paid',
+      tax_deduction: totalTax,
+      taxes_deducted: taxesJson,
+      tax_deduction_proof: taxProofVal,
+      paymentProofPhoto: paymentProofVal,
+      paidDate: settlePaidDate
+    }).eq('id', id);
+    
+    if (invErr) {
+      console.warn(`[SETTLE] Invoice update failed for ${id}: ${invErr.message}`);
+      // Fallback if columns are missing (e.g. paidDate)
+      if (invErr.message.includes('column') || invErr.message.includes('schema cache') || invErr.code === '42703' || invErr.code === 'PGRST204') {
+        const { error: fallbackErr } = await supabase.from('invoices').update({ 
+          status: 'paid', 
+          tax_deduction: totalTax,
+          taxes_deducted: taxesJson,
+          tax_deduction_proof: taxProofVal,
+          paymentProofPhoto: paymentProofVal
+        }).eq('id', id);
+        if (fallbackErr) {
+          console.error(`[SETTLE] Invoice fallback update failed:`, fallbackErr.message);
+          return res.status(500).json({ error: `Invoice fallback update failed: ${fallbackErr.message}` });
+        }
+      } else {
+        return res.status(500).json({ error: `Invoice update failed: ${invErr.message}` });
+      }
+    }
+    
+    // 2. Update Receivable status and add proof photo + tax info
+    const { error: recErr } = await supabase.from('receivables').update({ 
+      status: 'paid', 
+      balance: 0,
+      paymentProofPhoto: paymentProofVal,
+      tax_deduction: totalTax,
+      taxes_deducted: taxesJson,
+      tax_deduction_proof: taxProofVal,
+      paidDate: settlePaidDate
+    }).eq('invoiceId', id);
+    
+    if (recErr) {
+      console.warn(`[SETTLE] Receivable update failed for ${id}: ${recErr.message}`);
+      if (recErr.message.includes('column') || recErr.message.includes('schema cache') || recErr.code === '42703' || recErr.code === 'PGRST204') {
+        const { error: fallbackErr } = await supabase.from('receivables').update({ 
+          status: 'paid', 
+          balance: 0,
+          paymentProofPhoto: paymentProofVal,
+          tax_deduction: totalTax,
+          taxes_deducted: taxesJson,
+          tax_deduction_proof: taxProofVal
+        }).eq('invoiceId', id);
+        if (fallbackErr) {
+          console.error(`[SETTLE] Receivable fallback update failed:`, fallbackErr.message);
+          return res.status(500).json({ error: `Receivable fallback update failed: ${fallbackErr.message}` });
+        }
+      } else {
+        return res.status(500).json({ error: `Receivable update failed: ${recErr.message}` });
+      }
+    }
+    
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Settle Invoice Exception:', err);
+    res.status(500).json({ error: 'Internal server error during settlement' });
+  }
+});
+
 app.put('/api/invoices/*id', async (req, res) => {
   const id = Array.isArray(req.params.id) ? req.params.id.join('/') : req.params.id;
   const updates = req.body;
@@ -1436,82 +1517,6 @@ app.put('/api/invoices/*id', async (req, res) => {
     }
   }
   res.sendStatus(200);
-});
-
-app.put('/api/invoices/*id/settle', async (req, res) => {
-  const id = Array.isArray(req.params.id) ? req.params.id.join('/') : req.params.id;
-  const { paymentProofPhoto, taxesDeducted, taxDeductionProof, paidDate } = req.body;
-  
-  // Calculate total tax from the array
-  const taxesArr = Array.isArray(taxesDeducted) ? taxesDeducted : [];
-  const totalTax = taxesArr.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-  const taxesJson = JSON.stringify(taxesArr);
-  
-  try {
-    // 1. Update Invoice status
-    const { error: invErr } = await supabase.from('invoices').update({ 
-      status: 'paid',
-      tax_deduction: totalTax,
-      taxes_deducted: taxesJson,
-      tax_deduction_proof: taxDeductionProof,
-      paidDate
-    }).eq('id', id);
-    
-    if (invErr) {
-      console.warn(`[SETTLE] Invoice update failed for ${id}: ${invErr.message}`);
-      // Fallback if columns are missing (e.g. paidDate)
-      if (invErr.message.includes('column') || invErr.message.includes('schema cache') || invErr.code === '42703' || invErr.code === 'PGRST204') {
-        const { error: fallbackErr } = await supabase.from('invoices').update({ 
-          status: 'paid', 
-          tax_deduction: totalTax,
-          taxes_deducted: taxesJson,
-          tax_deduction_proof: taxDeductionProof
-        }).eq('id', id);
-        if (fallbackErr) {
-          console.error(`[SETTLE] Invoice fallback update failed:`, fallbackErr.message);
-          return res.status(500).json({ error: `Invoice fallback update failed: ${fallbackErr.message}` });
-        }
-      } else {
-        return res.status(500).json({ error: `Invoice update failed: ${invErr.message}` });
-      }
-    }
-    
-    // 2. Update Receivable status and add proof photo + tax info
-    const { error: recErr } = await supabase.from('receivables').update({ 
-      status: 'paid', 
-      balance: 0,
-      paymentProofPhoto,
-      tax_deduction: totalTax,
-      taxes_deducted: taxesJson,
-      tax_deduction_proof: taxDeductionProof,
-      paidDate
-    }).eq('invoiceId', id);
-    
-    if (recErr) {
-      console.warn(`[SETTLE] Receivable update failed for ${id}: ${recErr.message}`);
-      if (recErr.message.includes('column') || recErr.message.includes('schema cache') || recErr.code === '42703' || recErr.code === 'PGRST204') {
-        const { error: fallbackErr } = await supabase.from('receivables').update({ 
-          status: 'paid', 
-          balance: 0,
-          paymentProofPhoto,
-          tax_deduction: totalTax,
-          taxes_deducted: taxesJson,
-          tax_deduction_proof: taxDeductionProof
-        }).eq('invoiceId', id);
-        if (fallbackErr) {
-          console.error(`[SETTLE] Receivable fallback update failed:`, fallbackErr.message);
-          return res.status(500).json({ error: `Receivable fallback update failed: ${fallbackErr.message}` });
-        }
-      } else {
-        return res.status(500).json({ error: `Receivable update failed: ${recErr.message}` });
-      }
-    }
-    
-    res.sendStatus(200);
-  } catch (err) {
-    console.error('Settle Invoice Exception:', err);
-    res.status(500).json({ error: 'Internal server error during settlement' });
-  }
 });
 
 

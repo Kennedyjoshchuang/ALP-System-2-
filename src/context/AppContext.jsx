@@ -167,7 +167,9 @@ export const AppProvider = ({ children }) => {
               try {
                 newItem[key] = JSON.parse(newItem[key]);
               } catch (e) {
-                console.warn(`Failed to parse ${key} for item ${newItem.id}:`, e.message);
+                if (typeof newItem[key] === 'string' && (newItem[key].trim().startsWith('[') || newItem[key].trim().startsWith('{'))) {
+                  console.warn(`Failed to parse ${key} for item ${newItem.id}:`, e.message);
+                }
               }
             }
             // Ensure array type for common list columns if they are null/undefined
