@@ -1,10 +1,4 @@
 import React, { useState } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Configure pdfjs worker to use CDN matching pdfjs-dist version
-if (typeof window !== 'undefined' && pdfjsLib) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version || '4.0.379'}/pdf.worker.min.mjs`;
-}
 
 const ExtraDocsUploader = ({ extraDocuments = [], onChange, compact = false }) => {
   const [loading, setLoading] = useState(false);
@@ -21,6 +15,10 @@ const ExtraDocsUploader = ({ extraDocuments = [], onChange, compact = false }) =
   };
 
   const processPdfFile = async (file) => {
+    const pdfjsLib = await import('pdfjs-dist');
+    if (typeof window !== 'undefined' && pdfjsLib && pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version || '4.0.379'}/pdf.worker.min.mjs`;
+    }
     const arrayBuffer = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
     const pdf = await loadingTask.promise;
@@ -141,11 +139,6 @@ const ExtraDocsUploader = ({ extraDocuments = [], onChange, compact = false }) =
     const flat = getFlatPages();
     flat.splice(globalIndex, 1);
     updateFromFlatPages(flat);
-  };
-
-  const handleDeleteDoc = (docIndexToRemove) => {
-    const updated = (extraDocuments || []).filter((_, idx) => idx !== docIndexToRemove);
-    if (onChange) onChange(updated);
   };
 
   const flatPages = getFlatPages();

@@ -1,29 +1,55 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { Toaster } from 'react-hot-toast';
 import Layout from './components/Layout';
-import Marketing from './pages/Marketing';
-import QuotationList from './pages/QuotationList';
-import AdminHub from './pages/AdminHub';
-import Executor from './pages/Executor';
-import Accounting from './pages/Accounting';
-import Procurement from './pages/Procurement';
-import SystemControl from './pages/SystemControl';
-import HRD from './pages/HRD';
-import Login from './pages/Login';
-import CostApplications from './pages/CostApplications';
-import DashboardHome from './components/DashboardHome';
-import SuratJalanDetail from './pages/SuratJalanDetail';
-import PrintQuotation from './pages/PrintQuotation';
-import PrintInvoice from './pages/PrintInvoice';
-import PrintInvoiceAttachment from './pages/PrintInvoiceAttachment';
-import PrintInvoiceReceipt from './pages/PrintInvoiceReceipt';
-import PrintInvoiceDelivery from './pages/PrintInvoiceDelivery';
-import PrintPOAttachment from './pages/PrintPOAttachment';
 import MaintenanceOverlay from './components/MaintenanceOverlay';
-import Portal from './pages/Portal';
+import DashboardHome from './components/DashboardHome';
+
+// Lazy-loaded page components for optimal code-splitting
+const Portal = lazy(() => import('./pages/Portal'));
+const Login = lazy(() => import('./pages/Login'));
+const Marketing = lazy(() => import('./pages/Marketing'));
+const QuotationList = lazy(() => import('./pages/QuotationList'));
+const AdminHub = lazy(() => import('./pages/AdminHub'));
+const Executor = lazy(() => import('./pages/Executor'));
+const Accounting = lazy(() => import('./pages/Accounting'));
+const CostApplications = lazy(() => import('./pages/CostApplications'));
+const Procurement = lazy(() => import('./pages/Procurement'));
+const HRD = lazy(() => import('./pages/HRD'));
+const SystemControl = lazy(() => import('./pages/SystemControl'));
+const SuratJalanDetail = lazy(() => import('./pages/SuratJalanDetail'));
+
+// Lazy-loaded print pages
+const PrintQuotation = lazy(() => import('./pages/PrintQuotation'));
+const PrintInvoice = lazy(() => import('./pages/PrintInvoice'));
+const PrintInvoiceAttachment = lazy(() => import('./pages/PrintInvoiceAttachment'));
+const PrintInvoiceReceipt = lazy(() => import('./pages/PrintInvoiceReceipt'));
+const PrintInvoiceDelivery = lazy(() => import('./pages/PrintInvoiceDelivery'));
+const PrintPOAttachment = lazy(() => import('./pages/PrintPOAttachment'));
+
+const RouteLoadingFallback = () => (
+  <div style={{
+    minHeight: '60vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'column',
+    gap: '1rem',
+    color: '#cbd5e1'
+  }}>
+    <div style={{
+      width: '40px',
+      height: '40px',
+      border: '3px solid rgba(16, 185, 129, 0.2)',
+      borderTopColor: '#10b981',
+      borderRadius: '50%',
+      animation: 'spin 0.8s linear infinite'
+    }} />
+    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+  </div>
+);
 
 const ProtectedRoute = ({ children, useLayout = true }) => {
   const { user, loading } = useApp();
@@ -35,37 +61,39 @@ const ProtectedRoute = ({ children, useLayout = true }) => {
 const AppRoutes = () => {
   return (
     <Router>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/" element={<Portal />} />
-        
-        {/* Protected Dashboard Routes */}
-        <Route path="/dashboard" element={<ProtectedRoute><DashboardHome /></ProtectedRoute>} />
-        <Route path="/marketing" element={<ProtectedRoute><Marketing /></ProtectedRoute>} />
-        <Route path="/quotations" element={<ProtectedRoute><QuotationList /></ProtectedRoute>} />
-        <Route path="/admin" element={<ProtectedRoute><AdminHub /></ProtectedRoute>} />
-        <Route path="/executor" element={<ProtectedRoute><Executor /></ProtectedRoute>} />
-        <Route path="/accounting" element={<ProtectedRoute><Accounting /></ProtectedRoute>} />
-        <Route path="/cost-applications" element={<ProtectedRoute><CostApplications /></ProtectedRoute>} />
-        <Route path="/procurement" element={<ProtectedRoute><Procurement /></ProtectedRoute>} />
-        <Route path="/hrd" element={<ProtectedRoute><HRD /></ProtectedRoute>} />
-        <Route path="/system-control" element={<ProtectedRoute><SystemControl /></ProtectedRoute>} />
-        <Route path="/surat-jalan/:id" element={<ProtectedRoute><SuratJalanDetail /></ProtectedRoute>} />
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<Portal />} />
+          
+          {/* Protected Dashboard Routes */}
+          <Route path="/dashboard" element={<ProtectedRoute><DashboardHome /></ProtectedRoute>} />
+          <Route path="/marketing" element={<ProtectedRoute><Marketing /></ProtectedRoute>} />
+          <Route path="/quotations" element={<ProtectedRoute><QuotationList /></ProtectedRoute>} />
+          <Route path="/admin" element={<ProtectedRoute><AdminHub /></ProtectedRoute>} />
+          <Route path="/executor" element={<ProtectedRoute><Executor /></ProtectedRoute>} />
+          <Route path="/accounting" element={<ProtectedRoute><Accounting /></ProtectedRoute>} />
+          <Route path="/cost-applications" element={<ProtectedRoute><CostApplications /></ProtectedRoute>} />
+          <Route path="/procurement" element={<ProtectedRoute><Procurement /></ProtectedRoute>} />
+          <Route path="/hrd" element={<ProtectedRoute><HRD /></ProtectedRoute>} />
+          <Route path="/system-control" element={<ProtectedRoute><SystemControl /></ProtectedRoute>} />
+          <Route path="/surat-jalan/:id" element={<ProtectedRoute><SuratJalanDetail /></ProtectedRoute>} />
 
-        {/* Print Pages - No Layout */}
-        <Route path="/print/quotation" element={<ProtectedRoute useLayout={false}><PrintQuotation /></ProtectedRoute>} />
-        <Route path="/print/invoice" element={<ProtectedRoute useLayout={false}><PrintInvoice /></ProtectedRoute>} />
-        <Route path="/print/invoice-attachment" element={<ProtectedRoute useLayout={false}><PrintInvoiceAttachment /></ProtectedRoute>} />
-        <Route path="/print/invoice-receipt" element={<ProtectedRoute useLayout={false}><PrintInvoiceReceipt /></ProtectedRoute>} />
-        <Route path="/print/invoice-delivery" element={<ProtectedRoute useLayout={false}><PrintInvoiceDelivery /></ProtectedRoute>} />
-        <Route path="/print/po-attachment" element={<ProtectedRoute useLayout={false}><PrintPOAttachment /></ProtectedRoute>} />
+          {/* Print Pages - No Layout */}
+          <Route path="/print/quotation" element={<ProtectedRoute useLayout={false}><PrintQuotation /></ProtectedRoute>} />
+          <Route path="/print/invoice" element={<ProtectedRoute useLayout={false}><PrintInvoice /></ProtectedRoute>} />
+          <Route path="/print/invoice-attachment" element={<ProtectedRoute useLayout={false}><PrintInvoiceAttachment /></ProtectedRoute>} />
+          <Route path="/print/invoice-receipt" element={<ProtectedRoute useLayout={false}><PrintInvoiceReceipt /></ProtectedRoute>} />
+          <Route path="/print/invoice-delivery" element={<ProtectedRoute useLayout={false}><PrintInvoiceDelivery /></ProtectedRoute>} />
+          <Route path="/print/po-attachment" element={<ProtectedRoute useLayout={false}><PrintPOAttachment /></ProtectedRoute>} />
 
-        {/* Catch-all */}
-        <Route path="*" element={<Navigate to="/dashboard" />} />
-      </Routes>
+          {/* Catch-all */}
+          <Route path="*" element={<Navigate to="/dashboard" />} />
+        </Routes>
+      </Suspense>
     </Router>
   );
-}
+};
 
 function App() {
   return (

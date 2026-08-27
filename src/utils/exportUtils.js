@@ -1,6 +1,5 @@
-import * as XLSX from 'xlsx';
-
-export const exportToExcel = (data, fileName) => {
+export const exportToExcel = async (data, fileName) => {
+  const XLSX = await import('xlsx');
   const worksheet = XLSX.utils.json_to_sheet(data);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');

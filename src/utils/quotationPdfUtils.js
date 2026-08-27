@@ -1,15 +1,20 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import html2pdf from 'html2pdf.js';
-import JSZip from 'jszip';
 import toast from 'react-hot-toast';
-import PrintQuotation from '../pages/PrintQuotation';
 
 export const exportQuotationsFolder = async (quotations, companyOptions = {}, onProgress) => {
   if (!quotations || quotations.length === 0) {
     toast.error("Tidak ada penawaran untuk di-download.");
     return;
   }
+
+  // Dynamically load heavy engines only when user triggers bulk PDF export
+  const [html2pdfModule, { default: JSZip }, { default: PrintQuotation }] = await Promise.all([
+    import('html2pdf.js'),
+    import('jszip'),
+    import('../pages/PrintQuotation')
+  ]);
+  const html2pdf = html2pdfModule.default || html2pdfModule;
 
   const { systemName = "ALP" } = companyOptions;
   const zip = new JSZip();
