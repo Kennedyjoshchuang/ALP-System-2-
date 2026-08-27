@@ -140,6 +140,12 @@ const SuratJalanDetail = () => {
                     <span style={{ color: '#64748b', fontSize: '0.85rem' }}>Vessel / Kapal:</span>
                     <span style={{ fontWeight: '700', color: '#1e293b' }}>{jo.vesselName || '-'}</span>
                   </div>
+                  {(jo.blNumber || jo.blNo) && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b', fontSize: '0.85rem' }}>No. BL (Bill of Lading):</span>
+                      <span style={{ fontWeight: '700', color: '#1e293b' }}>{jo.blNumber || jo.blNo}</span>
+                    </div>
+                  )}
                   {jo.etd && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: '#64748b', fontSize: '0.85rem' }}>ETD:</span>

@@ -189,6 +189,7 @@ export const AppProvider = ({ children }) => {
         let etd = jo.etd || null;
         let eta = jo.eta || null;
         let vesselName = jo.vesselName || null;
+        let blNumber = jo.blNumber || jo.blNo || null;
         
         if (instructionText && instructionText.includes('|||')) {
           const parts = instructionText.split('|||');
@@ -201,6 +202,8 @@ export const AppProvider = ({ children }) => {
             if (meta.etd) etd = meta.etd;
             if (meta.eta) eta = meta.eta;
             if (meta.vesselName) vesselName = meta.vesselName;
+            if (meta.blNumber) blNumber = meta.blNumber;
+            if (meta.blNo) blNumber = meta.blNo;
           } catch (e) {
             // failed to parse
           }
@@ -215,7 +218,8 @@ export const AppProvider = ({ children }) => {
           shipmentStatus,
           etd,
           eta,
-          vesselName
+          vesselName,
+          blNumber
         };
       });
       setJobOrders(parsedJOs);
@@ -479,6 +483,7 @@ export const AppProvider = ({ children }) => {
     const etd = 'etd' in updates ? updates.etd : currentJo.etd;
     const eta = 'eta' in updates ? updates.eta : currentJo.eta;
     const vesselName = 'vesselName' in updates ? updates.vesselName : currentJo.vesselName;
+    const blNumber = 'blNumber' in updates ? updates.blNumber : ('blNo' in updates ? updates.blNo : currentJo.blNumber);
     
     const rawNewId = updates.newJoId || updates.id;
     const newJoId = rawNewId ? String(rawNewId).trim() : null;
@@ -493,6 +498,8 @@ export const AppProvider = ({ children }) => {
     delete finalUpdates.etd;
     delete finalUpdates.eta;
     delete finalUpdates.vesselName;
+    delete finalUpdates.blNumber;
+    delete finalUpdates.blNo;
     delete finalUpdates.joNumber;
     
     let rawInstruction = updates.instruction || updates.jobDescription || currentJo.instruction || currentJo.jobDescription || '';
@@ -500,8 +507,8 @@ export const AppProvider = ({ children }) => {
       rawInstruction = rawInstruction.split('|||')[0].trim();
     }
 
-    if (dispatchedAt || completedAt || shipmentStatus || etd || eta || vesselName) {
-      const meta = { dispatchedAt, completedAt, shipmentStatus, etd, eta, vesselName };
+    if (dispatchedAt || completedAt || shipmentStatus || etd || eta || vesselName || blNumber) {
+      const meta = { dispatchedAt, completedAt, shipmentStatus, etd, eta, vesselName, blNumber };
       finalUpdates.instruction = `${rawInstruction} ||| ${JSON.stringify(meta)}`;
     } else {
       finalUpdates.instruction = rawInstruction;
@@ -528,6 +535,7 @@ export const AppProvider = ({ children }) => {
         merged.etd = etd;
         merged.eta = eta;
         merged.vesselName = vesselName;
+        merged.blNumber = blNumber;
         delete merged.newJoId;
         return merged;
       }

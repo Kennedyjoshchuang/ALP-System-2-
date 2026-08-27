@@ -546,6 +546,7 @@ const Executor = () => {
           })) : [],
           activityStatus: jo.activityStatus || '',
           vesselName: jo.vesselName || '',
+          blNumber: jo.blNumber || jo.blNo || '',
           etd: jo.etd || '',
           dispatchedAtLocal: toDatetimeLocal(jo.dispatchedAt),
           completedAtLocal: toDatetimeLocal(jo.completedAt),
@@ -595,6 +596,7 @@ const Executor = () => {
 
   const handleDone = async (jo) => {
     const rawData = localData[jo.id] || {
+      joNumber: jo.id,
       containerNo: jo.containerNo,
       vehicleNo: jo.vehicleNo,
       driverName: jo.driverName,
@@ -606,21 +608,42 @@ const Executor = () => {
       })) : [],
       activityStatus: jo.activityStatus,
       vesselName: jo.vesselName,
+      blNumber: jo.blNumber || jo.blNo,
       etd: jo.etd,
       dispatchedAtLocal: toDatetimeLocal(jo.dispatchedAt),
       completedAtLocal: toDatetimeLocal(jo.completedAt),
       extra_charges: Array.isArray(jo.extra_charges) ? jo.extra_charges.map(ec => ({ ...ec })) : []
     };
     
+    const newJoNumber = (rawData.joNumber || jo.id).trim();
+
+    if (!newJoNumber) {
+      toast.error(isID ? 'Nomor Job Order tidak boleh kosong!' : 'Job Order Number cannot be empty!');
+      return;
+    }
+
+    if (newJoNumber !== jo.id) {
+      const exists = jobOrders.some(j => j.id === newJoNumber);
+      if (exists) {
+        toast.error(isID ? `Nomor JO "${newJoNumber}" sudah terdaftar di sistem!` : `JO Number "${newJoNumber}" already exists!`);
+        return;
+      }
+    }
+
     const data = { ...rawData };
-    data.dispatchedAt = toISOString(data.dispatchedAtLocal);
-    data.completedAt = toISOString(data.completedAtLocal);
+    const nowIso = new Date().toISOString();
+    data.dispatchedAt = toISOString(data.dispatchedAtLocal) || jo.dispatchedAt || nowIso;
+    data.completedAt = toISOString(data.completedAtLocal) || nowIso;
     delete data.dispatchedAtLocal;
     delete data.completedAtLocal;
     delete data.joNumber;
 
+    if (newJoNumber !== jo.id) {
+      data.newJoId = newJoNumber;
+    }
+
     if (!data.activityStatus) {
-      toast.error(isID ? 'Status Aktivitas wajib diisi!' : 'Activity Status is required!');
+      toast.error(isID ? 'Status Aktivitas wajib diisi sebelum menyelesaikan pekerjaan!' : 'Activity Status is required before completing job!');
       return;
     }
 
@@ -628,7 +651,7 @@ const Executor = () => {
     let updatedItems = data.items || [];
 
     if (hasItems) {
-      // Validate that all dispatched items have containers, vehicles, drivers
+      // Validate that all items have containers, vehicles, drivers
       const activeItems = updatedItems.filter(item => item.status === 'dispatched' || item.status === 'done');
       for (const item of activeItems) {
         const itemHasContainer = Array.isArray(item.containerNo) ? item.containerNo.some(c => c && c.trim()) : (item.containerNo && item.containerNo.trim());
@@ -644,10 +667,7 @@ const Executor = () => {
       }
 
       updatedItems = updatedItems.map(item => {
-        if (item.status === 'dispatched') {
-          return { ...item, status: 'done' };
-        }
-        return item;
+        return { ...item, status: 'done' };
       });
       data.items = updatedItems;
 
@@ -667,11 +687,23 @@ const Executor = () => {
       }
     }
 
-    // Sync to server before completing
-    await updateJOStatus(jo.id, data);
-    await completeJO(jo.id);
-    toast.success(isID ? `Job ${jo.id} selesai dan dipindahkan ke Records!` : `Job ${jo.id} completed and moved to Records!`);
-    setUploadingForId(null);
+    data.status = 'done';
+    data.shipmentStatus = 'done';
+
+    try {
+      await updateJOStatus(jo.id, data);
+      setLocalData(prev => {
+        const next = { ...prev };
+        delete next[jo.id];
+        if (newJoNumber !== jo.id) delete next[newJoNumber];
+        return next;
+      });
+      setUploadingForId(null);
+      toast.success(isID ? `Job ${newJoNumber || jo.id} berhasil disimpan dan diselesaikan!` : `Job ${newJoNumber || jo.id} saved and completed successfully!`);
+    } catch (err) {
+      console.error("Error completing JO:", err);
+      toast.error(err.error || err.message || (isID ? 'Gagal menyimpan dan menyelesaikan pekerjaan.' : 'Failed to save and complete job.'));
+    }
   };
 
   const handleSaveChanges = async (jo) => {
@@ -688,6 +720,7 @@ const Executor = () => {
       })) : [],
       activityStatus: jo.activityStatus,
       vesselName: jo.vesselName,
+      blNumber: jo.blNumber || jo.blNo,
       etd: jo.etd,
       dispatchedAtLocal: toDatetimeLocal(jo.dispatchedAt),
       completedAtLocal: toDatetimeLocal(jo.completedAt),
@@ -1519,6 +1552,11 @@ const Executor = () => {
                                 <span style={{ color: 'var(--text-muted)' }}>{isID ? 'Kapal:' : 'Vessel:'}</span> {jo.vesselName}
                               </div>
                             )}
+                            {(jo.blNumber || jo.blNo) && (
+                              <div style={{ fontSize: '0.85rem' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>{isID ? 'No. BL:' : 'BL No:'}</span> {jo.blNumber || jo.blNo}
+                              </div>
+                            )}
                             {jo.etd && (
                               <div style={{ fontSize: '0.85rem' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>ETD:</span> {formatETD(jo.etd)}
@@ -1849,6 +1887,17 @@ const Executor = () => {
                                           value={localData[jo.id]?.vesselName || ''} 
                                           onChange={e => handleLocalUpdate(jo.id, 'vesselName', e.target.value)} 
                                           placeholder={isID ? "Masukkan nama kapal..." : "Enter vessel name..."} 
+                                        />
+                                      </div>
+
+                                      <div className="input-group">
+                                        <label>{isID ? 'Nomor B/L (Bill of Lading)' : 'BL Number'}</label>
+                                        <input 
+                                          disabled={!canWrite}
+                                          type="text" 
+                                          value={localData[jo.id]?.blNumber || ''} 
+                                          onChange={e => handleLocalUpdate(jo.id, 'blNumber', e.target.value)} 
+                                          placeholder={isID ? "Masukkan nomor B/L..." : "Enter B/L number..."} 
                                         />
                                       </div>
                                       
