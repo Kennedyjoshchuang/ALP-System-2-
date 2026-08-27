@@ -746,6 +746,17 @@ const Accounting = () => {
     return 'Freight Forwarding Services';
   };
 
+  const getJoContainerList = (jo) => {
+    if (!jo) return [];
+    const itemContainers = Array.isArray(jo.items) 
+      ? jo.items.flatMap(it => Array.isArray(it.containerNo) ? it.containerNo : [it.containerNo]) 
+      : [];
+    const rootContainers = Array.isArray(jo.containerNo) 
+      ? jo.containerNo 
+      : (jo.containerNo ? [jo.containerNo] : []);
+    return [...new Set([...itemContainers, ...rootContainers].map(c => String(c || '').trim()).filter(Boolean))];
+  };
+
 
   // Invoice Confirmation Modal
   const [invoiceConfirmData, setInvoiceConfirmData] = useState(null);
@@ -1684,6 +1695,7 @@ const Accounting = () => {
           Date: jo.date,
           Customer: jo.customerName,
           Vessel_Name: jo.vesselName || '',
+          Container_No: getJoContainerList(jo).join(', '),
           BL_Number: jo.blNumber || jo.blNo || '',
           Status: jo.status,
           Revenue_Inv: revenue,
@@ -5061,7 +5073,7 @@ const Accounting = () => {
                    <th style={{padding:'12px'}}>JO Ref</th>
                    <th style={{padding:'12px'}}>{isID ? 'Pelanggan' : 'Customer'}</th>
                    <th style={{padding:'12px'}}>{isID ? 'Kapal / Vessel' : 'Vessel'}</th>
-                   <th style={{padding:'12px'}}>{isID ? 'No. BL' : 'BL Number'}</th>
+                   <th style={{padding:'12px'}}>{isID ? 'No. Kontainer' : 'Container No.'}</th>
                    <th style={{padding:'12px'}}>{isID ? 'No Invoice' : 'Inv ID'}</th>
                    <th style={{padding:'12px'}}>{isID ? 'Tgl Invoice' : 'Inv Date'}</th>
                    <th style={{padding:'12px'}}>Status</th>
@@ -5115,13 +5127,15 @@ const Accounting = () => {
                               )}
                             </td>
                             <td style={{ padding: '12px', fontSize: '0.82rem', fontWeight: '600' }}>
-                              {jo.blNumber || jo.blNo ? (
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: 'var(--text)' }}>
-                                  📄 {jo.blNumber || jo.blNo}
-                                </span>
-                              ) : (
-                                <span style={{ color: 'var(--text-muted)' }}>—</span>
-                              )}
+                              {(() => {
+                                const containers = getJoContainerList(jo);
+                                if (containers.length === 0) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+                                return (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: 'var(--text)' }} title={containers.join(', ')}>
+                                    📦 {containers.join(', ')}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td style={{ padding: '12px', fontSize: '0.8rem', fontWeight: '700', color: 'var(--secondary)' }}>
                               {invoice ? invoice.id : <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{isID ? 'Belum Ada' : 'None Yet'}</span>}
@@ -5409,13 +5423,15 @@ const Accounting = () => {
                           )}
                         </td>
                         <td style={{ padding: '12px', fontSize: '0.82rem', fontWeight: '600' }}>
-                          {jo.blNumber || jo.blNo ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: 'var(--text)' }}>
-                              📄 {jo.blNumber || jo.blNo}
-                            </span>
-                          ) : (
-                            <span style={{ color: 'var(--text-muted)' }}>—</span>
-                          )}
+                          {(() => {
+                            const containers = getJoContainerList(jo);
+                            if (containers.length === 0) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+                            return (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: 'var(--text)' }} title={containers.join(', ')}>
+                                📦 {containers.join(', ')}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td style={{ padding: '12px', fontSize: '0.8rem', fontWeight: '700', color: 'var(--secondary)' }}>
                           {invoice ? invoice.id : <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{isID ? 'Belum Ada' : 'None Yet'}</span>}
@@ -5476,7 +5492,7 @@ const Accounting = () => {
 
                   // Render Folder Group row and child rows
                   const groupVessels = [...new Set(group.jobOrders.map(j => j.vesselName).filter(Boolean))];
-                  const groupBLs = [...new Set(group.jobOrders.map(j => j.blNumber || j.blNo).filter(Boolean))];
+                  const groupContainers = [...new Set(group.jobOrders.flatMap(j => getJoContainerList(j)))];
 
                   return (
                     <React.Fragment key={group.key}>
@@ -5509,13 +5525,13 @@ const Accounting = () => {
                           )}
                         </td>
                         <td style={{ padding: '12px', fontSize: '0.8rem' }}>
-                          {groupBLs.length === 1 ? (
+                          {groupContainers.length === 1 ? (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: 'var(--text)', fontWeight: '600' }}>
-                              📄 {groupBLs[0]}
+                              📦 {groupContainers[0]}
                             </span>
-                          ) : groupBLs.length > 1 ? (
-                            <span style={{ color: 'var(--secondary)', fontWeight: '600', fontSize: '0.75rem' }} title={groupBLs.join(', ')}>
-                              📄 {groupBLs.length} BL
+                          ) : groupContainers.length > 1 ? (
+                            <span style={{ color: 'var(--secondary)', fontWeight: '600', fontSize: '0.75rem' }} title={groupContainers.join(', ')}>
+                              📦 {groupContainers.length} {isID ? 'Kontainer' : 'Containers'}
                             </span>
                           ) : (
                             <span style={{ color: 'var(--text-muted)' }}>—</span>
@@ -5590,13 +5606,15 @@ const Accounting = () => {
                                   )}
                                 </td>
                                 <td style={{ padding: '12px', fontSize: '0.82rem', fontWeight: '600' }}>
-                                  {jo.blNumber || jo.blNo ? (
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: 'var(--text)' }}>
-                                      📄 {jo.blNumber || jo.blNo}
-                                    </span>
-                                  ) : (
-                                    <span style={{ color: 'var(--text-muted)' }}>—</span>
-                                  )}
+                                  {(() => {
+                                    const containers = getJoContainerList(jo);
+                                    if (containers.length === 0) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+                                    return (
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: 'var(--text)' }} title={containers.join(', ')}>
+                                        📦 {containers.join(', ')}
+                                      </span>
+                                    );
+                                  })()}
                                 </td>
                                 <td style={{ padding: '12px', fontSize: '0.8rem', fontWeight: '700', color: 'var(--secondary)' }}>
                                   {invoice ? invoice.id : <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{isID ? 'Belum Ada' : 'None Yet'}</span>}
@@ -5889,13 +5907,15 @@ const Accounting = () => {
                               )}
                             </td>
                             <td style={{ padding: '12px', fontSize: '0.82rem', fontWeight: '600' }}>
-                              {jo.blNumber || jo.blNo ? (
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: 'var(--text)' }}>
-                                  📄 {jo.blNumber || jo.blNo}
-                                </span>
-                              ) : (
-                                <span style={{ color: 'var(--text-muted)' }}>—</span>
-                              )}
+                              {(() => {
+                                const containers = getJoContainerList(jo);
+                                if (containers.length === 0) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+                                return (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: 'var(--text)' }} title={containers.join(', ')}>
+                                    📦 {containers.join(', ')}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td style={{ padding: '12px', fontSize: '0.8rem', fontWeight: '700', color: 'var(--secondary)' }}>
                               {invoice ? invoice.id : <span style={{ color: 'var(--text-muted)', fontWeight: '400' }}>{isID ? 'Belum Ada' : 'None Yet'}</span>}
