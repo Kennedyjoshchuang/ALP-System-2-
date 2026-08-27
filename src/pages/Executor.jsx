@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { Truck, Camera, CheckCircle2, Package, History, PlayCircle, X, Search, FileSpreadsheet, Plus, FileText, Printer, Trash2, Folder, FolderOpen, ChevronDown, ChevronRight, RefreshCw, Receipt, ChevronUp, Image } from 'lucide-react';
+import { Truck, Camera, CheckCircle2, Package, History, PlayCircle, X, Search, FileSpreadsheet, Plus, FileText, Printer, Trash2, Folder, FolderOpen, ChevronDown, ChevronRight, RefreshCw, Receipt, ChevronUp, Image, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
@@ -56,7 +56,7 @@ const formatDuration = (dispatchedAt, completedAt, t, language) => {
 };
 
 const Executor = () => {
-  const { jobOrders, invoices = [], quotations = [], createInvoice, createCustomInvoice, deleteInvoice, updateJOStatus, completeJO, deleteJO, companyBankAccounts = [], t, language, hasAccess, customers = [] } = useApp();
+  const { jobOrders, invoices = [], quotations = [], createInvoice, createCustomInvoice, deleteInvoice, updateJOStatus, cancelDispatchedJO, completeJO, deleteJO, companyBankAccounts = [], t, language, hasAccess, customers = [] } = useApp();
   const isID = language === 'id';
   const canWrite = hasAccess ? hasAccess('executor', true) : false;
   const navigate = useNavigate();
@@ -71,6 +71,8 @@ const Executor = () => {
   const [verifyCode, setVerifyCode] = useState('');
   const [verifyError, setVerifyError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [joToCancel, setJoToCancel] = useState(null);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [localData, setLocalData] = useState({}); // { [joId]: { containerNo: [], vehicleNo: [], driverName: [], activityStatus: '' } }
   const [expandedGroups, setExpandedGroups] = useState({});
   const [expandedCompletedGroups, setExpandedCompletedGroups] = useState({});
@@ -118,22 +120,46 @@ const Executor = () => {
 
   const convertDMYToYYYYMMDD = (dmy) => {
     if (!dmy) return '';
-    const parts = dmy.split('/');
-    if (parts.length === 3) {
-      const [day, month, year] = parts;
-      return `${year}-${month}-${day}`;
+    const str = String(dmy).trim();
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) {
+        const [day, month, year] = parts;
+        return `${year.padStart(4, '20')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
     }
-    return dmy;
+    if (str.includes('-')) {
+      const parts = str.split('-');
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+        }
+        if (parts[2].length === 4) {
+          return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+      }
+    }
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) {
+      const y = parsed.getFullYear();
+      const m = String(parsed.getMonth() + 1).padStart(2, '0');
+      const d = String(parsed.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    return '';
   };
 
   const convertYYYYMMDDToDMY = (ymd) => {
     if (!ymd) return '';
-    const parts = ymd.split('-');
-    if (parts.length === 3) {
-      const [year, month, day] = parts;
-      return `${day}/${month}/${year}`;
+    const str = String(ymd).trim();
+    if (str.includes('-')) {
+      const parts = str.split('-');
+      if (parts.length === 3) {
+        const [year, month, day] = parts;
+        return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+      }
     }
-    return ymd;
+    return str;
   };
 
   const formatETD = (etdStr) => {
@@ -720,6 +746,28 @@ const Executor = () => {
     }
   };
 
+  const handleCancelJO = async () => {
+    if (!joToCancel) return;
+    setIsCancelling(true);
+    try {
+      await cancelDispatchedJO(joToCancel.id);
+      toast.success(isID 
+        ? `Job Order ${joToCancel.id} berhasil dibatalkan dan dikembalikan ke Admin Office!` 
+        : `Job Order ${joToCancel.id} cancelled and returned to Admin Office!`);
+      if (uploadingForId === joToCancel.id) {
+        setUploadingForId(null);
+      }
+      setJoToCancel(null);
+    } catch (err) {
+      console.error(err);
+      toast.error(isID 
+        ? 'Gagal membatalkan Job Order. Silakan coba lagi.' 
+        : 'Failed to cancel Job Order. Please try again.');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   return (
     <div className="executor-container" style={{ display: 'grid', gap: '30px' }}>
       
@@ -798,6 +846,56 @@ const Executor = () => {
                   }}
                 >
                   {isID ? 'Ya, Hapus' : 'Yes, Delete'}
+                </ButtonWithLoading>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Cancel Active JO Confirmation Modal */}
+      <AnimatePresence>
+        {joToCancel && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+              zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.85, opacity: 0 }}
+              className="glass-card"
+              style={{ padding: '36px', maxWidth: '500px', width: '100%', textAlign: 'center' }}
+            >
+              <div style={{ fontSize: '3rem', marginBottom: '16px' }}>↩️</div>
+              <h3 style={{ color: '#f59e0b', marginBottom: '8px' }}>
+                {isID ? 'Batalkan & Kembalikan ke Admin Office?' : 'Cancel & Return to Admin Office?'}
+              </h3>
+              <p style={{ color: 'var(--text)', fontSize: '1rem', fontWeight: '600', marginBottom: '6px' }}>
+                {joToCancel.id} — {joToCancel.customerName}
+              </p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '24px', lineHeight: '1.5' }}>
+                {isID 
+                  ? 'Pekerjaan ini akan ditarik dari daftar Operasional Aktif dan dikembalikan ke status Draft / Siap Dikirim di Kantor Admin.' 
+                  : 'This job will be removed from Active Operations and returned to Ready for Dispatch queue in Admin Office.'}
+              </p>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  className="btn"
+                  style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                  onClick={() => setJoToCancel(null)}
+                  disabled={isCancelling}
+                >
+                  {isID ? 'Batal' : 'Cancel'}
+                </button>
+                <ButtonWithLoading
+                  className="btn"
+                  loading={isCancelling}
+                  style={{ flex: 1, background: '#f59e0b', color: '#000', fontWeight: '700', border: 'none' }}
+                  onClick={handleCancelJO}
+                >
+                  {isID ? 'Ya, Kembalikan ke Admin' : 'Yes, Return to Admin'}
                 </ButtonWithLoading>
               </div>
             </motion.div>
@@ -1158,7 +1256,8 @@ const Executor = () => {
                                       type="date" 
                                       value={convertDMYToYYYYMMDD(shipmentEdits[jo.id]?.etd ?? jo.etd ?? '')} 
                                       onChange={(e) => handleShipmentChange(jo.id, 'etd', convertYYYYMMDDToDMY(e.target.value))}
-                                      style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text)', border: '1px solid var(--glass-border)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.75rem', flex: 1, colorScheme: 'dark' }}
+                                      onClick={(e) => { try { e.target.showPicker?.(); } catch (_) {} }}
+                                      style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text)', border: '1px solid var(--glass-border)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.75rem', flex: 1, colorScheme: 'dark', cursor: 'pointer' }}
                                     />
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1167,7 +1266,8 @@ const Executor = () => {
                                       type="date" 
                                       value={shipmentEdits[jo.id]?.eta ?? jo.eta ?? ''} 
                                       onChange={(e) => handleShipmentChange(jo.id, 'eta', e.target.value)}
-                                      style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text)', border: '1px solid var(--glass-border)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.75rem', flex: 1, colorScheme: 'dark' }}
+                                      onClick={(e) => { try { e.target.showPicker?.(); } catch (_) {} }}
+                                      style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text)', border: '1px solid var(--glass-border)', borderRadius: '4px', padding: '2px 4px', fontSize: '0.75rem', flex: 1, colorScheme: 'dark', cursor: 'pointer' }}
                                     />
                                   </div>
                                   {hasShipmentChanges(jo.id) && (
@@ -1446,13 +1546,23 @@ const Executor = () => {
                             <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
                               {activeTab === 'active' ? (
                                 canWrite ? (
-                                  <ButtonWithLoading 
-                                    className="btn btn-gold" 
-                                    style={{ padding: '6px 12px', fontSize: '0.75rem' }}
-                                    onClick={(e) => { e.stopPropagation(); return handleDone(jo); }}
-                                  >
-                                    {isID ? 'Selesai' : 'Done'}
-                                  </ButtonWithLoading>
+                                  <>
+                                    <ButtonWithLoading 
+                                      className="btn btn-gold" 
+                                      style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                                      onClick={(e) => { e.stopPropagation(); return handleDone(jo); }}
+                                    >
+                                      {isID ? 'Selesai' : 'Done'}
+                                    </ButtonWithLoading>
+                                    <button 
+                                      className="btn-icon" 
+                                      style={{ width: '38px', height: '38px', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)' }}
+                                      onClick={(e) => { e.stopPropagation(); setJoToCancel(jo); }}
+                                      title={isID ? "Batalkan & Kembalikan ke Admin Office" : "Cancel & Return to Admin Office"}
+                                    >
+                                      <RotateCcw size={18} />
+                                    </button>
+                                  </>
                                 ) : (
                                   <span className="badge badge-pending" style={{ fontSize: '0.7rem' }}>{isID ? 'Aktif' : 'Active'}</span>
                                 )
@@ -1749,6 +1859,7 @@ const Executor = () => {
                                           type="date" 
                                           value={convertDMYToYYYYMMDD(localData[jo.id]?.etd || '')} 
                                           onChange={e => handleLocalUpdate(jo.id, 'etd', convertYYYYMMDDToDMY(e.target.value))} 
+                                          onClick={(e) => { try { e.target.showPicker?.(); } catch (_) {} }}
                                           style={{
                                             background: 'var(--input-bg)',
                                             border: '1px solid var(--border)',
@@ -1756,7 +1867,8 @@ const Executor = () => {
                                             color: 'var(--text)',
                                             padding: '12px',
                                             width: '100%',
-                                            colorScheme: 'dark'
+                                            colorScheme: 'dark',
+                                            cursor: canWrite ? 'pointer' : 'default'
                                           }}
                                         />
                                       </div>
@@ -1770,13 +1882,15 @@ const Executor = () => {
                                             type="datetime-local" 
                                             value={localData[jo.id]?.dispatchedAtLocal || ''} 
                                             onChange={e => handleLocalUpdate(jo.id, 'dispatchedAtLocal', e.target.value)}
+                                            onClick={(e) => { try { e.target.showPicker?.(); } catch (_) {} }}
                                             style={{
                                               background: 'var(--input-bg)',
                                               border: '1px solid var(--border)',
                                               borderRadius: '10px',
                                               color: 'var(--text)',
                                               padding: '12px',
-                                              width: '100%'
+                                              width: '100%',
+                                              cursor: canWrite ? 'pointer' : 'default'
                                             }}
                                           />
                                         </div>
@@ -1788,13 +1902,15 @@ const Executor = () => {
                                               type="datetime-local" 
                                               value={localData[jo.id]?.completedAtLocal || ''} 
                                               onChange={e => handleLocalUpdate(jo.id, 'completedAtLocal', e.target.value)}
+                                              onClick={(e) => { try { e.target.showPicker?.(); } catch (_) {} }}
                                               style={{
                                                 background: 'var(--input-bg)',
                                                 border: '1px solid var(--border)',
                                                 borderRadius: '10px',
                                                 color: 'var(--text)',
                                                 padding: '12px',
-                                                width: '100%'
+                                                width: '100%',
+                                                cursor: canWrite ? 'pointer' : 'default'
                                               }}
                                             />
                                           </div>
@@ -1889,7 +2005,7 @@ const Executor = () => {
                                       </div>
                                       
                                       {canWrite && (
-                                        <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                                        <div style={{ display: 'flex', gap: '12px', marginTop: '10px', flexWrap: 'wrap' }}>
                                           <ButtonWithLoading
                                             className="btn btn-gold"
                                             style={{ padding: '10px 20px', fontSize: '0.85rem' }}
@@ -1905,6 +2021,17 @@ const Executor = () => {
                                             >
                                               {isID ? 'Selesaikan Pekerjaan' : 'Complete Job'}
                                             </ButtonWithLoading>
+                                          )}
+                                          {activeTab === 'active' && (
+                                            <button
+                                              type="button"
+                                              className="btn"
+                                              style={{ padding: '10px 18px', fontSize: '0.85rem', background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.35)', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                                              onClick={() => setJoToCancel(jo)}
+                                            >
+                                              <RotateCcw size={16} />
+                                              {isID ? 'Batalkan JO (Kembalikan ke Admin)' : 'Cancel JO (Return to Admin)'}
+                                            </button>
                                           )}
                                         </div>
                                       )}

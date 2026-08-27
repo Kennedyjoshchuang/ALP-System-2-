@@ -450,6 +450,25 @@ export const AppProvider = ({ children }) => {
     await updateJOStatus(joId, updates);
   };
 
+  const cancelDispatchedJO = async (joId) => {
+    const currentJo = jobOrders.find(j => j.id === joId) || {};
+    let updatedItems = null;
+    if (Array.isArray(currentJo.items)) {
+      updatedItems = currentJo.items.map(it => ({
+        ...it,
+        status: 'pending'
+      }));
+    }
+    const updates = {
+      status: 'pending',
+      dispatchedAt: null,
+      shipmentStatus: null,
+      activityStatus: ''
+    };
+    if (updatedItems) updates.items = updatedItems;
+    await updateJOStatus(joId, updates);
+  };
+
   const updateJOStatus = async (joId, updates) => {
     // Intercept updates to serialize dispatchedAt/completedAt/shipment fields into instruction polymorphically
     const currentJo = jobOrders.find(j => j.id === joId) || {};
@@ -476,16 +495,16 @@ export const AppProvider = ({ children }) => {
     delete finalUpdates.vesselName;
     delete finalUpdates.joNumber;
     
+    let rawInstruction = updates.instruction || updates.jobDescription || currentJo.instruction || currentJo.jobDescription || '';
+    if (rawInstruction.includes('|||')) {
+      rawInstruction = rawInstruction.split('|||')[0].trim();
+    }
+
     if (dispatchedAt || completedAt || shipmentStatus || etd || eta || vesselName) {
-      // Get the raw instruction (without old metadata)
-      let rawInstruction = updates.instruction || updates.jobDescription || currentJo.instruction || currentJo.jobDescription || '';
-      // If the updates or current state has metadata, strip it first to get the pure instruction
-      if (rawInstruction.includes('|||')) {
-        rawInstruction = rawInstruction.split('|||')[0].trim();
-      }
-      
       const meta = { dispatchedAt, completedAt, shipmentStatus, etd, eta, vesselName };
       finalUpdates.instruction = `${rawInstruction} ||| ${JSON.stringify(meta)}`;
+    } else {
+      finalUpdates.instruction = rawInstruction;
     }
     
     const apiRes = await apiRequest(`job-orders/${joId}`, {
@@ -1145,7 +1164,7 @@ export const AppProvider = ({ children }) => {
       prospects, addProspect, updateProspectStatus, convertProspectToCustomer, deleteProspect, updateProspect,
       prospectDrafts,
       quotations, createQuotation, updateQuotation, approveQuotation, unapproveQuotation, deleteQuotation,
-      jobOrders, createJO, createBulkJOs, dispatchJO, updateJOStatus, completeJO, deleteJO, convertLegacyJOs, convertBatchLegacyJOs,
+      jobOrders, createJO, createBulkJOs, dispatchJO, cancelDispatchedJO, updateJOStatus, completeJO, deleteJO, convertLegacyJOs, convertBatchLegacyJOs,
       invoices, createInvoice, createCustomInvoice, settleInvoice, deleteInvoice, updateInvoice,
       receivables, settleReceivable,
       salaries, addSalary, deleteSalary, updateSalary,
