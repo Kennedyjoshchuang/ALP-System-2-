@@ -74,7 +74,7 @@ const CostApplications = () => {
 
   const navigate = useNavigate();
   const isID = language === 'id';
-  const isAccountant = user?.role === 'owner' || hasAccess('accounting', true);
+  const isAccountant = user?.role === 'owner' || hasAccess('accountingBase', true) || hasAccess('accounting', true);
   const canAccessPage = user?.role === 'owner' || hasAccess('costApplications');
 
   useEffect(() => {

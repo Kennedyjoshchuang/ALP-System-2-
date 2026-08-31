@@ -10,7 +10,16 @@ export const parsePermissions = (roleStr) => {
   if (!roleStr) return {};
   if (roleStr.startsWith('{')) {
     try {
-      return JSON.parse(roleStr);
+      const perms = JSON.parse(roleStr);
+      // Backward compatibility: if legacy 'accounting' exists, bridge to accountingBase & jobFinancial and remove legacy key
+      if (perms.accounting && !perms.accountingBase && !perms.jobFinancial) {
+        perms.accountingBase = perms.accounting;
+        perms.jobFinancial = perms.accounting;
+        delete perms.accounting;
+      } else if (perms.accounting) {
+        delete perms.accounting;
+      }
+      return perms;
     } catch (e) {
       return {};
     }
@@ -18,11 +27,11 @@ export const parsePermissions = (roleStr) => {
   // Legacy role mapping
   switch (roleStr) {
     case 'marketing': return { marketing: 'write' };
-    case 'accounting': return { accounting: 'write' };
+    case 'accounting': return { accountingBase: 'write', jobFinancial: 'write' };
     case 'executor': return { executor: 'write' };
     case 'admin': return { admin: 'write', procurement: 'write' };
     case 'hrd': return { hrd: 'write' };
-    case 'owner': return { marketing: 'write', admin: 'write', procurement: 'write', executor: 'write', accounting: 'write', hrd: 'write', systemControl: 'write' };
+    case 'owner': return { marketing: 'write', admin: 'write', procurement: 'write', executor: 'write', accountingBase: 'write', jobFinancial: 'write', hrd: 'write', systemControl: 'write' };
     default: return {};
   }
 };
@@ -47,7 +56,22 @@ export const AppProvider = ({ children }) => {
   const [companyBankAccounts, setCompanyBankAccounts] = useState([]);
   const [user, setUser] = useState(() => {
     const saved = sessionStorage.getItem('alp_user');
-    return saved ? JSON.parse(saved) : null;
+    if (!saved) return null;
+    try {
+      const u = JSON.parse(saved);
+      if (u && u.permissions) {
+        if (u.permissions.accounting && !u.permissions.accountingBase && !u.permissions.jobFinancial) {
+          u.permissions.accountingBase = u.permissions.accounting;
+          u.permissions.jobFinancial = u.permissions.accounting;
+          delete u.permissions.accounting;
+        } else if (u.permissions.accounting) {
+          delete u.permissions.accounting;
+        }
+      }
+      return u;
+    } catch (e) {
+      return null;
+    }
   });
   const [theme, setTheme] = useState(() => localStorage.getItem('alp_theme') || 'dark');
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -57,20 +81,36 @@ export const AppProvider = ({ children }) => {
     if (!user) return false;
     if (user.role === 'owner') return true;
     
+    const checkLevel = (lvl) => {
+      if (!lvl || lvl === 'none') return false;
+      if (writeRequired) return lvl === 'write';
+      return lvl === 'write' || lvl === 'read';
+    };
+
     if (moduleKey === 'costApplications') {
-      if (user.role === 'accounting' || user.role === 'executor') return true;
+      if (user.role === 'executor') return true;
       if (user.permissions) {
-        if (user.permissions.accounting || user.permissions.executor || user.permissions.costApplications) return true;
+        if (user.permissions.accountingBase || user.permissions.executor || user.permissions.costApplications) return true;
       }
       return false;
     }
     
+    if (moduleKey === 'accounting') {
+      const baseAccess = checkLevel(user.permissions?.accountingBase);
+      const jobAccess = checkLevel(user.permissions?.jobFinancial);
+      return baseAccess || jobAccess;
+    }
+
+    if (moduleKey === 'accountingBase') {
+      return checkLevel(user.permissions?.accountingBase);
+    }
+
+    if (moduleKey === 'jobFinancial') {
+      return checkLevel(user.permissions?.jobFinancial);
+    }
+    
     if (user.permissions && user.permissions[moduleKey]) {
-      const accessLevel = user.permissions[moduleKey];
-      if (writeRequired) {
-        return accessLevel === 'write';
-      }
-      return accessLevel === 'write' || accessLevel === 'read';
+      return checkLevel(user.permissions[moduleKey]);
     }
     
     return false;
@@ -126,15 +166,15 @@ export const AppProvider = ({ children }) => {
         { name: 'prospects', allowed: hasAccess('marketing') },
         { name: 'quotations', allowed: hasAccess('marketing') },
         { name: 'job-orders', allowed: true },
-        { name: 'invoices', allowed: hasAccess('accounting') },
-        { name: 'receivables', allowed: hasAccess('accounting') },
+        { name: 'invoices', allowed: hasAccess('jobFinancial') || hasAccess('accountingBase') },
+        { name: 'receivables', allowed: hasAccess('accountingBase') },
         { name: 'vendors', allowed: hasAccess('procurement') },
-        { name: 'purchase-orders', allowed: hasAccess('admin') || hasAccess('accounting') },
-        { name: 'salaries', allowed: hasAccess('accounting') },
+        { name: 'purchase-orders', allowed: hasAccess('admin') || hasAccess('accountingBase') },
+        { name: 'salaries', allowed: hasAccess('accountingBase') },
         { name: 'other-expenses', allowed: true },
         { name: 'employees', allowed: hasAccess('hrd') },
         { name: 'employee-accounts', allowed: hasAccess('hrd') },
-        { name: 'company-bank-accounts', allowed: hasAccess('accounting') }
+        { name: 'company-bank-accounts', allowed: hasAccess('accountingBase') || hasAccess('jobFinancial') }
       ];
       const dataPromises = endpoints.map((ep) => {
         if (!ep.allowed) return Promise.resolve([]);

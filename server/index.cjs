@@ -55,18 +55,26 @@ function parsePermissions(roleStr) {
   if (!roleStr) return {};
   if (roleStr.startsWith('{')) {
     try {
-      return JSON.parse(roleStr);
+      const perms = JSON.parse(roleStr);
+      if (perms.accounting && !perms.accountingBase && !perms.jobFinancial) {
+        perms.accountingBase = perms.accounting;
+        perms.jobFinancial = perms.accounting;
+        delete perms.accounting;
+      } else if (perms.accounting) {
+        delete perms.accounting;
+      }
+      return perms;
     } catch (e) {
       return {};
     }
   }
   switch (roleStr) {
     case 'marketing': return { marketing: 'write' };
-    case 'accounting': return { accounting: 'write' };
+    case 'accounting': return { accountingBase: 'write', jobFinancial: 'write' };
     case 'executor': return { executor: 'write' };
     case 'admin': return { admin: 'write', procurement: 'write' };
     case 'hrd': return { hrd: 'write' };
-    case 'owner': return { marketing: 'write', admin: 'write', procurement: 'write', executor: 'write', accounting: 'write', hrd: 'write', systemControl: 'write' };
+    case 'owner': return { marketing: 'write', admin: 'write', procurement: 'write', executor: 'write', accountingBase: 'write', jobFinancial: 'write', hrd: 'write', systemControl: 'write' };
     default: return {};
   }
 }
@@ -181,7 +189,10 @@ const validateRoleUpdate = (editor, targetId, newRoleStr) => {
 
 // Helper for module access check
 function hasModuleAccess(user, moduleKey, isWrite) {
-  const perm = user.permissions?.[moduleKey];
+  let perm = user.permissions?.[moduleKey];
+  if (!perm && moduleKey === 'accounting') {
+    perm = user.permissions?.accountingBase || user.permissions?.jobFinancial;
+  }
   if (!perm) return false;
   if (isWrite) {
     return perm === 'write';
@@ -227,8 +238,24 @@ const authorize = (req, res, next) => {
     moduleKey = 'marketing';
   } else if (path.startsWith('/vendors')) {
     moduleKey = 'procurement';
-  } else if (path.startsWith('/invoices') || path.startsWith('/receivables') || path.startsWith('/salaries') || path.startsWith('/company-bank-accounts')) {
-    moduleKey = 'accounting';
+  } else if (path.startsWith('/invoices')) {
+    if (!isWrite) {
+      if (hasModuleAccess(req.user, 'jobFinancial', false) || hasModuleAccess(req.user, 'accountingBase', false) || hasModuleAccess(req.user, 'executor', false) || hasModuleAccess(req.user, 'admin', false)) {
+        return next();
+      }
+    } else {
+      moduleKey = 'jobFinancial';
+    }
+  } else if (path.startsWith('/receivables') || path.startsWith('/salaries')) {
+    moduleKey = 'accountingBase';
+  } else if (path.startsWith('/company-bank-accounts')) {
+    if (!isWrite) {
+      if (hasModuleAccess(req.user, 'accountingBase', false) || hasModuleAccess(req.user, 'jobFinancial', false) || hasModuleAccess(req.user, 'admin', false) || hasModuleAccess(req.user, 'executor', false)) {
+        return next();
+      }
+    } else {
+      moduleKey = 'accountingBase';
+    }
   } else if (path.startsWith('/other-expenses')) {
     // Permit all authenticated roles to make requests. Fine-grained RBAC is done in the route handlers.
     return next();
@@ -238,7 +265,7 @@ const authorize = (req, res, next) => {
     moduleKey = 'systemControl';
   } else if (path.startsWith('/purchase-orders')) {
     const hasAdmin = hasModuleAccess(req.user, 'admin', isWrite);
-    const hasAccounting = hasModuleAccess(req.user, 'accounting', isWrite);
+    const hasAccounting = hasModuleAccess(req.user, 'accountingBase', isWrite) || hasModuleAccess(req.user, 'accounting', isWrite);
     if (hasAdmin || hasAccounting) {
       return next();
     }
@@ -1697,7 +1724,7 @@ app.get('/api/other-expenses', async (req, res) => {
   const { data, error } = await supabase.from('other_expenses').select('*');
   if (error) return handleError(res, error, 'GET other_expenses');
 
-  const hasAccounting = req.user.role === 'owner' || req.user.permissions?.accounting === 'write';
+  const hasAccounting = req.user.role === 'owner' || req.user.permissions?.accountingBase === 'write' || req.user.permissions?.accounting === 'write';
   if (hasAccounting) {
     return res.json(data);
   }
@@ -1719,7 +1746,7 @@ app.get('/api/other-expenses', async (req, res) => {
 app.post('/api/other-expenses', async (req, res) => {
   const { id, employeeName, position, bankAccount, bankName, amount, description, taxes, proofPhoto, expenseDate, totalAfterTax, date } = req.body;
   
-  const hasAccounting = req.user.role === 'owner' || req.user.permissions?.accounting === 'write';
+  const hasAccounting = req.user.role === 'owner' || req.user.permissions?.accountingBase === 'write' || req.user.permissions?.accounting === 'write';
   
   let finalDescription = description;
   let finalStatus = 'pending';
@@ -1778,7 +1805,7 @@ app.post('/api/other-expenses', async (req, res) => {
 
 app.put('/api/other-expenses/:id', async (req, res) => {
   const updates = req.body;
-  const hasAccounting = req.user.role === 'owner' || req.user.permissions?.accounting === 'write';
+  const hasAccounting = req.user.role === 'owner' || req.user.permissions?.accountingBase === 'write' || req.user.permissions?.accounting === 'write';
 
   if (!hasAccounting) {
     // 1. Fetch existing item
@@ -1826,7 +1853,7 @@ app.put('/api/other-expenses/:id', async (req, res) => {
 });
 
 app.delete('/api/other-expenses/:id', async (req, res) => {
-  const hasAccounting = req.user.role === 'owner' || req.user.permissions?.accounting === 'write';
+  const hasAccounting = req.user.role === 'owner' || req.user.permissions?.accountingBase === 'write' || req.user.permissions?.accounting === 'write';
 
   if (!hasAccounting) {
     // 1. Fetch existing item

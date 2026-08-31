@@ -124,49 +124,54 @@ export const getTaskCounts = (context) => {
   }
 
   // 5. ACCOUNTING
-  if (hasAccess && hasAccess('accounting')) {
+  if (hasAccess && (hasAccess('accounting') || hasAccess('accountingBase') || hasAccess('jobFinancial'))) {
     const safeJobOrders = Array.isArray(jobOrders) ? jobOrders : [];
     const safeInvoices = Array.isArray(invoices) ? invoices : [];
     const safeExpenses = Array.isArray(otherExpenses) ? otherExpenses : [];
     const safePOs = Array.isArray(purchaseOrders) ? purchaseOrders : [];
 
-    // Amber: Actionable invoices - only JOs where the shipment status has been explicitly set to 'done' and not yet invoiced (matches generate invoice button on Accounting page)
-    const completedJOsNeedingInvoice = safeJobOrders.filter(jo => {
-      if (jo.shipmentStatus !== 'done') return false;
-      const alreadyInvoiced = safeInvoices.some(inv => {
-        if (String(inv.joId) === String(jo.id)) return true;
-        if (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.map(String).includes(String(jo.id))) return true;
-        return false;
-      });
-      return !alreadyInvoiced;
-    }).length;
-
-    // Purple: Cost applications & expense reimbursements pending approval/disbursement
-    const pendingExpenses = safeExpenses.filter(e => e.status === 'pending').length;
-
-    // Blue: Unpaid POs awaiting disbursement
-    const unpaidPOs = safePOs.filter(po => {
-      const isUnpaid = po.paymentStatus === 'unpaid' || po.status === 'unpaid' || (!po.paymentStatus && po.status === 'approved');
-      return isUnpaid && !po.paymentProofPhoto;
-    }).length;
-
     const accountingBadges = [];
-    if (completedJOsNeedingInvoice > 0) {
-      accountingBadges.push({ type: 'amber', count: completedJOsNeedingInvoice, labelId: 'Perlu Invoice', labelEn: 'Needs Invoice' });
+
+    // Job Financial: Completed JOs needing invoice
+    if (hasAccess('jobFinancial')) {
+      const completedJOsNeedingInvoice = safeJobOrders.filter(jo => {
+        if (jo.shipmentStatus !== 'done') return false;
+        const alreadyInvoiced = safeInvoices.some(inv => {
+          if (String(inv.joId) === String(jo.id)) return true;
+          if (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.map(String).includes(String(jo.id))) return true;
+          return false;
+        });
+        return !alreadyInvoiced;
+      }).length;
+
+      if (completedJOsNeedingInvoice > 0) {
+        accountingBadges.push({ type: 'amber', count: completedJOsNeedingInvoice, labelId: 'Perlu Invoice', labelEn: 'Needs Invoice' });
+      }
     }
-    if (pendingExpenses > 0) {
-      accountingBadges.push({ type: 'purple', count: pendingExpenses, labelId: 'Pengajuan Biaya', labelEn: 'Cost Approvals' });
+
+    // Accounting Base: Pending cost applications and unpaid POs
+    if (hasAccess('accountingBase')) {
+      const pendingExpenses = safeExpenses.filter(e => e.status === 'pending').length;
+      const unpaidPOs = safePOs.filter(po => {
+        const isUnpaid = po.paymentStatus === 'unpaid' || po.status === 'unpaid' || (!po.paymentStatus && po.status === 'approved');
+        return isUnpaid && !po.paymentProofPhoto;
+      }).length;
+
+      if (pendingExpenses > 0) {
+        accountingBadges.push({ type: 'purple', count: pendingExpenses, labelId: 'Pengajuan Biaya', labelEn: 'Cost Approvals' });
+      }
+      if (unpaidPOs > 0) {
+        accountingBadges.push({ type: 'blue', count: unpaidPOs, labelId: 'PO Belum Dibayar', labelEn: 'Unpaid POs' });
+      }
     }
-    if (unpaidPOs > 0) {
-      accountingBadges.push({ type: 'blue', count: unpaidPOs, labelId: 'PO Belum Dibayar', labelEn: 'Unpaid POs' });
-    }
+
     if (accountingBadges.length > 0) counts.accounting = accountingBadges;
   }
 
   // 6. COST APPLICATIONS
-  if (hasAccess && (user?.role === 'owner' || hasAccess('costApplications') || hasAccess('accounting') || hasAccess('executor'))) {
+  if (hasAccess && (user?.role === 'owner' || hasAccess('costApplications') || hasAccess('accountingBase') || hasAccess('accounting') || hasAccess('executor'))) {
     const safeExpenses = Array.isArray(otherExpenses) ? otherExpenses : [];
-    const isApprover = user?.role === 'owner' || (hasAccess && hasAccess('accounting', true));
+    const isApprover = user?.role === 'owner' || (hasAccess && (hasAccess('accountingBase', true) || hasAccess('accounting', true)));
 
     const costBadges = [];
     if (isApprover) {

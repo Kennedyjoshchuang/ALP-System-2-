@@ -2,7 +2,7 @@ import FormattedNumberInput from '../components/FormattedNumberInput';
 import toast from 'react-hot-toast';
 import { useConfirm } from '../context/ConfirmContext';
 import React, { useState, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { CreditCard, Download, Receipt, Wallet, CheckCircle, Check, Plus, X, XCircle, DollarSign, Search, FileSpreadsheet, RotateCcw, Edit3, Save, Image, ChevronDown, ChevronUp, User, Briefcase, Banknote, Calendar, FileText, Trash2, Settings, ExternalLink, ShieldCheck, ShieldAlert, GitMerge } from 'lucide-react';
 import { exportToExcel } from '../utils/exportUtils';
@@ -85,6 +85,26 @@ const sortInvoices = (list, sortBy) => {
 const Accounting = () => {
   const context = useApp();
   const confirm = useConfirm();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { hasAccess, language, user, loading, t } = context || {};
+
+  const hasJobFinancial = hasAccess ? hasAccess('jobFinancial') : false;
+  const canWriteJobFinancial = hasAccess ? hasAccess('jobFinancial', true) : false;
+  const hasAccountingBase = hasAccess ? hasAccess('accountingBase') : false;
+  const canWriteAccountingBase = hasAccess ? hasAccess('accountingBase', true) : false;
+  const canWrite = canWriteJobFinancial || canWriteAccountingBase;
+
+  const allowedTabs = React.useMemo(() => {
+    const tabs = [];
+    if (hasJobFinancial) {
+      tabs.push('billing', 'costing');
+    }
+    if (hasAccountingBase) {
+      tabs.push('piutang', 'salary', 'other_expenses', 'reimbursements', 'hutang', 'detail_report');
+    }
+    return tabs;
+  }, [hasJobFinancial, hasAccountingBase]);
   
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
@@ -100,6 +120,8 @@ const Accounting = () => {
       'admin office': { bg: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', text: 'var(--blue-vibrant)' },
       'procurement': { bg: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', text: '#a78bfa' },
       'executor': { bg: 'rgba(236, 72, 153, 0.1)', border: '1px solid rgba(236, 72, 153, 0.3)', text: '#f472b6' },
+      'accounting base': { bg: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', text: 'var(--gold-vibrant)' },
+      'job financial': { bg: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', text: 'var(--blue-vibrant)' },
       'accounting': { bg: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', text: 'var(--gold-vibrant)' },
       'hrd': { bg: 'rgba(20, 184, 166, 0.1)', border: '1px solid rgba(20, 184, 166, 0.3)', text: '#2dd4bf' },
       'system control': { bg: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', text: 'var(--red-vibrant)' }
@@ -138,13 +160,25 @@ const Accounting = () => {
     );
   };
 
-  const location = useLocation();
   const [activeTab, setActiveTab] = useState(() => {
     if (location.state && location.state.activeTab) {
       return location.state.activeTab;
     }
     return 'billing';
   });
+
+  React.useEffect(() => {
+    if (allowedTabs.length > 0 && !allowedTabs.includes(activeTab)) {
+      setActiveTab(allowedTabs[0]);
+    }
+  }, [allowedTabs, activeTab]);
+
+  React.useEffect(() => {
+    if (!loading && user && !hasJobFinancial && !hasAccountingBase && user.role !== 'owner') {
+      toast.error((language === 'id' ? 'Akses ditolak ke modul Accounting.' : 'Access denied to Accounting module.'));
+      navigate('/dashboard', { replace: true });
+    }
+  }, [loading, user, hasJobFinancial, hasAccountingBase, navigate, language]);
   const [expandedReportMonths, setExpandedReportMonths] = useState({});
   const [expandedOtherTxMonths, setExpandedOtherTxMonths] = useState({});
   const [receivableSubTab, setReceivableSubTab] = useState('outstanding');
@@ -343,7 +377,7 @@ const Accounting = () => {
   };
 
   const handleProcessSplit = async () => {
-    if (!canWrite || !splitModalData) return;
+    if (!canWriteJobFinancial || !splitModalData) return;
     const { jo, itemIdx, item } = splitModalData;
 
     setIsProcessingSplit(true);
@@ -517,7 +551,7 @@ const Accounting = () => {
   };
 
   const handleProcessMerge = async () => {
-    if (!canWrite || !mergeModalData || !mergeTargetJoId) return;
+    if (!canWriteJobFinancial || !mergeModalData || !mergeTargetJoId) return;
     const { sourceJo } = mergeModalData;
     const targetJo = jobOrders.find(j => String(j.id) === String(mergeTargetJoId));
     if (!targetJo) return;
@@ -782,11 +816,7 @@ const Accounting = () => {
     otherExpenses = [], addOtherExpense, deleteOtherExpense, updateOtherExpense,
     employees = [], companyBankAccounts = [], updateCompanyBank, deleteCompanyBank,
     customers = [],
-    getSystemConfig,
-    loading,
-    t,
-    language,
-    hasAccess
+    getSystemConfig
   } = context || {};
 
   const getAssociatedJOs = (invoice) => {
@@ -880,8 +910,6 @@ const Accounting = () => {
 
     return Array.from(containerSet);
   };
-
-  const canWrite = hasAccess ? hasAccess('accounting', true) : false;
 
   const isID = language === 'id';
   const highlightId = location.state?.scrollToId;
@@ -2355,6 +2383,7 @@ const Accounting = () => {
     });
   
   const handleIssueInvoice = async (joId, bankAccount, notes) => {
+    if (!canWriteJobFinancial) return;
     try {
       const linkedJO = jobOrders.find(j => String(j.id) === String(joId));
       if (!linkedJO) {
@@ -2863,7 +2892,7 @@ const Accounting = () => {
   };
 
   const confirmSettle = async () => {
-    if (!canWrite) return;
+    if (!canWriteAccountingBase) return;
     if (!settleModal) return;
     try {
       await settleInvoice(settleModal.id, settleForm.paymentProof, settleForm.taxes, settleForm.taxProof, settleForm.paymentDate);
@@ -2875,7 +2904,7 @@ const Accounting = () => {
   };
 
   const handleUndoInvoice = async (joId) => {
-    if (!canWrite) return;
+    if (!canWriteJobFinancial) return;
     const inv = invoices.find(i => i.joId === joId);
     if (!inv) {
       toast.error('Invoice tidak ditemukan.');
@@ -2891,7 +2920,7 @@ const Accounting = () => {
   };
 
   const handleUndoPaidInvoice = async (inv) => {
-    if (!canWrite) return;
+    if (!canWriteAccountingBase) return;
     const confirmed = await confirm(
       isID 
         ? `Batalkan pembayaran untuk Invoice ${inv.id}? Invoice akan dikembalikan ke Piutang Outstanding.`
@@ -4801,39 +4830,44 @@ const Accounting = () => {
 
       <h3 className="shimmer-text" style={{ fontSize: '1.8rem', marginBottom: '30px' }}>{isID ? 'Hub Manajemen Keuangan' : 'Financial Management Hub'}</h3>
       <div style={{ display: 'flex', gap: '12px', marginBottom: '30px', flexWrap:'wrap' }}>
-        <button
-          onClick={() => setActiveTab('billing')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
-            background: activeTab === 'billing' ? 'linear-gradient(135deg, var(--info), #1d4ed8)' : 'rgba(255,255,255,0.05)',
-            color: activeTab === 'billing' ? '#ffffff' : 'var(--text-muted)',
-            boxShadow: activeTab === 'billing' ? '0 4px 15px rgba(59,130,246,0.4)' : 'none',
-            border: activeTab === 'billing' ? 'none' : '1px solid var(--glass-border)'
-          }}
-        >
-          <Receipt size={17} /> {isID ? 'Penagihan & Invoice' : 'Billing & Invoices'}
-        </button>
+        {hasJobFinancial && (
+          <button
+            onClick={() => setActiveTab('billing')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
+              background: activeTab === 'billing' ? 'linear-gradient(135deg, var(--info), #1d4ed8)' : 'rgba(255,255,255,0.05)',
+              color: activeTab === 'billing' ? '#ffffff' : 'var(--text-muted)',
+              boxShadow: activeTab === 'billing' ? '0 4px 15px rgba(59,130,246,0.4)' : 'none',
+              border: activeTab === 'billing' ? 'none' : '1px solid var(--glass-border)'
+            }}
+          >
+            <Receipt size={17} /> {isID ? 'Penagihan & Invoice' : 'Billing & Invoices'}
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveTab('costing')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
-            background: activeTab === 'costing' ? 'linear-gradient(135deg, var(--secondary), #a07d1c)' : 'rgba(255,255,255,0.05)',
-            color: activeTab === 'costing' ? '#1a1200' : 'var(--text-muted)',
-            boxShadow: activeTab === 'costing' ? '0 4px 15px rgba(212,175,55,0.4)' : 'none',
-            border: activeTab === 'costing' ? 'none' : '1px solid var(--glass-border)'
-          }}
-        >
-          <DollarSign size={17} /> {isID ? 'Laba & Rugi' : 'Profit and Loss'}
-          {activeJOs.length > 0 && (
-            <span style={{ background: activeTab === 'costing' ? 'rgba(0,0,0,0.2)' : 'var(--secondary-border)', color: activeTab === 'costing' ? '#1a1200' : 'var(--secondary)', borderRadius: '20px', padding: '1px 8px', fontSize: '0.72rem', fontWeight: '800' }}>
-              {activeJOs.length}
-            </span>
-          )}
-        </button>
+        {hasJobFinancial && (
+          <button
+            onClick={() => setActiveTab('costing')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
+              background: activeTab === 'costing' ? 'linear-gradient(135deg, var(--secondary), #a07d1c)' : 'rgba(255,255,255,0.05)',
+              color: activeTab === 'costing' ? '#1a1200' : 'var(--text-muted)',
+              boxShadow: activeTab === 'costing' ? '0 4px 15px rgba(212,175,55,0.4)' : 'none',
+              border: activeTab === 'costing' ? 'none' : '1px solid var(--glass-border)'
+            }}
+          >
+            <DollarSign size={17} /> {isID ? 'Laba & Rugi' : 'Profit and Loss'}
+            {activeJOs.length > 0 && (
+              <span style={{ background: activeTab === 'costing' ? 'rgba(0,0,0,0.2)' : 'var(--secondary-border)', color: activeTab === 'costing' ? '#1a1200' : 'var(--secondary)', borderRadius: '20px', padding: '1px 8px', fontSize: '0.72rem', fontWeight: '800' }}>
+                {activeJOs.length}
+              </span>
+            )}
+          </button>
+        )}
 
+        {hasAccountingBase && (
           <button
             onClick={() => setActiveTab('piutang')}
             style={{
@@ -4846,37 +4880,42 @@ const Accounting = () => {
             }}
           >
             <Wallet size={17} /> {isID ? 'Piutang & Receivable' : 'Receivables & Piutang'}
-        </button>
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveTab('salary')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
-            background: activeTab === 'salary' ? 'linear-gradient(135deg, #8b5cf6, #6d28d9)' : 'rgba(255,255,255,0.05)',
-            color: activeTab === 'salary' ? '#ffffff' : 'var(--text-muted)',
-            boxShadow: activeTab === 'salary' ? '0 4px 15px rgba(139,92,246,0.4)' : 'none',
-            border: activeTab === 'salary' ? 'none' : '1px solid var(--glass-border)'
-          }}
-        >
-          <User size={17} /> {isID ? 'Biaya Gaji' : 'Payroll & Salaries'}
-        </button>
+        {hasAccountingBase && (
+          <button
+            onClick={() => setActiveTab('salary')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
+              background: activeTab === 'salary' ? 'linear-gradient(135deg, #8b5cf6, #6d28d9)' : 'rgba(255,255,255,0.05)',
+              color: activeTab === 'salary' ? '#ffffff' : 'var(--text-muted)',
+              boxShadow: activeTab === 'salary' ? '0 4px 15px rgba(139,92,246,0.4)' : 'none',
+              border: activeTab === 'salary' ? 'none' : '1px solid var(--glass-border)'
+            }}
+          >
+            <User size={17} /> {isID ? 'Biaya Gaji' : 'Payroll & Salaries'}
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveTab('other_expenses')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
-            background: activeTab === 'other_expenses' ? 'linear-gradient(135deg, #ec4899, #be185d)' : 'rgba(255,255,255,0.05)',
-            color: activeTab === 'other_expenses' ? '#ffffff' : 'var(--text-muted)',
-            boxShadow: activeTab === 'other_expenses' ? '0 4px 15px rgba(236,72,153,0.4)' : 'none',
-            border: activeTab === 'other_expenses' ? 'none' : '1px solid var(--glass-border)'
-          }}
-        >
-          <Briefcase size={17} /> {isID ? 'Pemasukan & Pengeluaran' : 'Income & Expenses'}
-        </button>
+        {hasAccountingBase && (
+          <button
+            onClick={() => setActiveTab('other_expenses')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
+              background: activeTab === 'other_expenses' ? 'linear-gradient(135deg, #ec4899, #be185d)' : 'rgba(255,255,255,0.05)',
+              color: activeTab === 'other_expenses' ? '#ffffff' : 'var(--text-muted)',
+              boxShadow: activeTab === 'other_expenses' ? '0 4px 15px rgba(236,72,153,0.4)' : 'none',
+              border: activeTab === 'other_expenses' ? 'none' : '1px solid var(--glass-border)'
+            }}
+          >
+            <Briefcase size={17} /> {isID ? 'Pemasukan & Pengeluaran' : 'Income & Expenses'}
+          </button>
+        )}
 
-        {(context?.user?.role === 'accounting' || context?.user?.role === 'owner') && (
+        {hasAccountingBase && (
           <button
             onClick={() => setActiveTab('reimbursements')}
             style={{
@@ -4892,35 +4931,39 @@ const Accounting = () => {
           </button>
         )}
 
-        <button
-          onClick={() => setActiveTab('hutang')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
-            background: activeTab === 'hutang' ? 'linear-gradient(135deg, var(--warning), #d97706)' : 'rgba(255,255,255,0.05)',
-            color: activeTab === 'hutang' ? '#ffffff' : 'var(--text-muted)',
-            boxShadow: activeTab === 'hutang' ? '0 4px 15px rgba(245,158,11,0.4)' : 'none',
-            border: activeTab === 'hutang' ? 'none' : '1px solid var(--glass-border)'
-          }}
-        >
-          <Banknote size={17} /> {isID ? 'Hutang & Payable' : 'Payables & Hutang'}
-        </button>
+        {hasAccountingBase && (
+          <button
+            onClick={() => setActiveTab('hutang')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
+              background: activeTab === 'hutang' ? 'linear-gradient(135deg, var(--warning), #d97706)' : 'rgba(255,255,255,0.05)',
+              color: activeTab === 'hutang' ? '#ffffff' : 'var(--text-muted)',
+              boxShadow: activeTab === 'hutang' ? '0 4px 15px rgba(245,158,11,0.4)' : 'none',
+              border: activeTab === 'hutang' ? 'none' : '1px solid var(--glass-border)'
+            }}
+          >
+            <Banknote size={17} /> {isID ? 'Hutang & Payable' : 'Payables & Hutang'}
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveTab('detail_report')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
-            background: activeTab === 'detail_report' ? 'linear-gradient(135deg, #6366f1, #4338ca)' : 'rgba(255,255,255,0.05)',
-            color: activeTab === 'detail_report' ? '#ffffff' : 'var(--text-muted)',
-            boxShadow: activeTab === 'detail_report' ? '0 4px 15px rgba(99,102,241,0.4)' : 'none',
-            border: activeTab === 'detail_report' ? 'none' : '1px solid var(--glass-border)'
-          }}
-        >
-          <FileText size={17} /> {isID ? 'Laporan Rinci' : 'Detail Report'}
-        </button>
+        {hasAccountingBase && (
+          <button
+            onClick={() => setActiveTab('detail_report')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '11px 22px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem', transition: 'all 0.2s',
+              background: activeTab === 'detail_report' ? 'linear-gradient(135deg, #6366f1, #4338ca)' : 'rgba(255,255,255,0.05)',
+              color: activeTab === 'detail_report' ? '#ffffff' : 'var(--text-muted)',
+              boxShadow: activeTab === 'detail_report' ? '0 4px 15px rgba(99,102,241,0.4)' : 'none',
+              border: activeTab === 'detail_report' ? 'none' : '1px solid var(--glass-border)'
+            }}
+          >
+            <FileText size={17} /> {isID ? 'Laporan Rinci' : 'Detail Report'}
+          </button>
+        )}
 
-        {canWrite && (
+        {canWriteAccountingBase && (
           <button
             onClick={() => setShowBankSettings(true)}
             style={{
@@ -4936,7 +4979,7 @@ const Accounting = () => {
           </button>
         )}
 
-        {canWrite && activeTab === 'billing' && (
+        {canWriteJobFinancial && activeTab === 'billing' && (
           <button
             onClick={() => {
               const dateVal = new Date().toISOString().substring(0, 10);

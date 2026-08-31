@@ -62,7 +62,8 @@ const HRD = () => {
     { key: 'Admin Office', label: isID ? 'Admin Office' : 'Admin Office' },
     { key: 'Procurement', label: isID ? 'Procurement (Pengadaan)' : 'Procurement' },
     { key: 'Executor', label: isID ? 'Executor (Pelaksana)' : 'Executor' },
-    { key: 'Accounting', label: isID ? 'Accounting (Akuntansi)' : 'Accounting' },
+    { key: 'Accounting Base', label: isID ? 'Accounting Base (Akuntansi Dasar)' : 'Accounting Base' },
+    { key: 'Job Financial', label: isID ? 'Job Financial (Keuangan Job Order)' : 'Job Financial' },
     { key: 'HRD', label: isID ? 'HRD' : 'HRD' },
     { key: 'System Control', label: isID ? 'System Control (Admin Sistem)' : 'System Control' }
   ];
@@ -75,6 +76,10 @@ const HRD = () => {
       const customParts = [];
       
       parts.forEach(part => {
+        if (part.toLowerCase() === 'accounting') {
+          checked.push('Accounting Base', 'Job Financial');
+          return;
+        }
         const matchedRole = standardRoles.find(r => r.key.toLowerCase() === part.toLowerCase());
         if (matchedRole) {
           checked.push(matchedRole.key);
@@ -83,7 +88,7 @@ const HRD = () => {
         }
       });
       
-      setSelectedRoles(checked);
+      setSelectedRoles([...new Set(checked)]);
       setCustomPosition(customParts.join(', '));
     }
   }, [isAddModalOpen, selectedEmployee]);
@@ -103,6 +108,8 @@ const HRD = () => {
       'admin office': { bg: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', text: 'var(--blue-vibrant)' },
       'procurement': { bg: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', text: '#a78bfa' },
       'executor': { bg: 'rgba(236, 72, 153, 0.1)', border: '1px solid rgba(236, 72, 153, 0.3)', text: '#f472b6' },
+      'accounting base': { bg: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', text: 'var(--gold-vibrant)' },
+      'job financial': { bg: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', text: 'var(--blue-vibrant)' },
       'accounting': { bg: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', text: 'var(--gold-vibrant)' },
       'hrd': { bg: 'rgba(20, 184, 166, 0.1)', border: '1px solid rgba(20, 184, 166, 0.3)', text: '#2dd4bf' },
       'system control': { bg: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', text: 'var(--red-vibrant)' }
@@ -149,7 +156,12 @@ const HRD = () => {
     if (parts.includes('admin office')) perms.admin = 'write';
     if (parts.includes('procurement')) perms.procurement = 'write';
     if (parts.includes('executor')) perms.executor = 'write';
-    if (parts.includes('accounting')) perms.accounting = 'write';
+    if (parts.includes('accounting base')) perms.accountingBase = 'write';
+    if (parts.includes('job financial')) perms.jobFinancial = 'write';
+    if (parts.includes('accounting')) {
+      perms.accountingBase = 'write';
+      perms.jobFinancial = 'write';
+    }
     if (parts.includes('hrd')) perms.hrd = 'write';
     if (parts.includes('system control')) perms.systemControl = 'write';
     return perms;
@@ -186,11 +198,20 @@ const HRD = () => {
         if (account) {
           let perms = {};
           if (account.role && account.role.startsWith('{')) {
-            try { perms = JSON.parse(account.role); } catch(e) {}
+            try { 
+              perms = JSON.parse(account.role);
+              if (perms.accounting && !perms.accountingBase && !perms.jobFinancial) {
+                perms.accountingBase = perms.accounting;
+                perms.jobFinancial = perms.accounting;
+                delete perms.accounting;
+              } else if (perms.accounting) {
+                delete perms.accounting;
+              }
+            } catch(e) {}
           } else {
             const rm = account.role;
             if (rm === 'marketing') perms = { marketing: 'write' };
-            else if (rm === 'accounting') perms = { accounting: 'write' };
+            else if (rm === 'accounting') perms = { accountingBase: 'write', jobFinancial: 'write' };
             else if (rm === 'executor') perms = { executor: 'write' };
             else if (rm === 'admin') perms = { admin: 'write', procurement: 'write' };
             else if (rm === 'hrd') perms = { hrd: 'write' };
@@ -201,7 +222,8 @@ const HRD = () => {
             admin: 'Admin Office',
             procurement: 'Procurement',
             executor: 'Executor',
-            accounting: 'Accounting',
+            accountingBase: 'Accounting Base',
+            jobFinancial: 'Job Financial',
             hrd: 'HRD',
             systemControl: 'System Control'
           };
@@ -254,7 +276,9 @@ const HRD = () => {
     setIsAccountSubmitting(true);
     setCreateAccountError('');
     try {
-      const finalRoleStr = JSON.stringify(accountData.permissions);
+      const cleanPerms = { ...accountData.permissions };
+      delete cleanPerms.accounting;
+      const finalRoleStr = JSON.stringify(cleanPerms);
       const payload = { username: accountData.username, password: accountData.password, role: finalRoleStr };
 
       if (isEditAccount) {
@@ -278,7 +302,8 @@ const HRD = () => {
         admin: 'Admin Office',
         procurement: 'Procurement',
         executor: 'Executor',
-        accounting: 'Accounting',
+        accountingBase: 'Accounting Base',
+        jobFinancial: 'Job Financial',
         hrd: 'HRD',
         systemControl: 'System Control'
       };
@@ -410,11 +435,20 @@ const HRD = () => {
                                   setSelectedEmployee(emp);
                                   let perms = {};
                                   if (account.role && account.role.startsWith('{')) {
-                                    try { perms = JSON.parse(account.role); } catch(e) {}
+                                    try { 
+                                      perms = JSON.parse(account.role); 
+                                      if (perms.accounting && !perms.accountingBase && !perms.jobFinancial) {
+                                        perms.accountingBase = perms.accounting;
+                                        perms.jobFinancial = perms.accounting;
+                                        delete perms.accounting;
+                                      } else if (perms.accounting) {
+                                        delete perms.accounting;
+                                      }
+                                    } catch(e) {}
                                   } else {
                                     const rm = account.role;
                                     if (rm === 'marketing') perms = { marketing: 'write' };
-                                    else if (rm === 'accounting') perms = { accounting: 'write' };
+                                    else if (rm === 'accounting') perms = { accountingBase: 'write', jobFinancial: 'write' };
                                     else if (rm === 'executor') perms = { executor: 'write' };
                                     else if (rm === 'admin') perms = { admin: 'write', procurement: 'write' };
                                     else if (rm === 'hrd') perms = { hrd: 'write' };
@@ -683,13 +717,14 @@ const HRD = () => {
                 <label style={{ display: 'block', marginBottom: '15px', fontWeight: 'bold' }}>Hak Akses Sistem (System Permissions)</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {[
-                    { key: 'marketing', label: 'Marketing (Pemasaran)' },
-                    { key: 'admin', label: 'Admin Office' },
-                    { key: 'procurement', label: 'Procurement (Pengadaan)' },
-                    { key: 'executor', label: 'Executor (Pelaksana)' },
-                    { key: 'accounting', label: 'Accounting (Akuntansi)' },
+                    { key: 'marketing', label: isID ? 'Marketing (Pemasaran)' : 'Marketing' },
+                    { key: 'admin', label: isID ? 'Admin Office' : 'Admin Office' },
+                    { key: 'procurement', label: isID ? 'Procurement (Pengadaan)' : 'Procurement' },
+                    { key: 'executor', label: isID ? 'Executor (Pelaksana)' : 'Executor' },
+                    { key: 'accountingBase', label: isID ? 'Accounting Base (Akuntansi Dasar)' : 'Accounting Base' },
+                    { key: 'jobFinancial', label: isID ? 'Job Financial (Keuangan Job Order / Proyek)' : 'Job Financial' },
                     { key: 'hrd', label: 'HRD' },
-                    { key: 'systemControl', label: 'System Control (Admin Sistem)', warning: true }
+                    { key: 'systemControl', label: isID ? 'System Control (Admin Sistem)' : 'System Control', warning: true }
                   ].map(mod => {
                     const hasPerm = accountData.permissions[mod.key] && accountData.permissions[mod.key] !== 'none';
                     const isWrite = accountData.permissions[mod.key] === 'write';
