@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { Truck, Camera, CheckCircle2, Package, History, PlayCircle, X, Search, FileSpreadsheet, Plus, FileText, Printer, Trash2, Folder, FolderOpen, ChevronDown, ChevronRight, RefreshCw, Receipt, ChevronUp, Image, RotateCcw } from 'lucide-react';
+import { Truck, Camera, CheckCircle2, Package, History, PlayCircle, X, Search, FileSpreadsheet, Plus, FileText, Printer, Trash2, Folder, FolderOpen, ChevronDown, ChevronRight, RefreshCw, Receipt, ChevronUp, Image, RotateCcw, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToExcel } from '../utils/exportUtils';
 import { ButtonWithLoading } from '../components/ButtonWithLoading';
@@ -61,6 +61,7 @@ const Executor = () => {
   const canWrite = hasAccess ? hasAccess('executor', true) : false;
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'records' or 'pending_invoices'
+  const [quotationFilter, setQuotationFilter] = useState('all'); // 'all' | 'with_quotation' | 'without_quotation'
   const fileInputRef = useRef(null);
   const [uploadingForId, setUploadingForId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -268,12 +269,23 @@ const Executor = () => {
     return 0;
   };
 
+  const hasQuotation = (jo) => Boolean(jo && jo.quotationId && jo.quotationId !== 'direct' && jo.quotationId !== 'no-quotation');
+
   const filteredJOs = jobOrders
     .filter(jo => {
       const tabMatch = activeTab === 'active' ? jo.status === 'dispatched' : (jo.status === 'done' || jo.status === 'invoiced');
       const searchMatch = (jo.id || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                         (jo.customerName || '').toLowerCase().includes(searchTerm.toLowerCase());
-      return tabMatch && searchMatch && filterByDate(jo.date);
+      const dateMatch = filterByDate(jo.date);
+      if (!tabMatch || !searchMatch || !dateMatch) return false;
+
+      if (quotationFilter === 'with_quotation') {
+        return hasQuotation(jo);
+      }
+      if (quotationFilter === 'without_quotation') {
+        return !hasQuotation(jo);
+      }
+      return true;
     })
     .sort((a, b) => {
       if (sortBy === 'created_desc') {
@@ -328,9 +340,62 @@ const Executor = () => {
       return 0;
     });
 
+  const activeCounts = React.useMemo(() => {
+    if (activeTab === 'pending_invoices') {
+      const groups = {};
+      completedJOs.forEach(jo => {
+        const qId = jo.quotationId || 'direct';
+        if (!jo.quotationId) {
+          const hasInvoice = invoices.some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.includes(jo.id)));
+          if (hasInvoice) return;
+        }
+        if (!groups[qId]) {
+          groups[qId] = {
+            quotationId: qId,
+            jobOrders: []
+          };
+        }
+        groups[qId].jobOrders.push(jo);
+      });
+
+      const validGroups = Object.values(groups).filter(group => {
+        if (group.quotationId === 'direct') {
+          return group.jobOrders.length > 0;
+        }
+        return group.jobOrders.some(jo => {
+          return !invoices.some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.includes(jo.id)));
+        });
+      });
+
+      const allCount = validGroups.reduce((acc, g) => acc + g.jobOrders.length, 0);
+      const withQuote = validGroups.filter(g => g.quotationId !== 'direct').reduce((acc, g) => acc + g.jobOrders.length, 0);
+      const withoutQuote = validGroups.filter(g => g.quotationId === 'direct').reduce((acc, g) => acc + g.jobOrders.length, 0);
+
+      return {
+        all: allCount,
+        withQuotation: withQuote,
+        withoutQuotation: withoutQuote
+      };
+    } else {
+      const baseJOs = jobOrders.filter(jo => {
+        const tabMatch = activeTab === 'active' ? jo.status === 'dispatched' : (jo.status === 'done' || jo.status === 'invoiced');
+        const searchMatch = (jo.id || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (jo.customerName || '').toLowerCase().includes(searchTerm.toLowerCase());
+        return tabMatch && searchMatch && filterByDate(jo.date);
+      });
+
+      return {
+        all: baseJOs.length,
+        withQuotation: baseJOs.filter(hasQuotation).length,
+        withoutQuotation: baseJOs.filter(jo => !hasQuotation(jo)).length
+      };
+    }
+  }, [jobOrders, activeTab, searchTerm, startDate, endDate, completedJOs, invoices]);
+
   const handleExport = () => {
     const dataToExport = filteredJOs.map(jo => ({
       JO_ID: jo.id,
+      Quotation_Ref: jo.quotationId || 'Direct',
       Date: jo.date,
       Customer: jo.customerName,
       Instruction: jo.jobDescription || jo.instruction || '-',
@@ -345,7 +410,8 @@ const Executor = () => {
       return;
     }
 
-    const fileName = activeTab === 'active' ? "Field_Operations_Aktif" : "Field_Operations_Records";
+    const filterSuffix = quotationFilter === 'with_quotation' ? "_Dengan_Penawaran" : quotationFilter === 'without_quotation' ? "_Tanpa_Penawaran" : "";
+    const fileName = (activeTab === 'active' ? "Field_Operations_Aktif" : "Field_Operations_Records") + filterSuffix;
     exportToExcel(dataToExport, fileName);
   };
 
@@ -982,6 +1048,47 @@ const Executor = () => {
         </div>
       </div>
 
+      {/* Quotation Separation Filter Toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginTop: '-10px' }}>
+        <div className="filter-segmented-group">
+          <button 
+            type="button"
+            className={`filter-segmented-btn ${quotationFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setQuotationFilter('all')}
+          >
+            <Layers size={15} />
+            <span>{isID ? 'Semua' : 'All'}</span>
+            <span className="filter-count-badge">
+              {activeCounts.all}
+            </span>
+          </button>
+
+          <button 
+            type="button"
+            className={`filter-segmented-btn ${quotationFilter === 'with_quotation' ? 'active' : ''}`}
+            onClick={() => setQuotationFilter('with_quotation')}
+          >
+            <FileText size={15} />
+            <span>{isID ? 'Dengan Penawaran' : 'With Quotation'}</span>
+            <span className="filter-count-badge">
+              {activeCounts.withQuotation}
+            </span>
+          </button>
+
+          <button 
+            type="button"
+            className={`filter-segmented-btn ${quotationFilter === 'without_quotation' ? 'active' : ''}`}
+            onClick={() => setQuotationFilter('without_quotation')}
+          >
+            <Package size={15} />
+            <span>{isID ? 'Tanpa Penawaran' : 'Without Quotation'}</span>
+            <span className="filter-count-badge">
+              {activeCounts.withoutQuotation}
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* Filter Bar */}
       <div className="glass-card" style={{ padding: '20px 25px', display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap', background: 'rgba(255,255,255,0.03)' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
@@ -1079,17 +1186,31 @@ const Executor = () => {
                   return hasUninvoicedJO;
                 });
 
-                if (pendingGroups.length === 0) {
+                const filteredPendingGroups = pendingGroups.filter(group => {
+                  if (quotationFilter === 'with_quotation') {
+                    return group.quotationId !== 'direct';
+                  }
+                  if (quotationFilter === 'without_quotation') {
+                    return group.quotationId === 'direct';
+                  }
+                  return true;
+                });
+
+                if (filteredPendingGroups.length === 0) {
                   return (
                     <tr>
                       <td colSpan="5" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                        {isID ? 'Tidak ada invoice tertunda.' : 'No pending invoices found.'}
+                        {quotationFilter === 'with_quotation'
+                          ? (isID ? 'Tidak ada invoice tertunda dengan penawaran.' : 'No pending invoices with quotation found.')
+                          : quotationFilter === 'without_quotation'
+                          ? (isID ? 'Tidak ada invoice tertunda tanpa penawaran.' : 'No pending invoices without quotation found.')
+                          : (isID ? 'Tidak ada invoice tertunda.' : 'No pending invoices found.')}
                       </td>
                     </tr>
                   );
                 }
 
-                return pendingGroups.map(group => {
+                return filteredPendingGroups.map(group => {
                   const isGroupExpanded = expandedCompletedGroups[group.quotationId] !== false;
                   const uninvoicedJOs = group.jobOrders.filter(jo => !invoices.some(inv => String(inv.joId) === String(jo.id) || (Array.isArray(inv.consolidatedJOs) && inv.consolidatedJOs.includes(jo.id))));
                   const allInvoiced = uninvoicedJOs.length === 0;
@@ -2120,12 +2241,16 @@ const Executor = () => {
           </tbody>
         </table></div>)}
 
-        {/* Surat Jalan Modal */}
+        {/* Empty State */}
         {activeTab !== 'pending_invoices' && filteredJOs.length === 0 && (
           <div style={{ textAlign: 'center', padding: '100px 20px' }}>
             <Package size={64} color="rgba(255,255,255,0.05)" style={{ marginBottom: '20px' }} />
             <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>
-              {activeTab === 'active' ? (isID ? 'Tidak ada operasi aktif yang ditugaskan.' : 'No active operations assigned.') : (isID ? 'Tidak ada catatan selesai yang ditemukan.' : 'No completed records found.')}
+              {quotationFilter === 'with_quotation'
+                ? (isID ? 'Tidak ada pekerjaan dengan penawaran ditemukan.' : 'No jobs with quotation found.')
+                : quotationFilter === 'without_quotation'
+                ? (isID ? 'Tidak ada pekerjaan tanpa penawaran ditemukan.' : 'No direct jobs without quotation found.')
+                : (activeTab === 'active' ? (isID ? 'Tidak ada operasi aktif yang ditugaskan.' : 'No active operations assigned.') : (isID ? 'Tidak ada catatan selesai yang ditemukan.' : 'No completed records found.'))}
             </p>
           </div>
         )}

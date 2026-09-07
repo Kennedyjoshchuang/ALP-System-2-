@@ -304,6 +304,8 @@ export const AppProvider = ({ children }) => {
         const unpackedInv = originalInv ? unpackInvoiceNotes(originalInv) : null;
         return {
           ...rec,
+          date: rec.date || (unpackedInv ? (unpackedInv.date || unpackedInv.created_at) : (rec.created_at || null)),
+          created_at: rec.created_at || (unpackedInv ? unpackedInv.created_at : null),
           joId: rec.joId || (unpackedInv ? unpackedInv.joId : null),
           consolidatedJOs: (unpackedInv && unpackedInv.consolidatedJOs) ? unpackedInv.consolidatedJOs : (rec.joId ? [rec.joId] : []),
           items: unpackedInv ? (unpackedInv.items || []) : [],

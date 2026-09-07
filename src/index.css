@@ -328,6 +328,82 @@ table thead th {
   background: rgba(255, 255, 255, 0.02);
 }
 
+/* Segmented Filter Control Buttons (WCAG AAA Compliant) */
+.filter-segmented-group {
+  display: inline-flex;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.filter-segmented-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.filter-segmented-btn:hover:not(.active) {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.light-theme .filter-segmented-btn:hover:not(.active) {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* Selected state: Solid single colour with high WCAG contrast */
+.filter-segmented-btn.active {
+  background: var(--gold-base); /* Solid single color #d4af37 */
+  color: #000000;              /* Pure black: 9.98:1 contrast ratio (exceeds WCAG AAA 7:1) */
+  font-weight: 700;
+  border-color: var(--gold-base);
+}
+
+.filter-segmented-btn.active .filter-count-badge {
+  background: rgba(0, 0, 0, 0.15);
+  color: #000000;
+}
+
+.filter-count-badge {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  padding: 1px 7px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.light-theme .filter-count-badge {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text);
+}
+
+/* Light Theme Selected State: Solid single colour with high WCAG contrast */
+.light-theme .filter-segmented-btn.active {
+  background: var(--green-base); /* Solid single color #065f46 */
+  color: #ffffff;               /* Pure white: 7.72:1 contrast ratio (exceeds WCAG AAA 7:1) */
+  border-color: var(--green-base);
+}
+
+.light-theme .filter-segmented-btn.active .filter-count-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
 /* Mobile Responsive Utilities */
 .table-container {
   width: 100%;

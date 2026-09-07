@@ -181,6 +181,13 @@ const Accounting = () => {
   }, [loading, user, hasJobFinancial, hasAccountingBase, navigate, language]);
   const [expandedReportMonths, setExpandedReportMonths] = useState({});
   const [expandedOtherTxMonths, setExpandedOtherTxMonths] = useState({});
+  const [expandedCostingMonths, setExpandedCostingMonths] = useState({});
+  const [expandedBillingMonths, setExpandedBillingMonths] = useState({});
+  const [expandedPiutangOutMonths, setExpandedPiutangOutMonths] = useState({});
+  const [expandedPiutangPaidMonths, setExpandedPiutangPaidMonths] = useState({});
+  const [expandedHutangOutMonths, setExpandedHutangOutMonths] = useState({});
+  const [expandedHutangPaidMonths, setExpandedHutangPaidMonths] = useState({});
+  const [expandedReimbursementMonths, setExpandedReimbursementMonths] = useState({});
   const [receivableSubTab, setReceivableSubTab] = useState('outstanding');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [costModal, setCostModal] = useState(null); // holds the JO being costed
@@ -950,6 +957,58 @@ const Accounting = () => {
     return true;
   };
 
+  const getMonthKey = (dateStr) => {
+    if (!dateStr) return 'Unknown';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'Unknown';
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+
+  const formatMonthName = (mKey) => {
+    if (!mKey || mKey === 'Unknown') return isID ? 'Tidak Diketahui' : 'Unknown';
+    const [year, month] = mKey.split('-');
+    const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+    return date.toLocaleDateString(isID ? 'id-ID' : 'en-US', { month: 'long', year: 'numeric' });
+  };
+
+  const isMonthExpanded = (expandedMap, mKey, index, hasSearch) => {
+    if (expandedMap && expandedMap[mKey] !== undefined) return !!expandedMap[mKey];
+    if (hasSearch) return true;
+    return index === 0;
+  };
+
+  const renderExpandCollapseButtons = (setExpandedMap, monthKeys) => {
+    if (!monthKeys || monthKeys.length <= 1) return null;
+    return (
+      <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+        <button
+          type="button"
+          className="btn"
+          style={{ padding: '4px 10px', fontSize: '0.72rem', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid var(--glass-border)', cursor: 'pointer', borderRadius: '6px' }}
+          onClick={() => {
+            const next = {};
+            monthKeys.forEach(k => { next[k] = true; });
+            setExpandedMap(next);
+          }}
+        >
+          {isID ? 'Buka Semua Bulan' : 'Expand All'}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          style={{ padding: '4px 10px', fontSize: '0.72rem', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid var(--glass-border)', cursor: 'pointer', borderRadius: '6px' }}
+          onClick={() => {
+            const next = {};
+            monthKeys.forEach(k => { next[k] = false; });
+            setExpandedMap(next);
+          }}
+        >
+          {isID ? 'Tutup Semua Bulan' : 'Collapse All'}
+        </button>
+      </div>
+    );
+  };
+
   const parsePolymorphicDescription = (desc) => {
     if (!desc || typeof desc !== 'string') {
       return { type: 'expense', category: 'Lain-lain', subcategory: '', description: String(desc || '') };
@@ -1000,6 +1059,46 @@ const Accounting = () => {
   const reimbursementsList = React.useMemo(() => {
     return allParsedOtherExpenses.filter(e => e.type === 'reimbursement');
   }, [allParsedOtherExpenses]);
+
+  const filteredReimbursements = React.useMemo(() => {
+    return reimbursementsList
+      .filter(r => filterByDate(r.expenseDate || r.date))
+      .filter(r => {
+        const name = r.employeeName || '';
+        const bank = r.recipientBankName || '';
+        const desc = r.description || '';
+        const term = searchTerm.toLowerCase();
+        return name.toLowerCase().includes(term) || bank.toLowerCase().includes(term) || desc.toLowerCase().includes(term);
+      });
+  }, [reimbursementsList, startDate, endDate, searchTerm]);
+
+  const reimbursementsByMonth = React.useMemo(() => {
+    const byMonth = {};
+    filteredReimbursements.forEach(r => {
+      const rDate = r.expenseDate || r.date;
+      const mKey = getMonthKey(rDate);
+      if (!byMonth[mKey]) {
+        byMonth[mKey] = {
+          items: [],
+          totalCost: 0,
+          paidCount: 0,
+          pendingCount: 0,
+          approvedCount: 0
+        };
+      }
+      const cost = parseFloat(r.totalCost || r.amount || 0);
+      byMonth[mKey].items.push(r);
+      byMonth[mKey].totalCost += cost;
+      if (r.status === 'paid') byMonth[mKey].paidCount++;
+      else if (r.status === 'approved') byMonth[mKey].approvedCount++;
+      else byMonth[mKey].pendingCount++;
+    });
+    return byMonth;
+  }, [filteredReimbursements]);
+
+  const sortedReimbursementMonths = React.useMemo(() => {
+    return Object.keys(reimbursementsByMonth).sort((a, b) => b.localeCompare(a));
+  }, [reimbursementsByMonth]);
 
   const existingCategories = React.useMemo(() => {
     const defaultCats = ['Gaji', 'Operasional', 'Bonus', 'Sewa', 'Lain-lain'];
@@ -1519,6 +1618,33 @@ const Accounting = () => {
     return financials;
   }, [groupedPLData, poMap, costAppMap, joInvoiceMap]);
 
+  const costingByMonth = React.useMemo(() => {
+    const byMonth = {};
+    groupedPLData.forEach(group => {
+      const firstJo = group.jobOrders[0] || {};
+      const joDate = firstJo.date || firstJo.created_at;
+      const mKey = getMonthKey(joDate);
+      if (!byMonth[mKey]) {
+        byMonth[mKey] = {
+          groups: [],
+          revenue: 0,
+          cost: 0,
+          totalJOs: 0
+        };
+      }
+      const fin = plGroupFinancials[group.key] || { cost: 0, revenue: 0 };
+      byMonth[mKey].groups.push(group);
+      byMonth[mKey].revenue += (fin.revenue || 0);
+      byMonth[mKey].cost += (fin.cost || 0);
+      byMonth[mKey].totalJOs += group.jobOrders.length;
+    });
+    return byMonth;
+  }, [groupedPLData, plGroupFinancials]);
+
+  const sortedCostingMonths = React.useMemo(() => {
+    return Object.keys(costingByMonth).sort((a, b) => b.localeCompare(a));
+  }, [costingByMonth]);
+
   const vendorList = vendors || [];
 
   const addCostLine = () => setCostLines(prev => [...prev, { vendorId: '', serviceIdx: '', qty: 1, customVendorName: '', customServiceDescription: '', customPrice: '', targetItemIdx: '' }]);
@@ -1771,16 +1897,28 @@ const Accounting = () => {
     } else if (activeTab === 'piutang') {
       const source = receivableSubTab === 'outstanding' ? receivables : paidInvoices;
       dataToExport = source
-        .filter(item => filterByDate(item.date))
+        .filter(item => {
+          const originalInv = invoices.find(i => i.id === item.id || i.id === item.invoiceId);
+          const itemDate = receivableSubTab === 'outstanding'
+            ? (item.date || originalInv?.date || item.created_at || originalInv?.created_at)
+            : (item.paidDate || item.date || originalInv?.paidDate || originalInv?.date);
+          return filterByDate(itemDate);
+        })
         .filter(item => item.id.toLowerCase().includes(searchTerm.toLowerCase()) || item.customerName.toLowerCase().includes(searchTerm.toLowerCase()))
-        .map(item => ({
-          Invoice_ID: item.id,
-          Date: item.date,
-          Customer: item.customerName,
-          Amount: item.amount,
-          Balance: item.balance || 0,
-          Status: item.status
-        }));
+        .map(item => {
+          const originalInv = invoices.find(i => i.id === item.id || i.id === item.invoiceId);
+          const itemDate = receivableSubTab === 'outstanding'
+            ? (item.date || originalInv?.date || item.created_at || originalInv?.created_at)
+            : (item.paidDate || item.date || originalInv?.paidDate || originalInv?.date);
+          return {
+            Invoice_ID: item.id,
+            Date: itemDate || '-',
+            Customer: item.customerName,
+            Amount: item.amount,
+            Balance: item.balance || 0,
+            Status: item.status
+          };
+        });
       fileName = receivableSubTab === 'outstanding' ? "Accounts_Receivable_Ledger" : "Invoice_Lunas_Archive";
     } else if (activeTab === 'outstanding_summary') {
       const summary = Object.values(receivables.reduce((acc, r) => {
@@ -3343,6 +3481,38 @@ const Accounting = () => {
 
     return sortInvoices(list, invoiceSortBy);
   }, [invoices, searchTerm, filterByDate, jobOrders, invoiceSortBy]);
+
+  const issuedInvoicesByMonth = React.useMemo(() => {
+    const byMonth = {};
+    filteredIssuedInvoices.forEach(inv => {
+      const invDate = inv.date || inv.created_at;
+      const mKey = getMonthKey(invDate);
+      if (!byMonth[mKey]) {
+        byMonth[mKey] = {
+          items: [],
+          revenue: 0,
+          cost: 0,
+        };
+      }
+      const rev = parseFloat(inv.amount || inv.subtotal || 0);
+      const associated = getAssociatedJOs(inv);
+      let invCost = 0;
+      associated.forEach(jo => {
+        const manualCost = Array.isArray(jo.costs) ? jo.costs.reduce((s, c) => s + (parseFloat(c.total) || 0), 0) : 0;
+        const poCost = (purchaseOrders || []).filter(po => String(po.joId) === String(jo.id)).reduce((s, p) => s + (parseFloat(p.grandTotal) || 0), 0);
+        const costAppCost = (costAppMap[String(jo.id)] || []).filter(ca => ca.status !== 'rejected').reduce((s, ca) => s + (parseFloat(ca.amount) || 0), 0);
+        invCost += (manualCost + poCost + costAppCost);
+      });
+      byMonth[mKey].items.push(inv);
+      byMonth[mKey].revenue += rev;
+      byMonth[mKey].cost += invCost;
+    });
+    return byMonth;
+  }, [filteredIssuedInvoices, jobOrders, purchaseOrders, costAppMap]);
+
+  const sortedBillingMonths = React.useMemo(() => {
+    return Object.keys(issuedInvoicesByMonth).sort((a, b) => b.localeCompare(a));
+  }, [issuedInvoicesByMonth]);
 
   return (
     <div className="accounting-container">
@@ -5084,7 +5254,10 @@ const Accounting = () => {
         <div className="glass-card" style={{ padding:'25px' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'20px', flexWrap:'wrap', gap:'15px' }}>
             <div>
-              <h4 style={{ margin:0, display:'flex', alignItems:'center', gap:'10px' }}><DollarSign size={20} style={{color:'var(--secondary)'}}/>{isID ? 'Laba & Rugi' : 'Profit and Loss'}</h4>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+                <h4 style={{ margin:0, display:'flex', alignItems:'center', gap: '10px' }}><DollarSign size={20} style={{color:'var(--secondary)'}}/>{isID ? 'Laba & Rugi' : 'Profit and Loss'}</h4>
+                {renderExpandCollapseButtons(setExpandedCostingMonths, sortedCostingMonths)}
+              </div>
               <p style={{ color:'var(--text-muted)', fontSize:'0.85rem', marginTop:'5px', marginBottom:0 }}>{isID ? 'Semua Job Order yang telah diterbitkan dari Admin Office. Biaya hanya dapat dipilih dari Vendor List tervalidasi.' : 'All Job Orders issued from the Admin Office. Costs can only be selected from the validated Vendor List.'}</p>
             </div>
             <div style={{ display:'flex', gap:'15px', flexShrink:0 }}>
@@ -5101,31 +5274,85 @@ const Accounting = () => {
               ))}
             </div>
           </div>
-          {activeJOs.length === 0 ? (
+          {sortedCostingMonths.length === 0 ? (
             <div style={{ textAlign:'center',padding:'60px',color:'var(--text-muted)' }}>
               <DollarSign size={48} style={{ opacity:0.2,display:'block',margin:'0 auto 15px' }}/>
               <p style={{ fontWeight:'600',marginBottom:'6px' }}>{isID ? 'Belum ada Job Order diterbitkan' : 'No Job Orders issued yet'}</p>
               <p style={{ fontSize:'0.85rem' }}>{isID ? 'Buat dan dispatch Job Order dari halaman Admin Office agar muncul di sini.' : 'Create and dispatch Job Orders from the Admin Office page to make them appear here.'}</p>
             </div>
           ) : (
-            <div className="table-container"><div className="table-container"><table style={{ width:'100%',borderCollapse:'collapse',minWidth:'900px' }}>
-              <thead>
-                <tr style={{ textAlign:'left', borderBottom:'2px solid var(--gold-metallic)' }}>
-                   <th style={{padding:'12px'}}>JO Ref</th>
-                   <th style={{padding:'12px'}}>{isID ? 'Pelanggan' : 'Customer'}</th>
-                   <th style={{padding:'12px'}}>{isID ? 'Kapal / Vessel' : 'Vessel'}</th>
-                   <th style={{padding:'12px'}}>{isID ? 'No. Kontainer' : 'Container No.'}</th>
-                   <th style={{padding:'12px'}}>{isID ? 'No Invoice' : 'Inv ID'}</th>
-                   <th style={{padding:'12px'}}>{isID ? 'Tgl Invoice' : 'Inv Date'}</th>
-                   <th style={{padding:'12px'}}>Status</th>
-                   <th style={{padding:'12px', textAlign:'right'}}>{isID ? 'Pendapatan (Inv)' : 'Revenue (Inv)'}</th>
-                   <th style={{padding:'12px', textAlign:'right'}}>{isID ? 'Total Biaya' : 'Total Cost'}</th>
-                   <th style={{padding:'12px', textAlign:'right'}}>{isID ? 'Laba/Rugi' : 'Profit/Loss'}</th>
-                   <th style={{padding:'12px', textAlign:'center'}}>{isID ? 'Aksi' : 'Action'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groupedPLData.map(group => {
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              {sortedCostingMonths.map((mKey, mIdx) => {
+                const monthData = costingByMonth[mKey];
+                const isExpanded = isMonthExpanded(expandedCostingMonths, mKey, mIdx, !!searchTerm);
+                const monthName = formatMonthName(mKey);
+                const monthProfit = monthData.revenue - monthData.cost;
+
+                return (
+                  <div key={mKey} className="glass-card" style={{ border: '1px solid var(--glass-border)', borderRadius: '12px', overflow: 'hidden', background: 'rgba(255,255,255,0.01)' }}>
+                    <div
+                      onClick={() => setExpandedCostingMonths(prev => ({ ...prev, [mKey]: !isExpanded }))}
+                      style={{
+                        padding: '15px 20px',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        background: isExpanded ? 'rgba(255,255,255,0.03)' : 'transparent',
+                        transition: 'background 0.2s',
+                        gap: '15px'
+                      }}
+                      className="table-row-hover"
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', color: 'var(--secondary)' }}>
+                          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        </span>
+                        <span style={{ fontWeight: '800', fontSize: '1rem', color: 'var(--secondary)' }}>{monthName}</span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                          ({monthData.totalJOs} Job Order)
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', fontSize: '0.85rem' }}>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isID ? 'Pendapatan:' : 'Revenue:'}</span>
+                          <span style={{ fontWeight: '700', color: 'var(--success)' }}>Rp {monthData.revenue.toLocaleString('id-ID')}</span>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isID ? 'Biaya:' : 'Cost:'}</span>
+                          <span style={{ fontWeight: '700', color: 'var(--danger)' }}>Rp {monthData.cost.toLocaleString('id-ID')}</span>
+                        </div>
+                        <div style={{ borderLeft: '1px solid var(--glass-border)', paddingLeft: '20px' }}>
+                          <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isID ? 'Laba/Rugi:' : 'Profit/Loss:'}</span>
+                          <span style={{ fontWeight: '800', color: monthProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                            Rp {monthProfit.toLocaleString('id-ID')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div style={{ padding: '20px', borderTop: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.1)', overflowX: 'auto' }}>
+                        <div className="table-container">
+                          <table style={{ width:'100%',borderCollapse:'collapse',minWidth:'900px' }}>
+                            <thead>
+                              <tr style={{ textAlign:'left', borderBottom:'2px solid var(--gold-metallic)' }}>
+                                 <th style={{padding:'12px'}}>JO Ref</th>
+                                 <th style={{padding:'12px'}}>{isID ? 'Pelanggan' : 'Customer'}</th>
+                                 <th style={{padding:'12px'}}>{isID ? 'Kapal / Vessel' : 'Vessel'}</th>
+                                 <th style={{padding:'12px'}}>{isID ? 'No. Kontainer' : 'Container No.'}</th>
+                                 <th style={{padding:'12px'}}>{isID ? 'No Invoice' : 'Inv ID'}</th>
+                                 <th style={{padding:'12px'}}>{isID ? 'Tgl Invoice' : 'Inv Date'}</th>
+                                 <th style={{padding:'12px'}}>Status</th>
+                                 <th style={{padding:'12px', textAlign:'right'}}>{isID ? 'Pendapatan (Inv)' : 'Revenue (Inv)'}</th>
+                                 <th style={{padding:'12px', textAlign:'right'}}>{isID ? 'Total Biaya' : 'Total Cost'}</th>
+                                 <th style={{padding:'12px', textAlign:'right'}}>{isID ? 'Laba/Rugi' : 'Profit/Loss'}</th>
+                                 <th style={{padding:'12px', textAlign:'center'}}>{isID ? 'Aksi' : 'Action'}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {monthData.groups.map(group => {
                   const isExpanded = expandedPLGroups[group.key] === true;
                   const groupFin = plGroupFinancials[group.key] || { cost: 0, revenue: 0, profitLoss: 0 };
                   
@@ -6019,6 +6246,11 @@ const Accounting = () => {
                 })}
               </tbody>
             </table></div></div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       ) : activeTab === 'billing' ? (
@@ -6482,39 +6714,116 @@ const Accounting = () => {
 
           <div className="glass-card" style={{ padding: '25px', overflowX: 'auto' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: isIssuedCollapsed ? '0' : '20px', cursor:'pointer' }} onClick={() => setIsIssuedCollapsed(!isIssuedCollapsed)}>
-              <h4 style={{ margin:0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Receipt size={20} style={{ color: 'var(--secondary)' }} />
-                {isID ? 'Invoice yang Diterbitkan' : 'Issued Invoices'}
-              </h4>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+                <h4 style={{ margin:0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Receipt size={20} style={{ color: 'var(--secondary)' }} />
+                  {isID ? 'Invoice yang Diterbitkan' : 'Issued Invoices'}
+                </h4>
+                <div onClick={e => e.stopPropagation()}>
+                  {renderExpandCollapseButtons(setExpandedBillingMonths, sortedBillingMonths)}
+                </div>
+              </div>
               <button style={{ background:'none', border:'none', color:'var(--secondary)', cursor:'pointer' }}>
                 {isIssuedCollapsed ? <ChevronDown /> : <ChevronUp />}
               </button>
             </div>
 
             {!isIssuedCollapsed && (
-              <div className="table-container"><div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
-              <thead>
-                <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--secondary)' }}>
-                  <th style={{ padding: '15px', width: '40px' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={selectedIssued.size > 0 && selectedIssued.size === filteredIssuedInvoices.length}
-                      onChange={() => toggleAllIssued(filteredIssuedInvoices)}
-                    />
-                  </th>
-                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'ID Inv / JO / Tgl' : 'Inv ID / JO / Date'}</th>
-                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'No. Kontainer' : 'Container No.'}</th>
-                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Info Pengiriman' : 'Shipment Info'}</th>
-                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Pelanggan' : 'Customer'}</th>
-                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'right' }}>{isID ? 'Pendapatan (INV)' : 'Revenue (INV)'}</th>
-                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'right' }}>{isID ? 'Total Biaya' : 'Total Cost'}</th>
-                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'right' }}>{isID ? 'Laba/Rugi' : 'Profit/Loss'}</th>
-                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'center' }}>{isID ? 'Status & Dokumen' : 'Status & Docs'}</th>
-                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'center' }}>{isID ? 'Aksi' : 'Action'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredIssuedInvoices.map(inv => {
+              sortedBillingMonths.length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  {isID ? 'Tidak ada invoice ditemukan.' : 'No invoices found.'}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  {sortedBillingMonths.map((mKey, mIdx) => {
+                    const monthData = issuedInvoicesByMonth[mKey];
+                    const isExpanded = isMonthExpanded(expandedBillingMonths, mKey, mIdx, !!searchTerm);
+                    const monthName = formatMonthName(mKey);
+                    const monthProfit = monthData.revenue - monthData.cost;
+                    const allInMonthSelected = monthData.items.length > 0 && monthData.items.every(inv => selectedIssued.has(inv.id));
+
+                    return (
+                      <div key={mKey} className="glass-card" style={{ border: '1px solid var(--glass-border)', borderRadius: '12px', overflow: 'hidden', background: 'rgba(255,255,255,0.01)' }}>
+                        {/* Monthly Summary Header */}
+                        <div
+                          onClick={() => setExpandedBillingMonths(prev => ({ ...prev, [mKey]: !isExpanded }))}
+                          style={{
+                            padding: '15px 20px',
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                            background: isExpanded ? 'rgba(255,255,255,0.03)' : 'transparent',
+                            transition: 'background 0.2s',
+                            gap: '15px'
+                          }}
+                          className="table-row-hover"
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', color: 'var(--secondary)' }}>
+                              {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                            </span>
+                            <span style={{ fontWeight: '800', fontSize: '1rem', color: 'var(--secondary)' }}>{monthName}</span>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                              ({monthData.items.length} invoice)
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', fontSize: '0.85rem' }}>
+                            <div>
+                              <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isID ? 'Pendapatan:' : 'Revenue:'}</span>
+                              <span style={{ fontWeight: '700', color: 'var(--success)' }}>Rp {monthData.revenue.toLocaleString('id-ID')}</span>
+                            </div>
+                            <div>
+                              <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isID ? 'Biaya:' : 'Cost:'}</span>
+                              <span style={{ fontWeight: '700', color: 'var(--danger)' }}>Rp {monthData.cost.toLocaleString('id-ID')}</span>
+                            </div>
+                            <div style={{ borderLeft: '1px solid var(--glass-border)', paddingLeft: '20px' }}>
+                              <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isID ? 'Laba/Rugi:' : 'Profit/Loss:'}</span>
+                              <span style={{ fontWeight: '800', color: monthProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                Rp {monthProfit.toLocaleString('id-ID')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Monthly Table */}
+                        {isExpanded && (
+                          <div style={{ padding: '20px', borderTop: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.1)', overflowX: 'auto' }}>
+                            <div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
+                              <thead>
+                                <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--secondary)' }}>
+                                  <th style={{ padding: '15px', width: '40px' }}>
+                                    <input 
+                                      type="checkbox" 
+                                      checked={allInMonthSelected}
+                                      onChange={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedIssued(prev => {
+                                          const next = new Set(prev);
+                                          if (allInMonthSelected) {
+                                            monthData.items.forEach(inv => next.delete(inv.id));
+                                          } else {
+                                            monthData.items.forEach(inv => next.add(inv.id));
+                                          }
+                                          return next;
+                                        });
+                                      }}
+                                    />
+                                  </th>
+                                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'ID Inv / JO / Tgl' : 'Inv ID / JO / Date'}</th>
+                                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'No. Kontainer' : 'Container No.'}</th>
+                                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Info Pengiriman' : 'Shipment Info'}</th>
+                                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>{isID ? 'Pelanggan' : 'Customer'}</th>
+                                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'right' }}>{isID ? 'Pendapatan (INV)' : 'Revenue (INV)'}</th>
+                                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'right' }}>{isID ? 'Total Biaya' : 'Total Cost'}</th>
+                                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'right' }}>{isID ? 'Laba/Rugi' : 'Profit/Loss'}</th>
+                                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'center' }}>{isID ? 'Status & Dokumen' : 'Status & Docs'}</th>
+                                  <th style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'center' }}>{isID ? 'Aksi' : 'Action'}</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {monthData.items.map(inv => {
                     const linkedJO = jobOrders.find(j => String(j.id) === String(inv.joId));
                     return (
                     <tr key={inv.id} style={{ borderBottom:'1px solid var(--glass-border)' }} className="table-row-hover">
@@ -6748,15 +7057,17 @@ const Accounting = () => {
                         </div>
                       </td>
                     </tr>
-                  )})}
-                {invoices.length === 0 && (
-                  <tr>
-                    <td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>{isID ? 'Tidak ada invoice ditemukan.' : 'No invoices found.'}</td>
-                  </tr>
-                )}
+                  );
+                })}
               </tbody>
-            </table></div></div>
-            )}
+            </table></div>
+          </div>
+        )}
+      </div>
+    );
+  })}
+</div>
+))}
 
             {selectedIssued.size > 0 && !isIssuedCollapsed && (
               <div style={{ marginTop: '20px', padding: '15px', background: 'var(--info-bg)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--info)' }}>
@@ -6839,44 +7150,151 @@ const Accounting = () => {
             </div>
           )}
 
-          <div className="glass-card" style={{ padding: '25px' }}>
-            <h4 style={{ marginBottom: '20px', color: receivableSubTab === 'outstanding' ? 'var(--secondary)' : 'var(--success)' }}>
-              {receivableSubTab === 'outstanding' ? (isID ? 'Buku Besar Piutang Usaha' : 'Accounts Receivable Ledger') : (isID ? 'Arsip Invoice Lunas' : 'Settled Invoices Archive')}
-            </h4>
-            <div className="table-container"><div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--glass-border)' }}>
-                  <th style={{ padding: '15px', width: '40px' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={selectedLedger.size > 0 && selectedLedger.size === (receivableSubTab === 'outstanding' ? (receivables || []).filter(r => r.status !== 'paid') : (paidInvoices || [])).filter(item => filterByDate(item.date)).filter(item => item.id.toLowerCase().includes(searchTerm.toLowerCase()) || item.customerName.toLowerCase().includes(searchTerm.toLowerCase())).length}
-                      onChange={() => toggleAllLedger((receivableSubTab === 'outstanding' ? (receivables || []).filter(r => r.status !== 'paid') : (paidInvoices || [])).filter(item => filterByDate(item.date)).filter(item => item.id.toLowerCase().includes(searchTerm.toLowerCase()) || item.customerName.toLowerCase().includes(searchTerm.toLowerCase())))}
-                    />
-                  </th>
+          {(() => {
+            const isOutstanding = receivableSubTab === 'outstanding';
+            const outstandingReceivables = (receivables || []).filter(r => r.status !== 'paid');
+            const rawItems = isOutstanding ? outstandingReceivables : paidInvoices;
+            const filteredItems = (rawItems || [])
+              .filter(item => {
+                const originalInv = invoices.find(i => i.id === item.id || i.id === item.invoiceId);
+                const itemDate = isOutstanding 
+                  ? (item.date || originalInv?.date || item.created_at || originalInv?.created_at)
+                  : (item.paidDate || item.date || originalInv?.paidDate || originalInv?.date);
+                return filterByDate(itemDate);
+              })
+              .filter(item => {
+                const id = item.id || '';
+                const name = item.customerName || '';
+                const term = searchTerm.toLowerCase();
+                return id.toLowerCase().includes(term) || name.toLowerCase().includes(term);
+              });
+            const enrichedItems = filteredItems.map(item => {
+              if (item.date) return item;
+              const originalInv = invoices.find(i => i.id === item.id || i.id === item.invoiceId);
+              const resolvedDate = item.date || originalInv?.date || item.created_at || originalInv?.created_at || null;
+              return resolvedDate ? { ...item, date: resolvedDate } : item;
+            });
+            const sortedItems = sortInvoices(enrichedItems, invoiceSortBy);
 
-                  <th style={{ padding: '15px' }}>Invoice</th>
-                  <th style={{ padding: '15px' }}>{isID ? 'Pelanggan' : 'Customer'}</th>
-                  <th style={{ padding: '15px' }}>{isID ? 'Info Pengiriman' : 'Shipment Info'}</th>
-                  <th style={{ padding: '15px' }}>{receivableSubTab === 'outstanding' ? (isID ? 'Jumlah Piutang' : 'Outstanding Amount') : (isID ? 'Jumlah Dibayar' : 'Amount Paid')}</th>
-                  {receivableSubTab === 'lunas' && <th style={{ padding: '15px' }}>{isID ? 'Potongan Pajak' : 'Tax Ded.'}</th>}
-                  <th style={{ padding: '15px' }}>{isID ? 'Aksi' : 'Action'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(() => {
-                  const outstandingReceivables = (receivables || []).filter(r => r.status !== 'paid');
-                  const filteredItems = (receivableSubTab === 'outstanding' ? outstandingReceivables : paidInvoices)
-                    .filter(item => filterByDate(item.date))
-                    .filter(item => {
-                      const id = item.id || '';
-                      const name = item.customerName || '';
-                      const term = searchTerm.toLowerCase();
-                      return id.toLowerCase().includes(term) || name.toLowerCase().includes(term);
-                    });
-                  
-                  const sortedItems = sortInvoices(filteredItems, invoiceSortBy);
-                  
-                  return sortedItems.map(item => (
+            const piutangByMonth = {};
+            sortedItems.forEach(item => {
+              const originalInv = invoices.find(i => i.id === item.id || i.id === item.invoiceId);
+              const itemDate = isOutstanding 
+                ? (item.date || originalInv?.date || item.created_at || originalInv?.created_at)
+                : (item.paidDate || item.date || originalInv?.paidDate || originalInv?.date);
+              const mKey = getMonthKey(itemDate);
+              if (!piutangByMonth[mKey]) {
+                piutangByMonth[mKey] = {
+                  items: [],
+                  totalAmount: 0,
+                  totalTax: 0
+                };
+              }
+              piutangByMonth[mKey].items.push(item);
+              piutangByMonth[mKey].totalAmount += parseFloat(item.balance || item.amount || 0);
+              piutangByMonth[mKey].totalTax += parseFloat(item.tax_deduction || 0);
+            });
+
+            const sortedPiutangMonths = Object.keys(piutangByMonth).sort((a, b) => b.localeCompare(a));
+            const currentExpandedMonths = isOutstanding ? expandedPiutangOutMonths : expandedPiutangPaidMonths;
+            const setCurrentExpandedMonths = isOutstanding ? setExpandedPiutangOutMonths : setExpandedPiutangPaidMonths;
+
+            return (
+              <div className="glass-card" style={{ padding: '25px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+                  <h4 style={{ margin: 0, color: isOutstanding ? 'var(--secondary)' : 'var(--success)' }}>
+                    {isOutstanding ? (isID ? 'Buku Besar Piutang Usaha' : 'Accounts Receivable Ledger') : (isID ? 'Arsip Invoice Lunas' : 'Settled Invoices Archive')}
+                  </h4>
+                  {renderExpandCollapseButtons(setCurrentExpandedMonths, sortedPiutangMonths)}
+                </div>
+
+                {sortedPiutangMonths.length === 0 ? (
+                  <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    {isID ? 'Data tidak ditemukan.' : 'No records found.'}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    {sortedPiutangMonths.map((mKey, mIdx) => {
+                      const monthData = piutangByMonth[mKey];
+                      const isExpanded = isMonthExpanded(currentExpandedMonths, mKey, mIdx, !!searchTerm);
+                      const monthName = formatMonthName(mKey);
+                      const allInMonthSelected = monthData.items.length > 0 && monthData.items.every(item => selectedLedger.has(item.id));
+
+                      return (
+                        <div key={mKey} className="glass-card" style={{ border: '1px solid var(--glass-border)', borderRadius: '12px', overflow: 'hidden', background: 'rgba(255,255,255,0.01)' }}>
+                          {/* Monthly Summary Header */}
+                          <div
+                            onClick={() => setCurrentExpandedMonths(prev => ({ ...prev, [mKey]: !isExpanded }))}
+                            style={{
+                              padding: '15px 20px',
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              cursor: 'pointer',
+                              background: isExpanded ? 'rgba(255,255,255,0.03)' : 'transparent',
+                              transition: 'background 0.2s',
+                              gap: '15px'
+                            }}
+                            className="table-row-hover"
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', color: isOutstanding ? 'var(--secondary)' : 'var(--success)' }}>
+                                {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                              </span>
+                              <span style={{ fontWeight: '800', fontSize: '1rem', color: isOutstanding ? 'var(--secondary)' : 'var(--success)' }}>{monthName}</span>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                                ({monthData.items.length} invoice)
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', fontSize: '0.85rem' }}>
+                              <div>
+                                <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isOutstanding ? (isID ? 'Total Piutang:' : 'Total Outstanding:') : (isID ? 'Total Terbayar:' : 'Total Paid:')}</span>
+                                <span style={{ fontWeight: '700', color: isOutstanding ? 'var(--warning)' : 'var(--success)' }}>Rp {monthData.totalAmount.toLocaleString('id-ID')}</span>
+                              </div>
+                              {!isOutstanding && monthData.totalTax > 0 && (
+                                <div>
+                                  <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isID ? 'Potongan Pajak:' : 'Tax Ded:'}</span>
+                                  <span style={{ fontWeight: '700', color: 'var(--danger)' }}>Rp {monthData.totalTax.toLocaleString('id-ID')}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Monthly Table */}
+                          {isExpanded && (
+                            <div style={{ padding: '20px', borderTop: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.1)', overflowX: 'auto' }}>
+                              <div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                  <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--glass-border)' }}>
+                                    <th style={{ padding: '15px', width: '40px' }}>
+                                      <input 
+                                        type="checkbox" 
+                                        checked={allInMonthSelected}
+                                        onChange={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedLedger(prev => {
+                                            const next = new Set(prev);
+                                            if (allInMonthSelected) {
+                                              monthData.items.forEach(item => next.delete(item.id));
+                                            } else {
+                                              monthData.items.forEach(item => next.add(item.id));
+                                            }
+                                            return next;
+                                          });
+                                        }}
+                                      />
+                                    </th>
+                                    <th style={{ padding: '15px' }}>Invoice</th>
+                                    <th style={{ padding: '15px' }}>{isID ? 'Pelanggan' : 'Customer'}</th>
+                                    <th style={{ padding: '15px' }}>{isID ? 'Info Pengiriman' : 'Shipment Info'}</th>
+                                    <th style={{ padding: '15px' }}>{isOutstanding ? (isID ? 'Jumlah Piutang' : 'Outstanding Amount') : (isID ? 'Jumlah Dibayar' : 'Amount Paid')}</th>
+                                    {!isOutstanding && <th style={{ padding: '15px' }}>{isID ? 'Potongan Pajak' : 'Tax Ded.'}</th>}
+                                    <th style={{ padding: '15px' }}>{isID ? 'Aksi' : 'Action'}</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {monthData.items.map(item => (
                     <tr key={item.id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
                       <td style={{ padding: '15px' }}>
                         <input 
@@ -6885,7 +7303,19 @@ const Accounting = () => {
                           onChange={() => toggleLedgerSelection(item.id)}
                         />
                       </td>
-                      <td style={{ padding: '15px', color: 'var(--secondary)', fontWeight: 'bold' }}>{item.id}</td>
+                      <td style={{ padding: '15px' }}>
+                        <div style={{ color: 'var(--secondary)', fontWeight: 'bold' }}>{item.id}</div>
+                        {(() => {
+                          const originalInv = invoices.find(i => i.id === item.id || i.id === item.invoiceId);
+                          const dateVal = item.date || originalInv?.date || item.created_at || originalInv?.created_at;
+                          if (!dateVal) return null;
+                          return (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                              {new Date(dateVal).toLocaleDateString(isID ? 'id-ID' : 'en-US')}
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td style={{ padding: '15px' }}>{item.customerName}</td>
                       <td style={{ padding: '15px' }}>
                         {(() => {
@@ -7009,34 +7439,35 @@ const Accounting = () => {
                         </div>
                       </td>
                     </tr>
-                  ));
-                })()}
-
-                {((receivableSubTab === 'outstanding' ? receivables : paidInvoices).length === 0) && (
-                  <tr>
-                    <td colSpan={receivableSubTab === 'lunas' ? "6" : "5"} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>{isID ? 'Data tidak ditemukan.' : 'No records found.'}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table></div></div>
-
-            {selectedLedger.size > 0 && (
-              <div style={{ marginTop: '20px', padding: '15px', background: receivableSubTab === 'lunas' ? 'var(--success-bg)' : 'var(--secondary-bg)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: receivableSubTab === 'lunas' ? '1px solid var(--success)' : '1px solid var(--secondary)' }}>
-                <span style={{ fontWeight: '600', color:'var(--text)' }}>{selectedLedger.size} {isID ? 'Invoice Terpilih' : 'Invoices Selected'}</span>
-                {receivableSubTab === 'lunas' ? (
-                  <button className="btn" style={{ background:'var(--success)', color:'white', display:'flex', alignItems:'center', gap:'8px' }} onClick={handleBatchPrintPaidInvoices}>
-                    <ExternalLink size={16} /> {isID ? 'Lihat Sekaligus (Dokumen Lengkap)' : 'Batch View (Full Doc)'}
-                  </button>
-                ) : (
-                  <button className="btn btn-gold" onClick={handleBatchPrint} style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-                    <Download size={16} /> {isID ? 'Unduh Invoice Terpilih (Batch)' : 'Download Selected Invoices (Batch)'}
-                  </button>
-                )}
+                  ))}
+                  </tbody>
+                </table></div>
               </div>
             )}
-
           </div>
-        </div>
+        );
+      })}
+                </div>
+              )}
+
+              {selectedLedger.size > 0 && (
+                <div style={{ marginTop: '20px', padding: '15px', background: receivableSubTab === 'lunas' ? 'var(--success-bg)' : 'var(--secondary-bg)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: receivableSubTab === 'lunas' ? '1px solid var(--success)' : '1px solid var(--secondary)' }}>
+                  <span style={{ fontWeight: '600', color:'var(--text)' }}>{selectedLedger.size} {isID ? 'Invoice Terpilih' : 'Invoices Selected'}</span>
+                  {receivableSubTab === 'lunas' ? (
+                    <button className="btn" style={{ background:'var(--success)', color:'white', display:'flex', alignItems:'center', gap:'8px' }} onClick={handleBatchPrintPaidInvoices}>
+                      <ExternalLink size={16} /> {isID ? 'Lihat Sekaligus (Dokumen Lengkap)' : 'Batch View (Full Doc)'}
+                    </button>
+                  ) : (
+                    <button className="btn btn-gold" onClick={handleBatchPrint} style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                      <Download size={16} /> {isID ? 'Unduh Invoice Terpilih (Batch)' : 'Download Selected Invoices (Batch)'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </div>
       ) : activeTab === 'salary' ? (
         <div className="salary-section">
           <div className="glass-card" style={{ padding: '25px', marginBottom: '25px' }}>
@@ -7120,9 +7551,12 @@ const Accounting = () => {
       ) : activeTab === 'reimbursements' ? (
         <div style={{ animation: 'fadeIn 0.5s ease-out' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h2 style={{ margin: 0, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Receipt size={24} style={{ color: '#14b8a6' }} /> {isID ? 'Reimbursement Staff' : 'Staff Reimbursements'}
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Receipt size={24} style={{ color: '#14b8a6' }} /> {isID ? 'Reimbursement Staff' : 'Staff Reimbursements'}
+              </h2>
+              {renderExpandCollapseButtons(setExpandedReimbursementMonths, sortedReimbursementMonths)}
+            </div>
             <button
               onClick={handleNewReimbursement}
               style={{
@@ -7135,28 +7569,80 @@ const Accounting = () => {
             </button>
           </div>
 
-          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)', borderRadius: '16px', overflow: 'hidden' }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--glass-border)' }}>
-                    <th style={{ padding: '15px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{isID ? 'Tanggal' : 'Date'}</th>
-                    <th style={{ padding: '15px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{isID ? 'Nama Staff' : 'Staff Name'}</th>
-                    <th style={{ padding: '15px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{isID ? 'Total Biaya' : 'Total Cost'}</th>
-                    <th style={{ padding: '15px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{isID ? 'Penerima / Rekening' : 'Recipient / Bank'}</th>
-                    <th style={{ padding: '15px', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>{isID ? 'Status' : 'Status'}</th>
-                    <th style={{ padding: '15px', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>{isID ? 'Aksi' : 'Actions'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reimbursementsList.length === 0 ? (
-                    <tr>
-                      <td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                        {isID ? 'Belum ada data reimbursement.' : 'No reimbursements recorded yet.'}
-                      </td>
-                    </tr>
-                  ) : (
-                    reimbursementsList.map((r, i) => (
+          {sortedReimbursementMonths.length === 0 ? (
+            <div style={{ background: 'var(--card-bg)', border: '1px solid var(--glass-border)', borderRadius: '16px', padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              {isID ? 'Belum ada data reimbursement.' : 'No reimbursements recorded yet.'}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              {sortedReimbursementMonths.map((mKey, mIdx) => {
+                const monthData = reimbursementsByMonth[mKey];
+                const isExpanded = isMonthExpanded(expandedReimbursementMonths, mKey, mIdx, !!searchTerm);
+                const monthName = formatMonthName(mKey);
+
+                return (
+                  <div key={mKey} className="glass-card" style={{ border: '1px solid var(--glass-border)', borderRadius: '12px', overflow: 'hidden', background: 'rgba(255,255,255,0.01)' }}>
+                    {/* Monthly Summary Header */}
+                    <div
+                      onClick={() => setExpandedReimbursementMonths(prev => ({ ...prev, [mKey]: !isExpanded }))}
+                      style={{
+                        padding: '15px 20px',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        background: isExpanded ? 'rgba(255,255,255,0.03)' : 'transparent',
+                        transition: 'background 0.2s',
+                        gap: '15px'
+                      }}
+                      className="table-row-hover"
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', color: '#14b8a6' }}>
+                          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        </span>
+                        <span style={{ fontWeight: '800', fontSize: '1rem', color: '#14b8a6' }}>{monthName}</span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                          ({monthData.items.length} {isID ? 'pengajuan' : 'submissions'})
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', fontSize: '0.85rem' }}>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isID ? 'Total Biaya:' : 'Total Cost:'}</span>
+                          <span style={{ fontWeight: '700', color: 'var(--text)' }}>Rp {monthData.totalCost.toLocaleString('id-ID')}</span>
+                        </div>
+                        {monthData.paidCount > 0 && (
+                          <div>
+                            <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isID ? 'Dibayar:' : 'Paid:'}</span>
+                            <span style={{ fontWeight: '700', color: 'var(--success)' }}>{monthData.paidCount}</span>
+                          </div>
+                        )}
+                        {monthData.pendingCount > 0 && (
+                          <div>
+                            <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isID ? 'Menunggu:' : 'Pending:'}</span>
+                            <span style={{ fontWeight: '700', color: 'var(--warning)' }}>{monthData.pendingCount}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Monthly Table */}
+                    {isExpanded && (
+                      <div style={{ padding: '20px', borderTop: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.1)', overflowX: 'auto' }}>
+                        <div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px' }}>
+                          <thead>
+                            <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--glass-border)' }}>
+                              <th style={{ padding: '15px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{isID ? 'Tanggal' : 'Date'}</th>
+                              <th style={{ padding: '15px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{isID ? 'Nama Staff' : 'Staff Name'}</th>
+                              <th style={{ padding: '15px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{isID ? 'Total Biaya' : 'Total Cost'}</th>
+                              <th style={{ padding: '15px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{isID ? 'Penerima / Rekening' : 'Recipient / Bank'}</th>
+                              <th style={{ padding: '15px', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>{isID ? 'Status' : 'Status'}</th>
+                              <th style={{ padding: '15px', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>{isID ? 'Aksi' : 'Actions'}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {monthData.items.map((r, i) => (
                       <tr key={r.id || i} style={{ borderBottom: '1px solid var(--glass-border)', transition: 'background 0.2s' }}>
                         <td style={{ padding: '15px' }}>{new Date(r.expenseDate || r.date).toLocaleDateString(isID ? 'id-ID' : 'en-US', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                         <td style={{ padding: '15px', fontWeight: '600' }}>{r.employeeName}</td>
@@ -7238,14 +7724,19 @@ const Accounting = () => {
                           </div>
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
         </div>
-      ) : activeTab === 'other_expenses' ? (
+      );
+    })}
+  </div>
+)}
+</div>
+) : activeTab === 'other_expenses' ? (
         <div className="other-expenses-section">
           <div className="glass-card" style={{ padding: '25px', marginBottom: '25px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -7656,45 +8147,142 @@ const Accounting = () => {
             )}
           </div>
 
-          <div className="glass-card" style={{ padding: '25px' }}>
-            <h4 style={{ marginBottom: '20px', color: payableSubTab === 'outstanding' ? 'var(--warning)' : 'var(--success)' }}>
-              {payableSubTab === 'outstanding' ? (isID ? 'Buku Besar Hutang Vendor Outstanding' : 'Outstanding Vendor Payables') : (isID ? 'Arsip Hutang Vendor Lunas' : 'Settled Vendor Payables')}
-            </h4>
-            <div className="table-container"><div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--glass-border)' }}>
-                  <th style={{ padding: '15px', width: '40px' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={selectedPayables.size > 0 && selectedPayables.size === purchaseOrders.filter(po => po.status === (payableSubTab === 'outstanding' ? 'issued' : 'paid') && filterByDate(po.date) && (po.id.toLowerCase().includes(searchTerm.toLowerCase()) || po.vendorName.toLowerCase().includes(searchTerm.toLowerCase()))).length}
-                      onChange={() => toggleAllPayables(purchaseOrders.filter(po => po.status === (payableSubTab === 'outstanding' ? 'issued' : 'paid') && filterByDate(po.date) && (po.id.toLowerCase().includes(searchTerm.toLowerCase()) || po.vendorName.toLowerCase().includes(searchTerm.toLowerCase()))))}
-                    />
-                  </th>
-                  <th style={{ padding: '15px' }}>PO ID / JO</th>
-                  <th style={{ padding: '15px' }}>{isID ? 'Nama Vendor' : 'Vendor Name'}</th>
-                  <th style={{ padding: '15px' }}>{isID ? 'Tanggal' : 'Date'}</th>
-                  <th style={{ padding: '15px', textAlign: 'right' }}>{payableSubTab === 'outstanding' ? (isID ? 'Total Keseluruhan' : 'Grand Total') : (isID ? 'Nominal Dibayar' : 'Amount Paid')}</th>
-                   <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Faktur Vendor' : 'Inv Vendor'}</th>
-                   <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Pajak (PPh)' : 'Tax (PPh)'}</th>
-                   <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Bukti Bayar' : 'Payment Proof'}</th>
-                   <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Bukti Pajak' : 'Tax Proof'}</th>
-                   <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Aksi' : 'Action'}</th>
+          {(() => {
+            const isOutstanding = payableSubTab === 'outstanding';
+            const filteredPOs = purchaseOrders
+              .filter(po => po.status === (isOutstanding ? 'issued' : 'paid'))
+              .filter(po => filterByDate(isOutstanding ? po.date : (po.paidDate || po.date)))
+              .filter(po => {
+                const id = po.id || '';
+                const name = po.vendorName || '';
+                const term = searchTerm.toLowerCase();
+                return id.toLowerCase().includes(term) || name.toLowerCase().includes(term);
+              });
 
-                </tr>
-              </thead>
-              <tbody>
-                {(() => {
-                  const filteredPOs = purchaseOrders
-                    .filter(po => po.status === (payableSubTab === 'outstanding' ? 'issued' : 'paid'))
-                    .filter(po => filterByDate(po.date))
-                    .filter(po => {
-                      const id = po.id || '';
-                      const name = po.vendorName || '';
-                      const term = searchTerm.toLowerCase();
-                      return id.toLowerCase().includes(term) || name.toLowerCase().includes(term);
-                    });
-                  
-                  return filteredPOs.map(po => (
+            const hutangByMonth = {};
+            filteredPOs.forEach(po => {
+              const poDate = isOutstanding ? (po.date || po.created_at) : (po.paidDate || po.date);
+              const mKey = getMonthKey(poDate);
+              if (!hutangByMonth[mKey]) {
+                hutangByMonth[mKey] = {
+                  items: [],
+                  totalGrand: 0,
+                  totalPaid: 0,
+                  totalTax: 0
+                };
+              }
+              const grand = parseFloat(po.grandTotal || 0);
+              const tax = parseFloat(po.tax_amount || 0);
+              const paid = grand - tax;
+              hutangByMonth[mKey].items.push(po);
+              hutangByMonth[mKey].totalGrand += grand;
+              hutangByMonth[mKey].totalTax += tax;
+              hutangByMonth[mKey].totalPaid += paid;
+            });
+
+            const sortedHutangMonths = Object.keys(hutangByMonth).sort((a, b) => b.localeCompare(a));
+            const currentExpandedMonths = isOutstanding ? expandedHutangOutMonths : expandedHutangPaidMonths;
+            const setCurrentExpandedMonths = isOutstanding ? setExpandedHutangOutMonths : setExpandedHutangPaidMonths;
+
+            return (
+              <div className="glass-card" style={{ padding: '25px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+                  <h4 style={{ margin: 0, color: isOutstanding ? 'var(--warning)' : 'var(--success)' }}>
+                    {isOutstanding ? (isID ? 'Buku Besar Hutang Vendor Outstanding' : 'Outstanding Vendor Payables') : (isID ? 'Arsip Hutang Vendor Lunas' : 'Settled Vendor Payables')}
+                  </h4>
+                  {renderExpandCollapseButtons(setCurrentExpandedMonths, sortedHutangMonths)}
+                </div>
+
+                {sortedHutangMonths.length === 0 ? (
+                  <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    {isID ? 'Data tidak ditemukan.' : 'No data found.'}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    {sortedHutangMonths.map((mKey, mIdx) => {
+                      const monthData = hutangByMonth[mKey];
+                      const isExpanded = isMonthExpanded(currentExpandedMonths, mKey, mIdx, !!searchTerm);
+                      const monthName = formatMonthName(mKey);
+                      const allInMonthSelected = monthData.items.length > 0 && monthData.items.every(po => selectedPayables.has(po.id));
+
+                      return (
+                        <div key={mKey} className="glass-card" style={{ border: '1px solid var(--glass-border)', borderRadius: '12px', overflow: 'hidden', background: 'rgba(255,255,255,0.01)' }}>
+                          {/* Monthly Summary Header */}
+                          <div
+                            onClick={() => setCurrentExpandedMonths(prev => ({ ...prev, [mKey]: !isExpanded }))}
+                            style={{
+                              padding: '15px 20px',
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              cursor: 'pointer',
+                              background: isExpanded ? 'rgba(255,255,255,0.03)' : 'transparent',
+                              transition: 'background 0.2s',
+                              gap: '15px'
+                            }}
+                            className="table-row-hover"
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', color: isOutstanding ? 'var(--warning)' : 'var(--success)' }}>
+                                {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                              </span>
+                              <span style={{ fontWeight: '800', fontSize: '1rem', color: isOutstanding ? 'var(--warning)' : 'var(--success)' }}>{monthName}</span>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                                ({monthData.items.length} PO)
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', fontSize: '0.85rem' }}>
+                              <div>
+                                <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>{isOutstanding ? (isID ? 'Total Hutang:' : 'Total Payables:') : (isID ? 'Total Dibayar:' : 'Total Settled:')}</span>
+                                <span style={{ fontWeight: '700', color: isOutstanding ? 'var(--warning)' : 'var(--success)' }}>Rp {(isOutstanding ? monthData.totalGrand : monthData.totalPaid).toLocaleString('id-ID')}</span>
+                              </div>
+                              {!isOutstanding && monthData.totalTax > 0 && (
+                                <div>
+                                  <span style={{ color: 'var(--text-muted)', marginRight: '5px' }}>Total PPh:</span>
+                                  <span style={{ fontWeight: '700', color: 'var(--danger)' }}>Rp {monthData.totalTax.toLocaleString('id-ID')}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Monthly Table */}
+                          {isExpanded && (
+                            <div style={{ padding: '20px', borderTop: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.1)', overflowX: 'auto' }}>
+                              <div className="table-container"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                  <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--glass-border)' }}>
+                                    <th style={{ padding: '15px', width: '40px' }}>
+                                      <input 
+                                        type="checkbox" 
+                                        checked={allInMonthSelected}
+                                        onChange={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedPayables(prev => {
+                                            const next = new Set(prev);
+                                            if (allInMonthSelected) {
+                                              monthData.items.forEach(po => next.delete(po.id));
+                                            } else {
+                                              monthData.items.forEach(po => next.add(po.id));
+                                            }
+                                            return next;
+                                          });
+                                        }}
+                                      />
+                                    </th>
+                                    <th style={{ padding: '15px' }}>PO ID / JO</th>
+                                    <th style={{ padding: '15px' }}>{isID ? 'Nama Vendor' : 'Vendor Name'}</th>
+                                    <th style={{ padding: '15px' }}>{isID ? 'Tanggal' : 'Date'}</th>
+                                    <th style={{ padding: '15px', textAlign: 'right' }}>{isOutstanding ? (isID ? 'Total Keseluruhan' : 'Grand Total') : (isID ? 'Nominal Dibayar' : 'Amount Paid')}</th>
+                                    <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Faktur Vendor' : 'Inv Vendor'}</th>
+                                    <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Pajak (PPh)' : 'Tax (PPh)'}</th>
+                                    <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Bukti Bayar' : 'Payment Proof'}</th>
+                                    <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Bukti Pajak' : 'Tax Proof'}</th>
+                                    <th style={{ padding: '15px', textAlign: 'center' }}>{isID ? 'Aksi' : 'Action'}</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {monthData.items.map(po => (
                     <tr key={po.id} style={{ borderBottom: '1px solid var(--glass-border)' }} className="table-row-hover">
                       <td style={{ padding: '15px' }}>
                         <input 
@@ -7880,37 +8468,41 @@ const Accounting = () => {
                           </div>
                         )}
                       </td>
-
                     </tr>
-                  ));
-                })()}
-                {purchaseOrders.filter(po => po.status === (payableSubTab === 'outstanding' ? 'issued' : 'paid')).length === 0 && (
-                   <tr><td colSpan="10" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>{isID ? 'Data tidak ditemukan.' : 'No data found.'}</td></tr>
-                )}
-              </tbody>
-            </table></div></div>
-
-            {payableSubTab === 'lunas' && selectedPayables.size > 0 && (
-              <div style={{ marginTop: '20px', padding: '15px', background: 'var(--success-bg)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--success)' }}>
-                <span style={{ fontWeight: '600', color:'var(--text)' }}>{selectedPayables.size} {isID ? 'PO Terpilih' : 'PO Selected'}</span>
-                <button className="btn btn-gold" onClick={handleBatchPrintPayable} style={{ background:'var(--success)', borderColor:'var(--success)', color:'white', display:'flex', alignItems:'center', gap:'8px' }}>
-                  <ExternalLink size={16} /> {isID ? 'Lihat Sekaligus (Dokumen Lengkap)' : 'Batch View (Full Docs)'}
-                </button>
-              </div>
-            )}
-
-            {payableSubTab === 'outstanding' && selectedPayables.size > 0 && (
-              <div style={{ marginTop: '20px', padding: '15px', background: 'var(--warning-bg)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--warning)' }}>
-                <span style={{ fontWeight: '600', color:'var(--text)' }}>{selectedPayables.size} {isID ? 'PO Terpilih' : 'PO Selected'}</span>
-                <button className="btn btn-gold" onClick={handleBatchDownloadVendorInvoice} style={{ background:'var(--warning)', borderColor:'var(--warning)', color:'white', display:'flex', alignItems:'center', gap:'8px' }}>
-                  <Download size={16} /> {isID ? 'Unduh Invoice Vendor (Masal)' : 'Download Vendor Invoices (Batch)'}
-                </button>
-              </div>
-            )}
-
-          </div>
+                  ))}
+                </tbody>
+              </table></div>
+            </div>
+          )}
         </div>
-      ) : activeTab === 'detail_report' ? (
+      );
+    })}
+  </div>
+)}
+
+{payableSubTab === 'lunas' && selectedPayables.size > 0 && (
+  <div style={{ marginTop: '20px', padding: '15px', background: 'var(--success-bg)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--success)' }}>
+    <span style={{ fontWeight: '600', color:'var(--text)' }}>{selectedPayables.size} {isID ? 'PO Terpilih' : 'PO Selected'}</span>
+    <button className="btn btn-gold" onClick={handleBatchPrintPayable} style={{ background:'var(--success)', borderColor:'var(--success)', color:'white', display:'flex', alignItems:'center', gap:'8px' }}>
+      <ExternalLink size={16} /> {isID ? 'Lihat Sekaligus (Dokumen Lengkap)' : 'Batch View (Full Docs)'}
+    </button>
+  </div>
+)}
+
+{payableSubTab === 'outstanding' && selectedPayables.size > 0 && (
+  <div style={{ marginTop: '20px', padding: '15px', background: 'var(--warning-bg)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--warning)' }}>
+    <span style={{ fontWeight: '600', color:'var(--text)' }}>{selectedPayables.size} {isID ? 'PO Terpilih' : 'PO Selected'}</span>
+    <button className="btn btn-gold" onClick={handleBatchDownloadVendorInvoice} style={{ background:'var(--warning)', borderColor:'var(--warning)', color:'white', display:'flex', alignItems:'center', gap:'8px' }}>
+      <Download size={16} /> {isID ? 'Unduh Invoice Vendor (Masal)' : 'Download Vendor Invoices (Batch)'}
+    </button>
+  </div>
+)}
+
+</div>
+);
+})()}
+</div>
+) : activeTab === 'detail_report' ? (
         <div className="report-section">
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'25px' }}>
               <h3 style={{ margin:0, color:'var(--secondary)', display:'flex', alignItems:'center', gap:'10px' }}><FileSpreadsheet size={24}/> {isID ? 'Analisis Laporan Keuangan' : 'Financial Report Analysis'}</h3>
