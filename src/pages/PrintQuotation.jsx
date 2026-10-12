@@ -152,30 +152,12 @@ const PrintQuotation = ({ initialData, hideToolbar = false }) => {
         }}
       >
         {/* Header Section (Kop Surat) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', borderBottom: '3px solid #0f172a', paddingBottom: '18px', marginBottom: '28px' }}>
-          <img src="/assets/logo.png" alt="Logo" style={{ width: '105px', height: '105px', objectFit: 'contain' }} />
-          <div style={{ flex: 1 }}>
-            <h1 style={{ 
-              margin: 0, 
-              fontFamily: "'Playfair Display', Georgia, serif", 
-              fontWeight: '700', 
-              fontSize: '2.15rem', 
-              color: '#15803d', 
-              letterSpacing: '0.5px',
-              lineHeight: '1.2'
-            }}>
-              PT. ALPHA LOGISTICS PRAKARSA
-            </h1>
-            <div style={{ 
-              fontSize: '0.98rem', 
-              lineHeight: '1.5', 
-              marginTop: '6px', 
-              fontWeight: '700', 
-              color: '#475569'
-            }}>
-              Jl. Duyung Kavling III Batu Ampar, Batam – Kepulauan Riau – Indonesia
-            </div>
-          </div>
+        <div style={{ marginBottom: '24px' }}>
+          <img
+            src="/assets/kop-alp.jpg"
+            alt="PT. Alpha Logistics Prakarsa – Freight Forwarding, Stevedoring, Trucking Services, Depo Container, Shipping Agency, Document Clearance, Special Cargo Handling, Warehousing and 3PL Services – Komplek Ruko The Summer Blok B1 No. 2A"
+            style={{ display: 'block', width: '100%', height: 'auto' }}
+          />
         </div>
 
         {/* Letter Metadata and Details */}
