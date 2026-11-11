@@ -31,7 +31,7 @@ npm run build
 # 6. Restart backend via PM2
 echo "🔄 Restarting PM2 process 'ALPSystem'..."
 if pm2 describe ALPSystem > /dev/null 2>&1; then
-    pm2 restart ALPSystem
+    pm2 restart ALPSystem --update-env
 else
     pm2 start server/index.cjs --name ALPSystem
 fi
