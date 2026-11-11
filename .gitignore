@@ -33,3 +33,6 @@ dist-ssr
 *.db
 server/alp_system.db
 scratch/
+
+# WhatsApp Bot Session
+server/auth_info_baileys/

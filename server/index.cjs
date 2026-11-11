@@ -294,12 +294,16 @@ const authorize = (req, res, next) => {
 // Protect all /api endpoints except /api/login
 app.use((req, res, next) => {
   if (req.path === '/api/login') return next();
+  if (req.path.startsWith('/api/google')) return next();
+  if (req.path.startsWith('/api/bot')) return next();
   if (!req.path.startsWith('/api')) return next();
   authenticate(req, res, next);
 });
 
 app.use((req, res, next) => {
   if (req.path === '/api/login') return next();
+  if (req.path.startsWith('/api/google')) return next();
+  if (req.path.startsWith('/api/bot')) return next();
   if (!req.path.startsWith('/api')) return next();
   authorize(req, res, next);
 });
@@ -2032,6 +2036,115 @@ app.delete('/api/company-bank-accounts/:id', async (req, res) => {
   res.sendStatus(204);
 });
 
+
+// --- WHATSAPP BOT & REMINDER ENGINE ---
+const botWhatsApp = require('./bot_whatsapp.cjs');
+const botScheduler = require('./bot_scheduler.cjs');
+
+app.get('/api/bot/status', (req, res) => {
+  res.json(botWhatsApp.getBotStatus());
+});
+
+app.get('/api/bot/qr', async (req, res) => {
+  const qrData = await botWhatsApp.getLatestQR();
+  const status = botWhatsApp.getBotStatus();
+  if (status.status === 'connected') {
+    return res.send(`<!DOCTYPE html><html><head><title>ALP WhatsApp Bot</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{font-family:sans-serif;background:#030712;color:#f3f4f6;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;}.box{background:rgba(255,255,255,0.05);padding:30px;border-radius:16px;border:1px solid #10b981;max-width:400px;}</style></head><body><div class="box"><h2 style="color:#10b981;">✅ Bot Terhubung!</h2><p>WhatsApp Bot saat ini aktif sebagai: <br><code>${status.botJid || 'Connected'}</code></p></div></body></html>`);
+  }
+  if (!qrData.dataUrl) {
+    return res.send(`<!DOCTYPE html><html><head><title>ALP WhatsApp Bot</title><meta http-equiv="refresh" content="3"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{font-family:sans-serif;background:#030712;color:#f3f4f6;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;}.box{background:rgba(255,255,255,0.05);padding:30px;border-radius:16px;border:1px solid rgba(255,255,255,0.1);max-width:400px;}</style></head><body><div class="box"><h2>Menyiapkan Kode QR...</h2><p>Status: <code>${status.status}</code></p><p>Halaman akan memuat ulang otomatis...</p></div></body></html>`);
+  }
+  res.send(`<!DOCTYPE html><html><head><title>Pairing WhatsApp Bot - ALP System</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="refresh" content="15"><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#030712;color:#f3f4f6;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box;}.card{background:#111827;border:1px solid #374151;border-radius:16px;padding:32px;max-width:420px;width:100%;text-align:center;box-shadow:0 10px 25px rgba(0,0,0,0.5);}h1{font-size:1.25rem;margin-top:0;color:#d4af37;}p{font-size:0.875rem;color:#9ca3af;line-height:1.5;}.qr-wrap{background:#ffffff;padding:16px;border-radius:12px;display:inline-block;margin:20px 0;}.qr-wrap img{width:240px;height:240px;display:block;}.instructions{text-align:left;background:#1f2937;padding:14px 18px;border-radius:8px;font-size:0.8rem;color:#d1d5db;}.instructions ol{margin:0;padding-left:20px;}.instructions li{margin-bottom:6px;}</style></head><body><div class="card"><h1>📱 Tautkan WhatsApp Bot ALP</h1><p>Buka WhatsApp pada ponsel yang ingin dijadikan bot operasional:</p><div class="qr-wrap"><img src="${qrData.dataUrl}" alt="WhatsApp QR Code"/></div><div class="instructions"><ol><li>Buka WhatsApp di ponsel Anda</li><li>Buka <b>Pengaturan</b> &gt; <b>Perangkat Tertaut</b></li><li>Pilih <b>Tautkan Perangkat</b> dan arahkan kamera ke kode QR di atas</li></ol></div><p style="margin-top:15px;font-size:0.75rem;">Halaman ini memuat ulang otomatis jika QR diperbarui.</p></div></body></html>`);
+});
+
+app.post('/api/bot/send', async (req, res) => {
+  const { chatId, message } = req.body;
+  if (!chatId || !message) {
+    return res.status(400).json({ error: 'chatId and message are required' });
+  }
+  const sent = await botWhatsApp.sendWhatsAppMessage(chatId, message);
+  if (!sent) {
+    return res.status(503).json({ error: 'Failed to send WhatsApp message. Bot might be offline.' });
+  }
+  res.json({ success: true, chatId });
+});
+
+// --- GOOGLE OAUTH2 FLOW (getfamiliaradmin@gmail.com) ---
+const googleAuthService = require('./services/google_auth.cjs');
+const fs = require('fs');
+
+app.get('/api/google/oauth/url', (req, res) => {
+  try {
+    const authUrl = googleAuthService.getOAuthConsentUrl();
+    res.json({ authUrl });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/google/oauth/login', (req, res) => {
+  try {
+    const authUrl = googleAuthService.getOAuthConsentUrl();
+    res.redirect(authUrl);
+  } catch (err) {
+    res.status(400).send(`<h3>Error:</h3><p>${err.message}</p>`);
+  }
+});
+
+app.get('/api/google/oauth/callback', async (req, res) => {
+  const { code, error } = req.query;
+  if (error) {
+    return res.status(400).send(`<h3>Otorisasi Ditolak</h3><p>${error}</p>`);
+  }
+  if (!code) {
+    return res.status(400).send('<h3>Kode Otorisasi tidak ditemukan.</h3>');
+  }
+
+  try {
+    const tokens = await googleAuthService.exchangeCodeForTokens(code);
+    if (tokens.refresh_token) {
+      const envPath = path.join(__dirname, '..', '.env');
+      if (fs.existsSync(envPath)) {
+        let envContent = fs.readFileSync(envPath, 'utf8');
+        if (envContent.includes('GOOGLE_REFRESH_TOKEN=')) {
+          envContent = envContent.replace(/GOOGLE_REFRESH_TOKEN=.*/g, `GOOGLE_REFRESH_TOKEN=${tokens.refresh_token}`);
+        } else {
+          envContent += `\nGOOGLE_REFRESH_TOKEN=${tokens.refresh_token}\n`;
+        }
+        fs.writeFileSync(envPath, envContent, 'utf8');
+      }
+      process.env.GOOGLE_REFRESH_TOKEN = tokens.refresh_token;
+    }
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Google Otorisasi Sukses - ALP System</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: sans-serif; background: #030712; color: #f3f4f6; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+          .card { background: #111827; border: 1px solid #10b981; border-radius: 16px; padding: 32px; max-width: 480px; text-align: center; }
+          h2 { color: #10b981; margin-top: 0; }
+          p { color: #9ca3af; font-size: 0.95rem; line-height: 1.5; }
+          code { background: #1f2937; padding: 4px 8px; border-radius: 4px; color: #6ee7b7; word-break: break-all; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h2>✅ Google Otorisasi Berhasil!</h2>
+          <p>Akun Google Drive & Sheets berhasil dihubungkan dengan ALP Bot.</p>
+          <p>Refresh token telah tersimpan di <code>.env</code>.</p>
+          <p>Anda dapat menutup halaman ini sekarang.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    res.status(500).send(`<h3>Gagal menukar token:</h3><p>${err.message}</p>`);
+  }
+});
+
 // Serve frontend static files
 const path = require('path');
 app.use(express.static(path.join(__dirname, '../dist')));
@@ -2043,4 +2156,12 @@ app.use((req, res) => {
 
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT} (Supabase backend)`);
+
+  // Start WhatsApp bot and Reminder scheduler
+  try {
+    botWhatsApp.initWhatsAppBot(supabase);
+    botScheduler.startReminderScheduler(supabase, botWhatsApp.sendWhatsAppMessage);
+  } catch (err) {
+    console.error('Failed to start WhatsApp bot service:', err.message);
+  }
 });

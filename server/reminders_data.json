@@ -1,0 +1,20 @@
+[
+  {
+    "id": "REM-135586",
+    "chat_id": "group-test@g.us",
+    "creator_phone": "628111222333",
+    "message": "Automated Test Reminder Execution",
+    "remind_at": "2026-11-08T13:05:33.586Z",
+    "status": "sent",
+    "created_at": "2026-11-08T13:05:36.002Z"
+  },
+  {
+    "id": "REM-282450",
+    "chat_id": "120363414122590995@g.us",
+    "creator_phone": "245294306484255",
+    "message": "do a flip",
+    "remind_at": "2026-11-08T15:23:00.000Z",
+    "status": "sent",
+    "created_at": "2026-11-08T15:21:22.800Z"
+  }
+]
