@@ -11,7 +11,7 @@ const config = {
 };
 
 const localDistDir = path.join(__dirname, 'dist');
-const remoteBase = '/var/www/alpsystem';
+const remoteBase = '/var/www/ALP-System-2-';
 
 function uploadFile(sftp, localPath, remotePath) {
   return new Promise((resolve, reject) => {
