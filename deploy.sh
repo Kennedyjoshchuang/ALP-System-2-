@@ -39,8 +39,15 @@ pm2 save
 
 # 7. Health Check
 echo "🔍 Running health check..."
-sleep 3
-HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/api/bot/status || true)
+HTTP_STATUS=""
+for i in {1..10}; do
+    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5001/api/bot/status || true)
+    if [ "$HTTP_STATUS" = "200" ]; then
+        break
+    fi
+    sleep 1
+done
+
 if [ "$HTTP_STATUS" = "200" ]; then
     echo "✅ Health check passed! (HTTP 200 on /api/bot/status)"
 else
