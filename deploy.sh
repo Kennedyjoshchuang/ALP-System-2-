@@ -8,9 +8,9 @@ echo "=========================================="
 echo "🚀 ALP System - Automated Deployment"
 echo "=========================================="
 
-# 1. Clean working tree (discard local package-lock.json diffs)
+# 1. Clean working tree (discard local drifts so pull is always clean)
 echo "🧹 Checking working tree..."
-git checkout package-lock.json 2>/dev/null || true
+git checkout -- . 2>/dev/null || true
 
 # 2. Pull latest code
 echo "📥 Pulling latest code from origin/main..."
