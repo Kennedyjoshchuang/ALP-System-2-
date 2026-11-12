@@ -1,8 +1,9 @@
 const path = require('path');
 const fs = require('fs');
-const { findInvoiceInSheet } = require('./services/google_sheets.cjs');
+const { findInvoiceInSheet, findJobOrderInSheet } = require('./services/google_sheets.cjs');
 const { generateInvoicePdfBuffer } = require('./services/pdf_generator.cjs');
-const { uploadInvoicePdf } = require('./services/google_drive.cjs');
+const { uploadInvoicePdf, uploadQuotationGoogleDoc, createQuotationFromTemplate, getTemplateTerms } = require('./services/google_drive.cjs');
+const { generateQuotationHtml } = require('./services/google_docs_generator.cjs');
 
 // Path to persistent reminders JSON store (resilient across all Node environments)
 const REMINDERS_FILE = path.join(__dirname, 'reminders_data.json');
@@ -74,6 +75,40 @@ async function getNextInvoiceId(supabase, projectCode = 'ALP') {
     return `${String(nextSeq).padStart(3, '0')}${suffix}`;
   } catch (err) {
     console.error('[bot_tools] Error in getNextInvoiceId:', err.message);
+    return `001${suffix}`;
+  }
+}
+
+async function getNextQuotationId(supabase, projectCode = 'ALP') {
+  const now = new Date();
+  const year = now.getFullYear();
+  const monthRoman = ROMAN_MONTHS[now.getMonth()];
+  const suffix = `/${projectCode}-QTN/${monthRoman}/${year}`;
+
+  try {
+    const { data, error } = await supabase
+      .from('quotations')
+      .select('id')
+      .like('id', `%/${projectCode}-QTN/%/${year}`);
+
+    if (error) throw error;
+
+    let maxSeq = 0;
+    if (data && data.length > 0) {
+      for (const q of data) {
+        const parts = q.id.split('/');
+        if (parts.length >= 4) {
+          const seqNum = parseInt(parts[0], 10);
+          if (!isNaN(seqNum) && seqNum > maxSeq) {
+            maxSeq = seqNum;
+          }
+        }
+      }
+    }
+    const nextSeq = maxSeq + 1;
+    return `${String(nextSeq).padStart(3, '0')}${suffix}`;
+  } catch (err) {
+    console.error('[bot_tools] Error in getNextQuotationId:', err.message);
     return `001${suffix}`;
   }
 }
@@ -553,6 +588,105 @@ async function printInvoiceFromSheet(supabase, { invoiceNumber }) {
 }
 
 /**
+ * 6c. printQuotationFromSheet
+ * Fetches Job Order row from Google Sheets, formats preview according to official ALP quotation template, and prepares draft
+ */
+async function printQuotationFromSheet(supabase, { joNumber, pic }) {
+  try {
+    if (!joNumber) {
+      return { error: true, message: 'Nomor Job Order wajib dicantumkan (contoh: "print quotation 05003" atau "05003").' };
+    }
+
+    const sheetData = await findJobOrderInSheet(joNumber);
+    const officialQuoId = await getNextQuotationId(supabase, 'ALP');
+
+    // If PIC provided by user or found in customers DB, use it
+    let effectivePic = pic && pic !== '-' && pic !== 'Bapak/Ibu' ? pic : null;
+
+    try {
+      const { data: custData } = await supabase
+        .from('customers')
+        .select('name, pic')
+        .ilike('name', `%${sheetData.customerName}%`)
+        .limit(1);
+
+      if (custData && custData.length > 0 && custData[0].pic && !effectivePic) {
+        effectivePic = custData[0].pic;
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    const draftId = `DRAFT-Q-${Date.now().toString().slice(-4)}`;
+    const finalPic = effectivePic || 'Bapak/Ibu';
+    const termsList = await getTemplateTerms();
+    const termsFormatted = termsList.map(t => `• ${t.replace(/^[*•\-]\s*/, '')}`).join('\n');
+
+    const draftData = {
+      type: 'sheet_quotation',
+      draftId,
+      quotationId: officialQuoId,
+      ...sheetData,
+      pic: finalPic,
+      attn: `${sheetData.customerName} (${finalPic})`,
+      terms: termsList,
+      createdAt: Date.now()
+    };
+
+    pendingDrafts.set(draftId, draftData);
+
+    const preview = `📋 *PREVIEW QUOTATION DARI GOOGLE SHEET (${draftId})*\n\n` +
+      `*No. Quotation:* ${officialQuoId}\n` +
+      `*Tanggal:* ${sheetData.dateFormatted}\n` +
+      `*Customer:* ${sheetData.customerName}\n` +
+      `*Attn (PIC):* ${finalPic}` + (!effectivePic ? ` _(Default Bapak/Ibu. Ketik "PIC: [Nama]" jika ingin mengisi nama PIC)_\n` : `\n`) +
+      `*Subject:* ${sheetData.subject}\n` +
+      (sheetData.joId ? `*Referensi JO:* ${sheetData.joId}\n` : '') +
+      `\n*Rincian Tarif:*\n` +
+      `• *Rute:* ${sheetData.tableRoute}\n` +
+      `• *Harga/Unit:* *${formatIDR(sheetData.unitRate)}*\n\n` +
+      `*Syarat & Ketentuan:*\n` +
+      `${termsFormatted}\n\n` +
+      `Ketik *Konfirmasi ${draftId}* untuk membuat Google Doc di folder Google Drive bulanan, atau ketik *Batal ${draftId}* untuk membatalkan.`;
+
+    return { draftId, preview, data: draftData };
+  } catch (err) {
+    return { error: true, message: `Gagal mengambil data quotation dari Google Sheet: ${err.message}` };
+  }
+}
+
+/**
+ * Update PIC on an active quotation draft
+ */
+async function setDraftPic(supabase, { draftId, pic }) {
+  let targetDraft = null;
+  let actualDraftId = draftId;
+
+  if (!draftId) {
+    const entries = Array.from(pendingDrafts.entries());
+    if (entries.length > 0) {
+      entries.sort((a, b) => b[1].createdAt - a[1].createdAt);
+      [actualDraftId, targetDraft] = entries[0];
+    }
+  } else {
+    targetDraft = pendingDrafts.get(draftId) || pendingDrafts.get(draftId.toUpperCase());
+    if (targetDraft) actualDraftId = targetDraft.draftId;
+  }
+
+  if (!targetDraft || targetDraft.type !== 'sheet_quotation') {
+    return { error: true, message: `Draft quotation tidak ditemukan atau sudah kadaluarsa.` };
+  }
+
+  targetDraft.pic = pic;
+  targetDraft.attn = `${targetDraft.customerName} (${pic})`;
+
+  return {
+    success: true,
+    message: `✅ PIC untuk *${actualDraftId}* diperbarui menjadi: *${pic}*.\nKetik *Konfirmasi ${actualDraftId}* untuk memproses Google Doc.`
+  };
+}
+
+/**
  * 7. confirmDraft
  */
 async function confirmDraft(supabase, { draftId, action = 'confirm' }) {
@@ -703,6 +837,64 @@ async function confirmDraft(supabase, { draftId, action = 'confirm' }) {
       };
     }
 
+    if (targetDraft.type === 'sheet_quotation') {
+      let docResult = null;
+      let docUrl = null;
+      let docError = null;
+
+      // Create quotation Google Doc by copying and editing the official Google Drive template
+      try {
+        docResult = await createQuotationFromTemplate(targetDraft);
+        docUrl = docResult.editUrl || docResult.webViewLink;
+      } catch (dErr) {
+        console.warn('[bot_tools] Google Drive quotation from template failed:', dErr.message);
+        docError = dErr.message;
+      }
+
+      // 3. Upsert into Supabase quotations table
+      try {
+        await supabase.from('quotations').upsert({
+          id: targetDraft.quotationId,
+          customerName: targetDraft.customerName,
+          pic: targetDraft.pic,
+          total: targetDraft.unitRate || targetDraft.totalAmount,
+          date: targetDraft.dateFormatted,
+          status: 'issued',
+          generalNotes: docUrl ? `Google Doc: ${docUrl}` : (docError ? `Drive Error: ${docError}` : null),
+          items: [
+            {
+              id: '1',
+              description: targetDraft.tableRoute,
+              qty: targetDraft.qty || 1,
+              unitPrice: targetDraft.unitRate,
+              total: targetDraft.totalAmount
+            }
+          ]
+        });
+      } catch (dbErr) {
+        console.warn('[bot_tools] Failed to upsert into Supabase quotations:', dbErr.message);
+      }
+
+      pendingDrafts.delete(actualDraftId);
+
+      const successMsg = `✅ *Quotation Berhasil Diterbitkan!*\n` +
+        `• No. Quotation: *${targetDraft.quotationId}*\n` +
+        `• Customer: *${targetDraft.customerName}*\n` +
+        `• PIC (Attn): *${targetDraft.pic}*\n` +
+        `• Rute / Unit: *${targetDraft.tableRoute}*\n` +
+        `• Tarif: *${formatIDR(targetDraft.unitRate)}*\n` +
+        (docUrl ? `• 📄 *Link Google Doc:* ${docUrl}\n` : (docError ? `⚠️ _Google Drive belum terhubung (${docError})_\n` : '')) +
+        `\n_File Google Doc resmi telah tersimpan di folder Google Drive bulanan dan dapat diedit langsung melalui tautan di atas._`;
+
+      return {
+        success: true,
+        type: 'sheet_quotation',
+        id: targetDraft.quotationId,
+        docUrl,
+        message: successMsg
+      };
+    }
+
     return { error: true, message: 'Tipe draft tidak dikenal.' };
   } catch (err) {
     return { error: true, message: `Gagal memproses konfirmasi draft: ${err.message}` };
@@ -818,9 +1010,12 @@ module.exports = {
   draftQuotation,
   draftInvoice,
   printInvoiceFromSheet,
+  printQuotationFromSheet,
+  setDraftPic,
   confirmDraft,
   createReminder,
   getDueReminders,
   markReminderSent,
+  getNextQuotationId,
   formatIDR
 };

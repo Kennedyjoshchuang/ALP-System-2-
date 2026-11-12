@@ -306,8 +306,176 @@ async function findInvoiceInSheet(invoiceQuery, spreadsheetId = (process.env.GOO
   };
 }
 
+/**
+ * Searches the Google Sheet for a matching Job Order (e.g. "05003", "JO.2026.05003", or customer name)
+ */
+async function findJobOrderInSheet(joQuery, spreadsheetId = (process.env.GOOGLE_SPREADSHEET_ID || DEFAULT_SHEET_ID)) {
+  if (!joQuery) {
+    throw new Error('Nomor Job Order wajib dicantumkan (contoh: "print quotation 05003" atau "JO.2026.05003").');
+  }
+
+  const queryClean = String(joQuery).trim().toLowerCase().replace(/^jo[.\s-]*/i, '');
+  const rows = await fetchSheetData(spreadsheetId);
+
+  // Column 1 is "NO. ORDER" (e.g. "JO.2026.05003")
+  const COL_JO_NO = 1;
+
+  let targetRowIndex = -1;
+  let matchedJoId = '';
+
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const joCell = row[COL_JO_NO] ? String(row[COL_JO_NO]).trim() : '';
+    if (!joCell) continue;
+
+    const lowerJo = joCell.toLowerCase();
+
+    // 1. Exact match e.g. "jo.2026.05003"
+    if (lowerJo === queryClean || lowerJo === `jo.${queryClean}` || lowerJo === `jo.2026.${queryClean}`) {
+      targetRowIndex = r;
+      matchedJoId = joCell;
+      break;
+    }
+
+    // 2. Suffix match e.g. query "05003" matches "JO.2026.05003"
+    if (lowerJo.endsWith(queryClean) || lowerJo.endsWith('.' + queryClean)) {
+      targetRowIndex = r;
+      matchedJoId = joCell;
+      break;
+    }
+
+    // 3. Substring match
+    if (lowerJo.includes(queryClean)) {
+      targetRowIndex = r;
+      matchedJoId = joCell;
+      break;
+    }
+  }
+
+  // If not matched by JO column, try matching by Customer Name or description in column 4
+  if (targetRowIndex === -1) {
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r];
+      const desc = row[4] ? String(row[4]).toLowerCase() : '';
+      if (desc.includes(queryClean)) {
+        targetRowIndex = r;
+        matchedJoId = row[COL_JO_NO] ? String(row[COL_JO_NO]).trim() : `JO-${queryClean}`;
+        break;
+      }
+    }
+  }
+
+  if (targetRowIndex === -1) {
+    throw new Error(`Data Job Order dengan referensi "${joQuery}" tidak ditemukan pada Google Sheet.`);
+  }
+
+  // Find start row of JO and search downwards for SALES row
+  const startRow = rows[targetRowIndex];
+  let joId = matchedJoId || (startRow[COL_JO_NO] ? String(startRow[COL_JO_NO]).trim() : '');
+  let vesselName = startRow[3] ? String(startRow[3]).trim() : '';
+  let fullDescription = startRow[4] ? String(startRow[4]).trim() : '';
+  let stuffingDate = startRow[2] ? String(startRow[2]).trim() : '';
+
+  // Look for sales amount in this row or subsequent rows of the same JO
+  let salesRow = startRow;
+  for (let r = targetRowIndex; r < Math.min(rows.length, targetRowIndex + 15); r++) {
+    const curRow = rows[r];
+    if (r > targetRowIndex && curRow[COL_JO_NO] && String(curRow[COL_JO_NO]).trim().startsWith('JO.')) {
+      break;
+    }
+    if (curRow[4] && !fullDescription) {
+      fullDescription = String(curRow[4]).trim();
+    }
+    const potentialSales = cleanNumber(curRow[9]);
+    if (potentialSales > 0) {
+      salesRow = curRow;
+      break;
+    }
+  }
+
+  // Extract Customer Name from description block
+  let customerName = 'PT. Tanindo Sentosa'; // fallback if not parsed
+  const custMatch = fullDescription.match(/CUSTOMER\s*:\s*([^\r\n]+)/i) ||
+                    fullDescription.match(/CNSGNEE\s*:\s*([^\r\n]+)/i) ||
+                    fullDescription.match(/CONSIGNEE\s*:\s*([^\r\n]+)/i) ||
+                    fullDescription.match(/SHIPPER\s*:\s*([^\r\n]+)/i);
+
+  if (custMatch && custMatch[1]) {
+    customerName = custMatch[1].trim();
+  }
+
+  // Extract Route
+  const descLines = fullDescription.split('\n').map(l => l.trim()).filter(Boolean);
+  let route = 'Jakarta-Batam';
+  for (const line of descLines) {
+    const upper = line.toUpperCase();
+    if (upper.includes('JAKARTA') && upper.includes('BATAM')) {
+      const match = line.match(/(?:JAKARTA\s*[-–]\s*BATAM|BATAM\s*[-–]\s*JAKARTA)/i);
+      if (match) {
+        route = match[0].replace(/\s+/g, '').replace('–', '-');
+      }
+      break;
+    } else if (line.includes('-') && !line.includes(':') && (upper.includes('SURABAYA') || upper.includes('MEDAN') || upper.includes('SINGAPORE'))) {
+      route = line;
+      break;
+    }
+  }
+
+  // Extract Size / Container Type
+  const rawQty = salesRow[7];
+  const rawSize = salesRow[8];
+  const rawSales = salesRow[9];
+
+  const qty = parseQuantity(rawQty);
+  let sizeStr = (rawSize ? String(rawSize).trim() : '20ft').toUpperCase();
+  let containerType = 'Dry Container 20ft';
+
+  if (sizeStr.includes('40') || sizeStr.includes('40FT') || sizeStr.includes("40'")) {
+    containerType = 'Dry Container 40ft';
+  } else if (sizeStr.includes('20') || sizeStr.includes('20FT') || sizeStr.includes("20'")) {
+    containerType = 'Dry Container 20ft';
+  } else if (sizeStr.includes('LCL') || sizeStr.includes('CBM') || sizeStr.includes('M3')) {
+    containerType = 'LCL Cargo';
+  } else if (sizeStr) {
+    containerType = sizeStr;
+  }
+
+  const totalAmount = cleanNumber(rawSales);
+  const unitRate = qty > 0 ? Math.round(totalAmount / qty) : totalAmount;
+
+  // Formatted Route & Unit description for the Tarif table e.g. "Jakarta-Batam Dry Container 20ft"
+  const tableRoute = `${route} ${containerType}`.trim();
+  const subject = `Penawaran Pengiriman ${containerType} ${route}`.trim();
+
+  // Date formatted DD/MM/YYYY
+  const now = new Date();
+  const dateFormatted = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+
+  return {
+    joId: matchedJoId || joId,
+    customerName,
+    route,
+    containerType,
+    tableRoute,
+    subject,
+    qty,
+    unitRate,
+    totalAmount,
+    dateFormatted,
+    stuffingDate,
+    vesselName,
+    fullDescription,
+    raw: {
+      rawSales,
+      rawQty,
+      rawSize
+    }
+  };
+}
+
 module.exports = {
   findInvoiceInSheet,
+  findJobOrderInSheet,
   fetchSheetData,
   DEFAULT_SHEET_ID
 };

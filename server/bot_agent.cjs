@@ -141,6 +141,36 @@ const toolDeclarations = [
     }
   },
   {
+    name: 'printQuotationFromSheet',
+    description: 'Cari data Job Order di Google Sheets berdasarkan nomor JO (contoh: "05003", "JO.2026.05003", atau nama customer) dan buatkan draft preview penawaran harga (Quotation) resmi ALP untuk dibuatkan Google Doc di Google Drive.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        joNumber: {
+          type: 'STRING',
+          description: 'Nomor Job Order, nomor referensi JO di Google Sheets, contoh: "05003", "JO.2026.05003", atau nama customer.'
+        },
+        pic: {
+          type: 'STRING',
+          description: 'Nama PIC customer (contoh: "Bu Wiwi / Pak Tedy"). Jika tidak disertakan, sistem default ke "Bapak/Ibu".'
+        }
+      },
+      required: ['joNumber']
+    }
+  },
+  {
+    name: 'setDraftPic',
+    description: 'Perbarui nama PIC pada draft quotation yang sedang aktif sebelum konfirmasi.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        pic: { type: 'STRING', description: 'Nama PIC customer yang baru' },
+        draftId: { type: 'STRING', description: 'ID draft quotation (opsional, jika kosong menggunakan draft terakhir)' }
+      },
+      required: ['pic']
+    }
+  },
+  {
     name: 'confirmDraft',
     description: 'Eksekusi konfirmasi atau pembatalan draft Quotation atau Invoice setelah user melihat preview dan setuju.',
     parameters: {
@@ -198,7 +228,8 @@ TUGAS OPERASIONAL:
 3. Cek total expected sales dari kontrak/quotation aktif.
 4. Input Quotation / Invoice: Selalu panggil 'draftQuotation' atau 'draftInvoice' terlebih dahulu untuk menampilkan preview. Hanya panggil 'confirmDraft' setelah user mengonfirmasi ("konfirmasi", "ok", "confirm").
 5. Cetak Invoice dari Google Sheets: Jika staf meminta mencetak invoice berdasarkan nomor (contoh: "print invoice 125", "cetak invoice 101"), panggil 'printInvoiceFromSheet' untuk mengambil data dari Google Sheets dan menampilkan preview draft resmi.
-6. Pengingat: Panggil 'createReminder' jika diminta mengingatkan jadwal.`;
+6. Buat / Cetak Quotation dari Google Sheets: Jika staf meminta membuat quotation berdasarkan nomor Job Order (contoh: "print quotation 05003", "buat quotation 05003", "cetak quotation JO.2026.05003"), panggil 'printQuotationFromSheet' untuk mengambil data dari Google Sheets dan menampilkan preview penawaran resmi ALP. Tanyakan atau perbarui PIC jika diinginkan (default ke "Bapak/Ibu").
+7. Pengingat: Panggil 'createReminder' jika diminta mengingatkan jadwal.`;
 }
 
 // Model fallback cascade: defaults to gemini-3.5-flash-lite, fallback to gemini-3.1-flash-lite
@@ -225,6 +256,23 @@ async function processUserMessage(supabase, chatId, userPhone, userText) {
     const invNum = printMatch[1];
     const res = await botTools.printInvoiceFromSheet(supabase, { invoiceNumber: invNum });
     return res.preview || res.message;
+  }
+
+  // Quick shortcut for printing quotation from Google Sheets (e.g. "print quotation 05003" or "buat quotation 05003")
+  const quoteMatch = trimmed.match(/^(?:print|cetak|buatkan|buat)\s+quotation\s+([a-z0-9/._-]+)(?:\s+(?:pic|attn)\s+(.+))?/i);
+  if (quoteMatch) {
+    const joNum = quoteMatch[1];
+    const pic = quoteMatch[2] ? quoteMatch[2].trim() : null;
+    const res = await botTools.printQuotationFromSheet(supabase, { joNumber: joNum, pic });
+    return res.preview || res.message;
+  }
+
+  // Quick shortcut for updating PIC on active quotation draft: e.g. "pic: Bu Wiwi" or "pic Bu Wiwi / Pak Tedy"
+  const picMatch = trimmed.match(/^pic[:\s]+(.+)/i);
+  if (picMatch) {
+    const picName = picMatch[1].trim();
+    const res = await botTools.setDraftPic(supabase, { pic: picName });
+    return res.message;
   }
 
   if (trimmed === 'konfirmasi' || trimmed === 'confirm' || trimmed.startsWith('konfirmasi ') || trimmed.startsWith('confirm ')) {
@@ -288,6 +336,12 @@ async function processUserMessage(supabase, chatId, userPhone, userText) {
         } else if (functionName === 'printInvoiceFromSheet') {
           toolOutput = await botTools.printInvoiceFromSheet(supabase, functionArgs);
           replyText = toolOutput.preview || toolOutput.message;
+        } else if (functionName === 'printQuotationFromSheet') {
+          toolOutput = await botTools.printQuotationFromSheet(supabase, functionArgs);
+          replyText = toolOutput.preview || toolOutput.message;
+        } else if (functionName === 'setDraftPic') {
+          toolOutput = await botTools.setDraftPic(supabase, functionArgs);
+          replyText = toolOutput.message;
         } else if (functionName === 'confirmDraft') {
           toolOutput = await botTools.confirmDraft(supabase, functionArgs);
           if (toolOutput.pdfBuffer) {
